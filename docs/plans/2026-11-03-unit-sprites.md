@@ -33,7 +33,7 @@ regenerated and visually inspected before the render task is ticked.
 
 ## Tasks
 
-- [ ] 1. Add the sprite frame table - files: `index.html` (section 3, after `KINDS`),
+- [x] 1. Add the sprite frame table - files: `index.html` (section 3, after `KINDS`),
       `AGENTS.md` - change: `SPRITES` table mapping `villager|militia` x `0|1` to
       `{sx, sy, sw, sh, dw, dh}` 24x24 cells + `spriteFor(kind, team)` resolver;
       AGENTS.md line allowing exactly one image, `assets/sprites.png` - proved by: new

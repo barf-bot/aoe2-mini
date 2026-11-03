@@ -165,6 +165,29 @@ check(AoE2.popUsed(Game, 0) === 4, 'pop: 4 of 5 used', String(AoE2.popUsed(Game,
 const startRes = JSON.stringify(Game.res[0]);
 check(Game.res[0].wood === 200 && Game.res[0].food === 200, 'roster: starting stock 200 food / 200 wood', startRes);
 
+/* ---- 5b. sprite frame table ----------------------------------------- */
+// The atlas layout is data, not code: one sheet, one cell per kind x team.
+// Adding a unit kind without giving it a cell must fail here (the archer is
+// on the roadmap exactly so this check fires when it lands).
+const sheet = AoE2.SPRITE_SHEET || {};
+let spriteErr = '';
+const rects = new Set();
+outer:
+for (const kind of Object.keys(AoE2.KINDS)) {
+  for (let team = 0; team < AoE2.TEAM.length; team++) {
+    const f = typeof AoE2.spriteFor === 'function' ? AoE2.spriteFor(kind, team) : null;
+    const okCell = !!f && f.sx >= 0 && f.sy >= 0 && f.sw > 0 && f.sh > 0 &&
+      f.dw > 0 && f.dh > 0 && f.sx + f.sw <= sheet.w && f.sy + f.sh <= sheet.h;
+    if (!okCell) { spriteErr = kind + '/' + AoE2.TEAM[team].name; break outer; }
+    rects.add(f.sx + ',' + f.sy + ' ' + f.sw + 'x' + f.sh);
+  }
+}
+const pairs = Object.keys(AoE2.KINDS).length * AoE2.TEAM.length;
+if (!spriteErr && rects.size !== pairs) spriteErr = 'overlapping/duplicate cells';
+check(!spriteErr, 'sprites: frame table covers every unit kind x team',
+  spriteErr ? 'bad cell: ' + spriteErr
+    : pairs + ' cells inside the ' + sheet.w + 'x' + sheet.h + ' sheet');
+
 /* ---- 6. simulate 30s: economy + movement invariants ----------------- */
 const DT = 1 / 30;
 const step = (n) => { for (let i = 0; i < n; i++) AoE2.stepGame(Game, DT); };

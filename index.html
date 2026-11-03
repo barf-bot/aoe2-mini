@@ -121,6 +121,29 @@ const KINDS = {
               cost:{food:60, gold:20}, time:6, buildable:false },
 };
 
+/* Sprite atlas v1 -- every unit x team frame lives in ONE image,
+ * assets/sprites.png. tools/gen-atlas.js renders this table into that sheet, so
+ * the art and the code cannot drift: sx/sy/sw/sh = the cell inside the sheet,
+ * dw/dh = the size the cell is drawn on screen. Cells are ordered like TEAM
+ * (index 0 = Blue, 1 = Red), left to right. New unit kinds must add a cell or
+ * the `sprites: frame table covers every unit kind x team` check fails.
+ */
+const SPRITE_SHEET = { w: 96, h: 24 };
+const SPRITES = {
+  villager: [{ sx: 0,  sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },   // Blue
+             { sx: 24, sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 }],  // Red
+  militia:  [{ sx: 48, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 },   // Blue
+             { sx: 72, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 }],  // Red
+};
+
+/** The atlas cell for (kind, team), or null when that unit has no art yet. */
+function spriteFor(kind, team) {
+  const cells = SPRITES[kind];
+  if (!Array.isArray(cells)) return null;
+  const c = cells[team];
+  return (c && typeof c.sx === 'number' && typeof c.sw === 'number') ? c : null;
+}
+
 const BLD = {
   town_center: { label:'Town Center', hp:1800, w:3, h:3, cost:{wood:275},
                  time:25, pop:5, trains:['villager'] },
@@ -1448,6 +1471,7 @@ function stepGame(Game, dt) {
 
 const AoE2 = {
   CFG, KINDS, BLD, AGES, T, PAL, TEAM, RES_OF_TILE,
+  SPRITE_SHEET, SPRITES, spriteFor,
   makeWorld, findSite, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, createState, boot, stepGame, stepSim, renderFrame,
   build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
