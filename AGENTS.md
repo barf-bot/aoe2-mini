@@ -34,7 +34,7 @@ is proven too — commit the regenerated `preview.png` when visuals change.
 The game exports its internals for exactly this reason:
 
 ```js
-if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;  // index.html:1448
+if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;  // index.html:1457
 ```
 
 If you add a new mechanic, add the check that proves it. Fix the test *and* the code with
