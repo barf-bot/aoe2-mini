@@ -24,6 +24,19 @@ no framework, no assets to download. Open `index.html` and play.
 - Straight-line movement with a walkability check — no A\* pathfinding around water yet
 - One simple AI opponent, no lobby/multiplayer
 
+## Docs
+
+| File | What's in it |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | rules for working on the repo (single-file constraint, verification gate, editing rule) |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | file map with line ranges, the `Game` shape, sim/render/input models |
+| [`docs/GAME_RULES.md`](docs/GAME_RULES.md) | the implemented ruleset — every stat, cost and rule, with line refs |
+| [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) | naming, formatting, the feature recipe, anti-rules |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | prioritized next work, each with an exit condition |
+| [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | dated history of what shipped and what was fixed |
+
+Start with `AGENTS.md` if you're an agent picking the repo up cold.
+
 ## Tools in this repo
 
 | File | Purpose |
