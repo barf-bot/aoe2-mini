@@ -7,14 +7,14 @@ current `main`.
 
 | § | Section | Lines | Contents |
 |---|---|---|---|
-| 1 | config | 99-162 | `CFG`, `KINDS`, `BLD`, `AGES`, `T`, `PAL`, `TEAM`, `RES_OF_TILE`, `CARRY_COLOR` — every tunable number |
-| 2 | world / map | 163-313 | seeded generation (`mulberry32`, `hash2`, `makeWorld`), site search, resource tiles and sources |
-| 3 | entities | 314-421 | `makeUnit`, `makeBuilding`, `rebuildBlocks`, `workPos` |
-| 4 | simulation | 422-809 | `stepSim`/`updateUnit` (the order state machine), movement, economy, orders, `build`, `train`, `upgradeAge`; sub-blocks `economy helpers` (719), `enemy AI` (751), `toast` (798) — **pure logic, no DOM** |
-| 5 | render | 810-1137 | `beginCanvas`, world/building/unit drawing, ghost, drag box, minimap, HUD + command bar HTML |
-| 6 | input | 1138-1283 | picking, mouse, keyboard, delegated command-bar clicks |
-| 7 | boot | 1284-1446 | canvas sizing, `createState`, `resetGame`, `boot`, the rAF loop |
-| — | public surface | 1447-1464 | the `AoE2` export object + `module.exports` / `window.Game` wiring |
+| 1 | config | 99-185 | `CFG`, `KINDS`, `SPRITE_SHEET`/`SPRITES`/`spriteFor`, `BLD`, `AGES`, `T`, `PAL`, `TEAM`, `RES_OF_TILE`, `CARRY_COLOR` — every tunable number |
+| 2 | world / map | 186-336 | seeded generation (`mulberry32`, `hash2`, `makeWorld`), site search, resource tiles and sources |
+| 3 | entities | 337-455 | `setAtlas`, `sourceFromTile`/`sourceFromFarm`, `workSpot`, `makeUnit`, `makeBuilding`, `rebuildBlocks`, `workPos` |
+| 4 | simulation | 456-847 | `stepSim`/`updateUnit` (the order state machine), movement, economy, orders, `build`, `train`, `upgradeAge`; sub-blocks `economy helpers` (757), `enemy AI` (789), `toast` (836) — **pure logic, no DOM** |
+| 5 | render | 848-1188 | `beginCanvas`, world/building/unit drawing, ghost, drag box, minimap, HUD + command bar HTML |
+| 6 | input | 1189-1334 | picking, mouse, keyboard, delegated command-bar clicks |
+| 7 | boot | 1335-1508 | canvas sizing, `createState`, `resetGame`, `loadAtlas`, `boot`, the rAF loop |
+| — | public surface | 1509-1524 | the `AoE2` export banner + object, `module.exports` / `window.Game` wiring |
 
 ## The `Game` object
 
@@ -22,10 +22,15 @@ Everything mutable lives on one object, created by `createState()` and passed in
 function — no hidden globals, which is what makes the logic testable from node:
 
 ```
-Game = { world, units[], buildings[], blocks(Map buildingId -> tiles), res[2], age,
-         ageBonus, cam{x,y}, keys, mouse, drag, selection[], selectedBuilding, groups{},
-         placing, started, wave, time, frame, dom{...}, view, minimapCache }
+Game = { world, units[], buildings[], blocks(Map buildingId -> tiles), sprites{atlas},
+         res[2], age, ageBonus, cam{x,y}, keys, mouse, drag, selection[],
+         selectedBuilding, groups{}, placing, started, wave, time, frame, dom{...}, view,
+         minimapCache }
 ```
+
+`Game.sprites.atlas` is the one place the unit atlas is attached (`setAtlas`,
+`index.html:343`): `loadAtlas` fills it in the browser and the harnesses inject an image
+there, so the renderer never has to wonder where the sheet came from.
 
 Coordinate systems: **tile** coords (`tx`,`ty`) for the world grid, **world pixels**
 (`x = tx * CFG.TILE`), **screen pixels** (`sx`) via `toWorld(e)` / camera offset. Terrain
@@ -41,7 +46,7 @@ type lookup is a flat array index (`ty * world.w + tx`).
   behaviour is deterministic given the same seed (`CFG.SEED = 1337`).
 - Dead units are pruned out of `Game.units`; buildings persist.
 
-### Unit order state machine (`updateUnit`, index.html:450)
+### Unit order state machine (`updateUnit`, index.html:484)
 
 `idle` → `move` → `harvest` → `go_deposit` → (re-acquire source via `nextSource`) …
 plus `build` (works on a site until `built >= 1`) and `attack` (chase to
@@ -49,22 +54,33 @@ plus `build` (works on a site until `built >= 1`) and `attack` (chase to
 `CFG.CARRY_MAX`; the carried resource is recorded in `u.carryRes` so `deposit()` credits
 the right stockpile — that field being unset was a real bug (deposits silently vanished).
 
+Every unit also carries its rendering state: `u.face` (`+1`/`-1`) and `u.anim` (seconds
+spent walking). Both are set by `moveUnit` (`index.html:560`) and nothing else, so an
+idle unit's pose stays frozen instead of animating on the spot.
+
 ### Combat
 
 Damage comes from `KINDS[kind].atk`; ages scale it through `Game.ageBonus` (set to the age
-index on upgrade, `index.html:715`) — 1× at Dark Age, so 6 militia swings (6×11) kill a
+index on upgrade, `index.html:747`) — 1× at Dark Age, so 6 militia swings (6×11) kill a
 60 hp villager. Attackers only damage the target they're ordered to attack.
 
 ## Render model
 
-No image assets. Terrain tiles come from `PAL` (three variants per terrain, chosen by a
-per-tile hash), trees/ore/berries are drawn as vector paths (`drawTree`, `drawOre`,
-`drawBerry`). Units are team-coloured discs/squares with a selection ring, a health bar
-and a carry dot tinted by `CARRY_COLOR`. Buildings are footprints with team colour and a
-progress overlay while `built < 1`. Canvases go through `beginCanvas(canvas, w, h)`; sizes
-come from `sizeW/sizeH(dom)` with node-safe fallbacks (`view_W/view_H`, index.html:1300).
-The HUD (resource bar, info panel, command bar, queue) is DOM, rebuilt every frame from
-`infoHtml/commandsHtml/queueHtml` strings.
+Terrain tiles come from `PAL` (three variants per terrain, chosen by a per-tile hash),
+trees/ore/berries are drawn as vector paths (`drawTree`, `drawOre`, `drawBerry`), and
+buildings are footprints with team colour and a progress overlay while `built < 1`.
+
+Units come from `assets/sprites.png`: `spriteFor(kind, team)` (`index.html:140`) names the
+atlas cell, and `drawUnits` (`index.html:953`) blits it at integer pixels with
+`drawImage`, mirrors it with `scale(-1, 1)` when `u.face` is `-1`, and offsets it 1px on an
+8 Hz walk clock driven by `u.anim`. The old team-coloured disc/square drawing stays as the
+fallback whenever no atlas is loaded. On top of the sprite: selection ring, health bar and
+the carry dot tinted by `CARRY_COLOR`.
+
+Canvases go through `beginCanvas(canvas, w, h)`; sizes come from `sizeW/sizeH(dom)` with
+node-safe fallbacks (`view_W/view_H`, `index.html:1360`). The HUD (resource bar, info
+panel, command bar, queue) is DOM, rebuilt every frame from `infoHtml/commandsHtml/queueHtml`
+strings.
 
 ## Input model
 
@@ -84,9 +100,18 @@ re-bound each frame.
 - `tools/headless-check.js` — reads `index.html`, extracts the `<script>` body into a temp
   `.js`, installs a stub `document`/`window` (elements with `textContent`/`innerHTML`
   accessors, cached per id, `fire()` to dispatch events, a Proxy 2D context that swallows
-  every draw call), requires it, then asserts invariants. It never opens a browser.
+  every draw call), requires it, then asserts invariants. It never opens a browser. Node
+  has no `Image`, so the sandbox defines one (section 2b) whose `src` setter decodes the
+  real sheet — caveat measured on `@napi-rs/canvas` 1.1.0: an `Image` built that way
+  reports the right size but paints nothing, so this stub proves the loading *wiring*
+  while `render-preview.js` renders from a properly decoded image.
 - `tools/render-preview.js` — same stub, except the view canvas comes from
-  `@napi-rs/canvas`, so `renderFrame` paints real pixels; writes `preview.png`. Falls back
-  to the stub-only path (just proving the draw calls run) when the package is absent.
+  `@napi-rs/canvas`, so `renderFrame` paints real pixels; writes `preview.png`. The atlas
+  is decoded with `loadImage()` and injected via `setAtlas`, exactly what a browser's
+  `img.onload` does. Falls back to the stub-only path (just proving the draw calls run)
+  when the package is absent.
+- `tools/gen-atlas.js` — renders the `SPRITES` table into `assets/sprites.png`
+  deterministically (same table → same bytes), so the committed PNG can be diffed in
+  review instead of trusted.
 - Contract to keep: the game must remain loadable in node. Every DOM access from section 7
   needs a guard, and every DOM element the code reaches for must exist in both stubs.

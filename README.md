@@ -1,7 +1,7 @@
 # AoE2 Mini — Dark Age prototype
 
 A browser-playable Age of Empires II prototype in **one HTML file** — no build step,
-no framework, no assets to download. Open `index.html` and play.
+no framework, one small PNG of unit art. Open `index.html` and play.
 
 **Live:** https://barf-bot.github.io/aoe2-mini/
 
@@ -13,14 +13,16 @@ no framework, no assets to download. Open `index.html` and play.
 - A Town Center with villagers that harvest → carry → deposit → retarget when a tile empties
 - Buildings: house (population), farm (food field), all constructed over time with hp scaling
 - Ages: Dark → Feudal → Castle, with the food costs and unlock rules
-- Units: villager and militia, a training queue at the Town Center, attack cooldowns, deaths
+- Units: villager and militia drawn from a pixel-art sprite atlas (`assets/sprites.png`),
+  a training queue at the Town Center, attack cooldowns, deaths
 - Controls: click / drag-select, control groups (`Ctrl+1…9`, `1…9` to recall), right-click
   move / attack / gather, hotkeys (`H` for house, `Esc` to cancel), minimap camera drag
 - An enemy village that reacts and fights back
 
 ## Known limits (it's a prototype)
 
-- Prototype art: tinted tiles and unit discs, not AoE2 sprites
+- Sprite art covers units only: buildings, resource objects and ground tiles are still
+  drawn procedurally
 - Straight-line movement with a walkability check — no A\* pathfinding around water yet
 - One simple AI opponent, no lobby/multiplayer
 
@@ -42,13 +44,17 @@ Start with `AGENTS.md` if you're an agent picking the repo up cold.
 | File | Purpose |
 |---|---|
 | `index.html` | the entire game (markup, styles, engine, renderer) |
-| `tools/headless-check.js` | extracts the `<script>` from the HTML, stubs the DOM, runs the simulation and asserts 63 invariants — currently **63/63 pass** |
+| `assets/sprites.png` | the unit atlas: 96×24, one 24×24 cell per unit kind × team |
+| `tools/gen-atlas.js` | regenerates `assets/sprites.png` from the `SPRITES` table in `index.html` |
+| `tools/headless-check.js` | extracts the `<script>` from the HTML, stubs the DOM, runs the simulation and asserts 72 invariants — currently **72/72 pass** |
 | `tools/render-preview.js` | boots the same code against a real canvas (`@napi-rs/canvas`) and writes `preview.png`, so the renderer is verified, not just assumed |
+| `tools/audit-line-refs.js` | checks that every `index.html:NNN` reference in the docs still points at the code it names, and that the documented section ranges match the real ones |
 | `preview.png` | a real frame of the game rendered headlessly |
 
 ```bash
-node tools/headless-check.js        # 63/63 checks passed
+node tools/headless-check.js        # 72/72 checks passed
 node tools/render-preview.js        # rewrites preview.png
+node tools/gen-atlas.js             # rewrites assets/sprites.png from the sprite table
 ```
 
 ## How to run locally

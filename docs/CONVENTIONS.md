@@ -53,17 +53,19 @@ repo-level workflow rules (verification, deploy, the >300-line editing rule) see
 
 ## Adding a feature (the recipe)
 
-1. Add the data to §1 (costs/stats) — pure data, no logic.
+1. Add the data to §1 (costs/stats, plus the `SPRITES` cell table for any new unit art) —
+   pure data, no logic.
 2. Implement the logic in §4 as pure functions; export them in the `AoE2` object.
 3. Add the visible layer: draw function in §5, command wiring in §6.
 4. Add the assertion to `tools/headless-check.js` **before** declaring it works, then run
-   the harness and the preview renderer.
+   the harness, the preview renderer and `tools/audit-line-refs.js`.
 5. Update `docs/GAME_RULES.md` (numbers) and `docs/CHANGELOG.md` in the same commit.
 6. Commit with an imperative subject; commit the regenerated `preview.png` if visuals moved.
 
 ## Anti-rules
 
-- No frameworks, no bundlers, no `package.json`, no image or font assets.
+- No frameworks, no bundlers, no `package.json`; the only image allowed is the generated
+  `assets/sprites.png` (regenerate with `tools/gen-atlas.js`, never hand-edit it).
 - No splitting `index.html` into modules — the single file is the product's shape.
 - No whole-file rewrites of `index.html` (use `patch`; see `AGENTS.md`).
 - No drive-by reformatting in a feature commit — it destroys reviewability of the patch.

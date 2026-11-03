@@ -66,7 +66,7 @@ regenerated and visually inspected before the render task is ticked.
       to the old shapes without an atlas - proved by: `node tools/render-preview.js`
       output inspected visually, `preview.png` committed with the change.
 
-- [ ] 6. Sync the docs - files: `README.md`, `docs/ARCHITECTURE.md`,
+- [x] 6. Sync the docs - files: `README.md`, `docs/ARCHITECTURE.md`,
       `docs/GAME_RULES.md`, `docs/CHANGELOG.md`, `docs/ROADMAP.md` - change: document
       `tools/gen-atlas.js`, refresh line refs, dated changelog entry, roadmap item 8
       narrowed to "buildings, resource objects and ground tiles remain" - proved by: line

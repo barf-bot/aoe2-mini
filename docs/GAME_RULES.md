@@ -1,6 +1,6 @@
 # Game rules (as implemented)
 
-Every number here is read out of `index.html` §1 config (lines 99-161). If the code and
+Every number here is read out of `index.html` §1 config (lines 99-185). If the code and
 this file disagree, the code is right and this file is a bug.
 
 ## Map
@@ -35,6 +35,9 @@ this file disagree, the code is right and this file is a bug.
 - Melee range = `attacker.r + target.r + 4` px (5 for villager, 6 for militia).
 - Age bonus multiplies damage: `ageBonus` equals the current age index (0 at Dark Age).
 - Population used counts **villagers only**, per AoE2 convention.
+- Art: both kinds render from the unit atlas (`SPRITE_SHEET` 96×24 at `index.html:131`, one
+  24×24 cell per kind × team, drawn at 20×20 for villagers and 22×22 for militia), mirrored
+  when the unit walks left; `tools/gen-atlas.js` regenerates the PNG from `SPRITES`.
 
 ## Buildings (`BLD`)
 
@@ -54,7 +57,7 @@ this file disagree, the code is right and this file is a bug.
 ## Ages (`AGES`)
 
 Dark Age → Feudal Age → Castle Age → Imperial Age.
-Cost (`index.html:711`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
+Cost (`index.html:747`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
 costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle, Castle → Imperial). Hotkey `T`.
 Each upgrade sets `Game.ageBonus = Game.age`, which scales unit damage.
 
