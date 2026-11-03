@@ -12,9 +12,9 @@ current `main`.
 | 3 | entities | 314-421 | `makeUnit`, `makeBuilding`, `rebuildBlocks`, `workPos` |
 | 4 | simulation | 422-809 | `stepSim`/`updateUnit` (the order state machine), movement, economy, orders, `build`, `train`, `upgradeAge`; sub-blocks `economy helpers` (719), `enemy AI` (751), `toast` (798) — **pure logic, no DOM** |
 | 5 | render | 810-1137 | `beginCanvas`, world/building/unit drawing, ghost, drag box, minimap, HUD + command bar HTML |
-| 6 | input | 1138-1274 | picking, mouse, keyboard, delegated command-bar clicks |
-| 7 | boot | 1275-1437 | canvas sizing, `createState`, `resetGame`, `boot`, the rAF loop |
-| — | public surface | 1438-1455 | the `AoE2` export object + `module.exports` / `window.Game` wiring |
+| 6 | input | 1138-1283 | picking, mouse, keyboard, delegated command-bar clicks |
+| 7 | boot | 1284-1446 | canvas sizing, `createState`, `resetGame`, `boot`, the rAF loop |
+| — | public surface | 1447-1464 | the `AoE2` export object + `module.exports` / `window.Game` wiring |
 
 ## The `Game` object
 
@@ -69,7 +69,10 @@ The HUD (resource bar, info panel, command bar, queue) is DOM, rebuilt every fra
 ## Input model
 
 `attachInput(Game, doc)` registers `mousemove`, `mousedown`, `mouseup`, `contextmenu`,
-`keydown`, `keyup`. Click-vs-drag is decided by a 4px threshold; mixed drag selections
+`keydown`, `keyup`. `mousemove` updates `Game.mouse` (the edge-scroll state) only while
+the pointer is over the canvas or mid-drag — coords measured on the header/footer set it
+to `null` instead, so hovering HUD chrome no longer reads as "cursor on a screen edge"
+and pans the camera. Click-vs-drag is decided by a 4px threshold; mixed drag selections
 collapse to villagers (AoE2 behaviour). Commands: left select, right click issue order,
 WASD/arrows pan, `Ctrl+1..9` set group, `1..9` recall, `H`/`F`/`B` arm house/farm/barracks
 placement, `T` upgrade age, `Esc` clears placement then selection. The command bar is

@@ -15,6 +15,11 @@ commits on `main`.
 - README documents `barracks` and the full age ladder it already supported.
 
 ### Fixed
+- Hovering a header resource icon or a footer command button panned the camera: the
+  document `mousemove` fed canvas-relative coords into the edge-scroll even when the
+  pointer was off the canvas (a pointer above the top edge read as "cursor pinned to
+  the top edge"). `Game.mouse` is now set only while the pointer is over the canvas or
+  during a drag; harness section 10b covers it (63 → 66 checks).
 - Docs now match the code: corrected section line ranges (banners at 99/163/314/422/810/
   1138/1275) and the age-cost rule (Imperial is reachable, not blocked).
 

@@ -68,6 +68,7 @@ queues a villager (up to 5 villagers) or a militia, and never double-queues.
 
 Left click select · drag to box-select (mixed selections collapse to villagers) · right
 click move / attack / gather (context decided by what is under the cursor) · `WASD` or
-arrow keys pan at 620 px/s · 14 px edge-scroll band · `Ctrl+1..9` store group, `1..9`
+arrow keys pan at 620 px/s · 14 px edge-scroll band, active only while the pointer is
+over the canvas (not over header/footer chrome) · `Ctrl+1..9` store group, `1..9`
 recall · `H` house, `F` farm, `B` barracks, `T` upgrade age, `Esc` cancels placement then
 clears selection · minimap click/drag moves the camera · "New map" reseeds and resets.
