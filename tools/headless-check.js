@@ -112,6 +112,32 @@ global.window = {
   requestAnimationFrame(cb) { rafQueue.push(cb); return rafQueue.length; },
 };
 
+/* ---- 2b. Image stub (the atlas loader's browser API) ---------------- */
+// index.html's loadAtlas() does `new Image(); img.src = 'assets/sprites.png'`.
+// Node has no Image, so the sandbox gets one that decodes the real file through
+// @napi-rs/canvas synchronously (a browser fires onload later; the game only
+// reads the field on the next frame, so firing inline is equivalent). Without a
+// canvas backend there is no Image at all and the game must still boot on its
+// procedural fallback -- which is what loadAtlas guards for.
+const napiImage = (() => {
+  for (const t of [path.join(__dirname, 'node_modules', '@napi-rs', 'canvas'), '@napi-rs/canvas']) {
+    try { return require(t); } catch (e) { /* next */ }
+  }
+  return null;
+})();
+const HTML_DIR = path.dirname(path.resolve(HTML));
+if (napiImage) {
+  global.Image = class Image extends napiImage.Image {
+    constructor() { super(); this.onload = null; this._src = ''; }
+    set src(src) {
+      this._src = src;
+      super.src = fs.readFileSync(path.isAbsolute(src) ? src : path.join(HTML_DIR, src));
+      if (this.onload) this.onload();
+    }
+    get src() { return this._src; }
+  };
+}
+
 /* ---- 3. load + boot -------------------------------------------------- */
 const AoE2 = require(jsPath);
 check(!!AoE2 && !!AoE2.CFG, 'module: exports the game surface', Object.keys(AoE2 || {}).length + ' exports');
@@ -187,6 +213,27 @@ if (!spriteErr && rects.size !== pairs) spriteErr = 'overlapping/duplicate cells
 check(!spriteErr, 'sprites: frame table covers every unit kind x team',
   spriteErr ? 'bad cell: ' + spriteErr
     : pairs + ' cells inside the ' + sheet.w + 'x' + sheet.h + ' sheet');
+
+/* ---- 5c. atlas wiring ----------------------------------------------- */
+// setAtlas is the single injection point for the sheet, so the renderer has one
+// field to consult and both harnesses can hand it an image (task 3). Probed on a
+// throwaway state so the booted Game below keeps whatever boot() loaded.
+const atlasState = AoE2.createState();
+const probeAtlas = { tag: 'probe-atlas' };
+const describeAtlas = (s) => (s && s.sprites
+  ? 'atlas=' + String(s.sprites.atlas).slice(0, 30) : 'Game.sprites missing');
+const stored = typeof AoE2.setAtlas === 'function' ? AoE2.setAtlas(atlasState, probeAtlas) : undefined;
+check(stored === probeAtlas && atlasState.sprites.atlas === probeAtlas,
+  'sprites: setAtlas stores the atlas source', describeAtlas(atlasState));
+const cleared = typeof AoE2.setAtlas === 'function' ? AoE2.setAtlas(atlasState, null) : undefined;
+check(cleared === null && atlasState.sprites.atlas === null,
+  'sprites: setAtlas clears the atlas source', describeAtlas(atlasState));
+// and boot() must have used it for the committed sheet whenever a backend exists
+check(!!Game.sprites && !!Game.sprites.atlas === !!napiImage,
+  'sprites: boot loadAtlas wired assets/sprites.png',
+  Game.sprites && Game.sprites.atlas
+    ? 'loaded ' + Game.sprites.atlas.src + ' ' + Game.sprites.atlas.width + 'x' + Game.sprites.atlas.height
+    : (napiImage ? 'nothing loaded' : 'no canvas backend in this sandbox'));
 
 /* ---- 6. simulate 30s: economy + movement invariants ----------------- */
 const DT = 1 / 30;

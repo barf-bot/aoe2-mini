@@ -336,6 +336,16 @@ function findAlternative(world, unit, res, maxR) {
 
 /* ---------------------------- 3. entities ------------------------------ */
 
+/** Attach (or clear) the unit atlas on Game: the ONE injection point, so the
+ *  renderer has a single field to consult and the harnesses can hand it an
+ *  image without touching the browser. See SPRITE_SHEET in section 1 and
+ *  tools/gen-atlas.js, which renders that table into assets/sprites.png. */
+function setAtlas(Game, source) {
+  if (!Game.sprites) Game.sprites = { atlas: null };
+  Game.sprites.atlas = source || null;
+  return Game.sprites.atlas;
+}
+
 /** A harvest source: either a world tile or a farm's field. Both expose
  *  {res, x, y, amount getter/setter} so the harvest code has one shape. */
 function sourceFromTile(world, unit, tx, ty) {
@@ -1343,6 +1353,7 @@ function sizeH(dom) {
 function createState() {
   const Game = {
     world: null, units: [], buildings: [], blocks: new Map(), occupied: new Set(),
+    sprites: { atlas: null },
     res: [{ food: 0, wood: 0, gold: 0, stone: 0 }, { food: 0, wood: 0, gold: 0, stone: 0 }],
     selection: [], selectedBuilding: null, groups: {}, keys: {},
     cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, placing: null,
@@ -1396,12 +1407,22 @@ function assignStarter(Game, v) {
   }
 }
 
+/** Fetch the unit atlas once, at boot (node has no Image, so this is a no-op
+ *  there and the renderer keeps drawing units procedurally). */
+function loadAtlas(Game) {
+  if (typeof Image === 'undefined') return;
+  const img = new Image();
+  img.onload = () => setAtlas(Game, img);
+  img.src = 'assets/sprites.png';
+}
+
 function boot(doc) {
   const Game = createState();
   const d = doc || (typeof document !== 'undefined' ? document : null);
   if (!d) return Game;
   const viewEl = d.getElementById('view');
   if (!viewEl) return Game;
+  loadAtlas(Game);
 
   Game.dom = {
     view: viewEl,
@@ -1473,7 +1494,7 @@ const AoE2 = {
   CFG, KINDS, BLD, AGES, T, PAL, TEAM, RES_OF_TILE,
   SPRITE_SHEET, SPRITES, spriteFor,
   makeWorld, findSite, tileRes, sourceFromTile, sourceFromFarm, workSpot,
-  makeUnit, makeBuilding, createState, boot, stepGame, stepSim, renderFrame,
+  makeUnit, makeBuilding, setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   popCap, popUsed, selectedUnits, canAfford, spend, resetGame,
 };

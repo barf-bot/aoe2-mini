@@ -28,6 +28,22 @@ function loadCanvas() {
 }
 const napi = loadCanvas();
 
+/* index.html's loadAtlas() needs `new Image()`. With a napi backend, hand it one
+ * that decodes the real assets/sprites.png (same contract as the stub in
+ * tools/headless-check.js); without a backend there is no Image and the game
+ * boots on its procedural drawing path, which is what that path is for. */
+if (napi) {
+  global.Image = class Image extends napi.Image {
+    constructor() { super(); this.onload = null; this._src = ''; }
+    set src(src) {
+      this._src = src;
+      super.src = fs.readFileSync(path.isAbsolute(src) ? src : path.join(ROOT, src));
+      if (this.onload) this.onload();
+    }
+    get src() { return this._src; }
+  };
+}
+
 /* ---------- DOM stub (same contract as tools/headless-check.js) ---------- */
 function stubCtx(canvas) {
   const store = { canvas };

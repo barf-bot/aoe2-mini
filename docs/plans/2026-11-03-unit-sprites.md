@@ -40,14 +40,14 @@ regenerated and visually inspected before the render task is ticked.
       check `sprites: frame table covers every unit kind x team` (written first, fails,
       then passes).
 
-- [ ] 2. Add `tools/gen-atlas.js`, commit `assets/sprites.png` - files: new
+- [x] 2. Add `tools/gen-atlas.js`, commit `assets/sprites.png` - files: new
       `tools/gen-atlas.js`, new `assets/sprites.png` - change: extracts the `<script>`
       from `index.html`, requires it for the frame table, draws the four pixel-art frames
       (outline + 2-tone team colours) into a 96x24 canvas and writes the PNG - proved by:
       two consecutive runs produce the same sha256, and the PNG decodes at 96x24 with
       every cell non-empty (alpha sampled per frame via `@napi-rs/canvas`).
 
-- [ ] 3. Load the atlas - files: `index.html` (section 3 `setAtlas`, section 7 boot
+- [x] 3. Load the atlas - files: `index.html` (section 3 `setAtlas`, section 7 boot
       `loadAtlas`), `tools/render-preview.js`, `tools/headless-check.js` - change:
       `setAtlas(Game, source)` as the single injection point, `loadAtlas()` uses `new
       Image()` guarded by `typeof Image !== 'undefined'` and `assets/sprites.png`; both
