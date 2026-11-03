@@ -1,0 +1,1455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AoE2 Mini &mdash; Dark Age prototype</title>
+<style>
+  :root{
+    --bg:#12141a; --panel:#1c1f28; --ink:#e9e3d3; --dim:#9aa0b0;
+    --gold:#c8a558; --gold-dk:#8a6f34; --blue:#5b8fd6; --red:#d1584f; --line:#333846;
+    --ok:#6fbf73; --bad:#d1584f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font:13px/1.45 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100%}
+  header{display:flex;align-items:stretch;gap:14px;padding:6px 10px;
+    background:linear-gradient(#242837,#191c24);border-bottom:1px solid var(--line);
+    user-select:none;flex:0 0 auto}
+  header .brand{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--gold);letter-spacing:.5px}
+  header .brand small{color:var(--dim);font-weight:400;letter-spacing:0}
+  .res{display:flex;align-items:center;gap:6px;padding:0 9px;border-left:1px solid var(--line)}
+  .res b{font-variant-numeric:tabular-nums;font-size:14px}
+  .res span{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+  #r_food b{color:#e7b16a} #r_wood b{color:#9ec96f} #r_gold b{color:#f0d264} #r_stone b{color:#c6c8cf}
+  #r_pop b{color:#9dc4f0} #r_age b{color:var(--gold)}
+  #stage{position:relative;flex:1 1 auto;min-height:0;background:#0d0f13}
+  #view{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+  #minimap{position:absolute;right:8px;bottom:8px;width:168px;height:168px;
+    border:2px solid var(--line);border-radius:4px;background:#0b0d11;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  #toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);padding:6px 14px;border-radius:3px;
+    background:rgba(20,22,28,.92);border:1px solid var(--gold-dk);color:var(--gold);
+    opacity:0;transition:opacity .18s;pointer-events:none;white-space:nowrap}
+  #toast.show{opacity:1}
+  footer{flex:0 0 auto;display:flex;align-items:stretch;gap:0;
+    background:linear-gradient(#1f2330,#171a22);border-top:1px solid var(--line);min-height:74px}
+  #info{flex:0 0 250px;padding:8px 12px;border-right:1px solid var(--line);font-size:12px;color:var(--dim)}
+  #info h4{margin:0 0 4px;color:var(--ink);font-size:13px}
+  #info .hp{margin-top:4px;height:6px;border-radius:3px;background:#0d0f13;overflow:hidden}
+  #info .hp i{display:block;height:100%;background:var(--ok)}
+  #commands{flex:1 1 auto;display:flex;flex-wrap:wrap;align-content:flex-start;gap:6px;padding:8px}
+  button{font:inherit;color:var(--ink);background:linear-gradient(#2c313f,#20242f);
+    border:1px solid var(--line);border-radius:3px;padding:6px 10px;cursor:pointer}
+  button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+  button:disabled{opacity:.42;cursor:not-allowed}
+  button.armed{border-color:var(--gold);color:#1a1a1a;background:linear-gradient(#d9b870,#b08c3f)}
+  button .c{color:var(--dim);font-size:11px;margin-left:6px}
+  #queue{flex:0 0 210px;padding:8px;border-left:1px solid var(--line);font-size:11px;color:var(--dim)}
+  #queue .bar{height:6px;background:#0d0f13;border-radius:3px;overflow:hidden;margin-top:4px}
+  #queue .bar i{display:block;height:100%;background:var(--blue)}
+  .hint{color:#6c7181;font-size:11px;padding:8px 12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">AoE2&nbsp;MINI <small>dark age prototype</small></div>
+    <div class="res" id="r_food"><span>food</span><b>0</b></div>
+    <div class="res" id="r_wood"><span>wood</span><b>0</b></div>
+    <div class="res" id="r_gold"><span>gold</span><b>0</b></div>
+    <div class="res" id="r_stone"><span>stone</span><b>0</b></div>
+    <div class="res" id="r_pop"><span>pop</span><b>0/0</b></div>
+    <div class="res" id="r_age"><span>age</span><b>Dark Age</b></div>
+  </header>
+
+  <div id="stage">
+    <canvas id="view"></canvas>
+    <canvas id="minimap" width="168" height="168"></canvas>
+    <div id="toast"></div>
+  </div>
+
+  <footer>
+    <div id="info"></div>
+    <div id="commands"></div>
+    <div id="queue"></div>
+  </footer>
+</div>
+
+<script>
+'use strict';
+/* =========================================================================
+   AoE2 Mini -- a single-file browser RTS prototype (Dark Age slice)
+   Controls: left click / drag to select, right click to command, WASD to pan.
+
+   Map of this file:
+     1. config      tuning constants (stats, costs, sizes)
+     2. world       seeded map generation (terrain + resources)
+     3. entities    unit / building factories
+     4. commands    orders, economy, combat, enemy AI   <- pure logic
+     5. render      canvas terrain, sprites, minimap, HUD
+     6. input       mouse + keyboard
+     7. boot        DOM wiring and the frame loop
+
+   Section 4 never touches the DOM, so the whole simulation can be driven from
+   node: see tools/headless-check.js, which boots this file against a stub DOM
+   and asserts the economy, construction, training and combat actually work.
+   ========================================================================= */
+
+/* ------------------------------ 1. config ------------------------------ */
+
+const CFG = {
+  MAP_W: 96,
+  MAP_H: 96,
+  TILE: 22,                       // px per tile (single zoom level for now)
+  SEED: 1337,                     // fixed map => reproducible, testable
+  START: { food: 200, wood: 200, gold: 100, stone: 100 },
+  CARRY_MAX: 10,                  // villager carry capacity (AoE2 uses 10)
+  GATHER_RATE: 3.0,               // resource units per second while working
+  AGE_FOOD: 500,                  // food cost of Feudal Age
+  WAVE_EVERY: 45,                 // seconds between enemy attack waves
+  UNIT_SEP: 11,                   // min px between two units
+  PAN_SPEED: 620,                 // px/s camera pan
+  EDGE: 14,                       // px edge-scroll band
+  RES: { tree: 60, gold: 800, stone: 450, berry: 110 },
+};
+
+const KINDS = {
+  villager: { label:'Villager', hp:60,  speed:46, atk:3,  atkTime:1.0, r:5,
+              cost:{food:50},          time:5, buildable:true },
+  militia:  { label:'Militia',  hp:110, speed:58, atk:11, atkTime:0.9, r:6,
+              cost:{food:60, gold:20}, time:6, buildable:false },
+};
+
+const BLD = {
+  town_center: { label:'Town Center', hp:1800, w:3, h:3, cost:{wood:275},
+                 time:25, pop:5, trains:['villager'] },
+  house:       { label:'House',       hp:560,  w:2, h:2, cost:{wood:25},
+                 time:4,  pop:5, trains:[] },
+  farm:        { label:'Farm',        hp:320,  w:2, h:2, cost:{wood:60},
+                 time:6,  pop:0, trains:[], field:170 },
+  barracks:    { label:'Barracks',    hp:1300, w:2, h:2, cost:{wood:175},
+                 time:12, pop:0, trains:['militia'] },
+};
+
+const AGES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
+
+const T = { GRASS:0, WATER:1, FOREST:2, GOLD:3, STONE:4, BERRY:5 };
+
+/* per-tile palettes; a per-tile hash picks the variant, so terrain looks
+   textured without needing a single image asset */
+const PAL = [
+  ['#4d6a35','#4a6632','#516f38'],   // grass
+  ['#2c527d','#2a5683','#315c8d'],   // water
+  ['#33512b','#2f4d26','#37562d'],   // forest
+  ['#6b6f79','#656a74','#757984'],   // gold ore
+  ['#8d8f96','#84868d','#9a9ca3'],   // stone
+  ['#7d4a55','#74454f','#87505c'],   // berry bush
+];
+
+const TEAM = [
+  { name:'Blue', main:'#5b8fd6', dark:'#2f5f9e', light:'#a8cbf3' },
+  { name:'Red',  main:'#d1584f', dark:'#9a3831', light:'#f2a89f' },
+];
+
+/* which resource a tile type yields */
+const RES_OF_TILE = {
+  [T.FOREST]: 'wood', [T.GOLD]: 'gold', [T.STONE]: 'stone', [T.BERRY]: 'food',
+};
+const CARRY_COLOR = {
+  food:'#e7b16a', wood:'#9ec96f', gold:'#f0d264', stone:'#c6c8cf',
+};
+
+/* --------------------------- 2. world / map ---------------------------- */
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hash2(x, y, seed) {
+  let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(seed | 0, 1274126177);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+/** Seeded map: grass base, water lakes, forest clumps, gold/stone/berry fields.
+ *  Both castle sites are carved out first, and (like a real lobby) each gets a
+ *  gold field right next to its Town Center. */
+function makeWorld(seed) {
+  const w = CFG.MAP_W, h = CFG.MAP_H, n = w * h;
+  const world = { w, h, seed, type: new Uint8Array(n), amount: new Int32Array(n), shade: new Uint8Array(n) };
+  const rnd = mulberry32(seed);
+  const idx = (x, y) => y * w + x;
+  const inside = (x, y) => x >= 0 && y >= 0 && x < w && y < h;
+  for (let i = 0; i < n; i++) world.shade[i] = hash2(i % w, (i / w) | 0, seed) % 3;
+
+  const put = (x, y, t, amt) => {
+    if (!inside(x, y) || world.type[idx(x, y)] !== T.GRASS) return false;
+    world.type[idx(x, y)] = t;
+    world.amount[idx(x, y)] = amt | 0;
+    return true;
+  };
+  const blob = (cx, cy, r, t, amt) => {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.sqrt(dx * dx + dy * dy) > r + 0.6 - rnd() * 1.3) continue;  // ragged edge
+        put(cx + dx, cy + dy, t, amt);
+      }
+    }
+  };
+  const patch = (cx, cy, t, amt) => {                     // small ore/berry patch
+    const cells = 2 + ((rnd() * 3) | 0);
+    for (let k = 0; k < cells; k++) put(cx + ((rnd() * 3) | 0) - 1, cy + ((rnd() * 3) | 0) - 1, t, amt);
+  };
+
+  const siteA = findSite(world, Math.round(w * 0.30), Math.round(h * 0.52), 3);
+  const siteB = findSite(world, Math.round(w * 0.72), Math.round(h * 0.46), 3);
+  const onSite = (x, y) => nearSite(siteA, x, y) || nearSite(siteB, x, y);
+
+  for (let k = 0; k < 3; k++) {                                     // lakes
+    const cx = 3 + ((rnd() * (w - 6)) | 0), cy = 3 + ((rnd() * (h - 6)) | 0);
+    if (onSite(cx, cy)) continue;
+    blob(cx, cy, 2 + ((rnd() * 3) | 0), T.WATER, 0);
+  }
+  for (let k = 0; k < 11; k++) {                                    // forests
+    const cx = 2 + ((rnd() * (w - 4)) | 0), cy = 2 + ((rnd() * (h - 4)) | 0);
+    if (onSite(cx, cy)) continue;
+    blob(cx, cy, 2 + ((rnd() * 3) | 0), T.FOREST, CFG.RES.tree);
+  }
+  for (let k = 0; k < 3; k++) {                                     // extra stone / gold
+    const cx = 3 + ((rnd() * (w - 6)) | 0), cy = 3 + ((rnd() * (h - 6)) | 0);
+    if (onSite(cx, cy)) continue;
+    patch(cx, cy, k < 2 ? T.STONE : T.GOLD, k < 2 ? CFG.RES.stone : CFG.RES.gold);
+  }
+  for (let k = 0; k < 7; k++) {                                     // berries
+    const cx = 3 + ((rnd() * (w - 6)) | 0), cy = 3 + ((rnd() * (h - 6)) | 0);
+    if (onSite(cx, cy)) continue;
+    patch(cx, cy, T.BERRY, CFG.RES.berry);
+  }
+
+  /* the guaranteed start: gold 3 tiles off the keep, berries next to it */
+  let gold = 0, berry = 0;
+  const ring = [];
+  for (let dy = -4; dy <= 4; dy++) {
+    for (let dx = -4; dx <= 4; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 3) continue;
+      ring.push([siteA.tx + dx, siteA.ty + dy]);
+    }
+  }
+  ring.sort((a, b) => (Math.abs(a[0] - siteA.tx) + Math.abs(a[1] - siteA.ty)) -
+                      (Math.abs(b[0] - siteA.tx) + Math.abs(b[1] - siteA.ty)));
+  for (const [x, y] of ring) {
+    if (gold < 2 && put(x, y, T.GOLD, CFG.RES.gold)) { gold++; continue; }
+    if (berry < 2 && put(x, y, T.BERRY, CFG.RES.berry)) berry++;
+    if (gold >= 2 && berry >= 2) break;
+  }
+  for (let dx = -3; dx <= 3; dx += 2) put(siteB.tx + dx, siteB.ty - 2, T.GOLD, CFG.RES.gold);
+  return world;
+}
+
+/** Spiral search for a flat grassy size x size pad closest to (px,py). */
+function findSite(world, px, py, size) {
+  const w = world.w, h = world.h;
+  const fits = (x, y) => {
+    if (x < 0 || y < 0 || x + size > w || y + size > h) return false;
+    for (let dy = 0; dy < size; dy++) {
+      for (let dx = 0; dx < size; dx++) {
+        if (world.type[(y + dy) * w + (x + dx)] !== T.GRASS) return false;
+      }
+    }
+    return true;
+  };
+  for (let r = 0; r < Math.max(w, h); r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (fits(px + dx, py + dy)) return { tx: px + dx, ty: py + dy };
+      }
+    }
+  }
+  return { tx: 1, ty: 1 };
+}
+
+function nearSite(site, x, y) {
+  return Math.abs(x - site.tx) <= 6 && Math.abs(y - site.ty) <= 6;
+}
+
+/** Read a harvestable tile: null if out of bounds / not a resource / empty. */
+function tileRes(world, tx, ty) {
+  if (tx < 0 || ty < 0 || tx >= world.w || ty >= world.h) return null;
+  const t = world.type[ty * world.w + tx];
+  const res = RES_OF_TILE[t];
+  if (!res || world.amount[ty * world.w + tx] <= 0) return null;
+  return { tx, ty, res };
+}
+
+/** First harvestable tile of `res` (or any, if res is null) in ring r. */
+function ringRes(world, ux, uy, r, res) {
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const t = tileRes(world, ux + dx, uy + dy);
+      if (t && (!res || t.res === res)) return t;
+    }
+  }
+  return null;
+}
+
+/** Search outward for a source of the same resource a villager can switch to. */
+function findAlternative(world, unit, res, maxR) {
+  const ux = Math.floor(unit.x / CFG.TILE), uy = Math.floor(unit.y / CFG.TILE);
+  for (let r = 1; r <= maxR; r++) {
+    const t = ringRes(world, ux, uy, r, res);
+    if (t) return t;
+  }
+  return null;
+}
+
+/* ---------------------------- 3. entities ------------------------------ */
+
+/** A harvest source: either a world tile or a farm's field. Both expose
+ *  {res, x, y, amount getter/setter} so the harvest code has one shape. */
+function sourceFromTile(world, unit, tx, ty) {
+  const t = tileRes(world, tx, ty);
+  if (!t) return null;
+  const spot = workSpot(world, unit, tx, ty);
+  return {
+    kind: 'tile', tx, ty, res: t.res, x: spot.x, y: spot.y,
+    get amount() { return world.amount[ty * world.w + tx]; },
+    set amount(v) { world.amount[ty * world.w + tx] = Math.max(0, Math.round(v)); },
+  };
+}
+
+function sourceFromFarm(b) {
+  return {
+    kind: 'farm', b: b.id, res: 'food', x: b.x, y: b.y,
+    get amount() { return b.field; },
+    set amount(v) { b.field = Math.max(0, v); },
+  };
+}
+
+/** Work position: walkable tile centre nearest the unit among the 8 neighbours
+ *  of the target tile (mirrors AoE2's "stand next to the thing"). */
+function workSpot(world, unit, tx, ty) {
+  const c = (x, y) => ({ x: x * CFG.TILE + CFG.TILE / 2, y: y * CFG.TILE + CFG.TILE / 2 });
+  const cand = [];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const x = tx + dx, y = ty + dy;
+      if (x < 0 || y < 0 || x >= world.w || y >= world.h) continue;
+      if (world.type[y * world.w + x] === T.WATER) continue;
+      cand.push(c(x, y));
+    }
+  }
+  if (!cand.length) return c(tx, ty);
+  let best = c(tx, ty), bd = Infinity;
+  for (const p of cand) {
+    const d = (p.x - unit.x) ** 2 + (p.y - unit.y) ** 2;
+    if (d < bd) { bd = d; best = p; }
+  }
+  return best;
+}
+
+function makeUnit(Game, kind, team, x, y) {
+  const k = KINDS[kind];
+  const u = {
+    id: Game.nextId++, kind, team, x, y,
+    hp: k.hp, maxHp: k.hp, speed: k.speed, atk: k.atk, atkTime: k.atkTime, r: k.r,
+    order: { kind: 'idle' }, carry: 0, carryRes: null, work: 0, cd: 0, dead: false,
+  };
+  Game.units.push(u);
+  return u;
+}
+
+function makeBuilding(Game, kind, team, tx, ty) {
+  const def = BLD[kind];
+  const b = {
+    id: Game.nextId++, kind, team, tx, ty, w: def.w, h: def.h,
+    x: (tx + def.w / 2) * CFG.TILE, y: (ty + def.h / 2) * CFG.TILE,
+    hp: def.hp, maxHp: def.hp, built: 0, field: def.field ? def.field : 0,
+    time: def.time, queue: [], born: Game.time,
+  };
+  Game.buildings.push(b);
+  rebuildBlocks(Game);
+  return b;
+}
+
+/** Building id -> list of tile indices it occupies (units walk around them). */
+function rebuildBlocks(Game) {
+  const map = new Map();
+  const occupied = new Set();
+  for (const b of Game.buildings) {
+    const tiles = [];
+    for (let dy = 0; dy < b.h; dy++) {
+      for (let dx = 0; dx < b.w; dx++) {
+        const i = (b.ty + dy) * Game.world.w + (b.tx + dx);
+        tiles.push(i);
+        occupied.add(i);
+      }
+    }
+    map.set(b.id, tiles);
+  }
+  Game.blocks = map;
+  Game.occupied = occupied;
+}
+
+/** Free tile next to a building for a unit to spawn / stand on. */
+function workPos(Game, b) {
+  const tiles = Game.blocks.get(b.id) || [];
+  for (const i of tiles) {
+    const ux = i % Game.world.w, uy = (i / Game.world.w) | 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const x = ux + dx, y = uy + dy;
+        if (x < 0 || y < 0 || x >= Game.world.w || y >= Game.world.h) continue;
+        const k = y * Game.world.w + x;
+        if (Game.occupied.has(k)) continue;
+        if (Game.world.type[k] === T.WATER) continue;
+        return { x: x * CFG.TILE + CFG.TILE / 2, y: y * CFG.TILE + CFG.TILE / 2 };
+      }
+    }
+  }
+  return { x: b.x, y: b.y };
+}
+
+/* --------------------------- 4. simulation ----------------------------- */
+
+/** One fixed simulation step. Pure logic, no DOM. */
+function stepSim(Game, dt) {
+  Game.time += dt;
+
+  for (const b of Game.buildings) {
+    if (b.built < 1 || !b.queue.length) continue;
+    b.queue[0].t -= dt;
+    while (b.queue.length && b.queue[0].t <= 0) {
+      const job = b.queue.shift();
+      const p = workPos(Game, b);
+      makeUnit(Game, job.kind, b.team, p.x, p.y);
+      if (!b.queue.length) break;
+    }
+  }
+
+  for (const u of Game.units.slice()) updateUnit(Game, u, dt);
+  separate(Game);
+
+  if (Game.units.some(u => u.dead)) {
+    Game.units = Game.units.filter(u => !u.dead);
+    Game.selection = Game.selection.filter(id => Game.units.some(u => u.id === id));
+  }
+
+  aiStep(Game, dt);
+}
+
+function updateUnit(Game, u, dt) {
+  if (u.dead) return;
+  const o = u.order;
+
+  if (o.kind === 'idle') return;
+
+  if (o.kind === 'move') {
+    if (moveUnit(Game, u, o.x, o.y, dt)) u.order = { kind: 'idle' };
+    return;
+  }
+
+  if (o.kind === 'attack') {
+    const t = Game.units.find(x => x.id === o.target);
+    if (!t || t.dead) { u.order = { kind: 'idle' }; return; }
+    if (moveUnit(Game, u, t.x, t.y, dt, u.r + t.r + 4)) {
+      u.cd -= dt;
+      if (u.cd <= 0) {
+        u.cd = u.atkTime;
+        t.hp -= u.atk * (1 + 0.25 * Game.ageBonus);
+        if (t.hp <= 0) t.dead = true;
+      }
+    }
+    return;
+  }
+
+  if (o.kind === 'build') {
+    const b = Game.buildings.find(x => x.id === o.b);
+    if (!b || b.built >= 1) { u.order = { kind: 'idle' }; return; }
+    const p = workPos(Game, b);
+    if (!moveUnit(Game, u, p.x, p.y, dt, CFG.TILE)) return;
+    b.built = Math.min(1, b.built + dt / Math.max(0.5, b.time));
+    b.hp = Math.max(1, Math.round(b.maxHp * b.built));
+    if (b.built >= 1) {
+      b.built = 1;
+      if (u.team === 0) toast(Game, BLD[b.kind].label + ' complete');
+      u.order = { kind: 'idle' };
+    }
+    return;
+  }
+
+  if (o.kind === 'go_deposit') {
+    const drop = Game.buildings.find(x => x.id === o.b);
+    if (!drop) { u.carry = 0; u.order = { kind: 'idle' }; return; }
+    if (!moveUnit(Game, u, drop.x, drop.y, dt, CFG.TILE)) return;
+    deposit(Game, u, drop);
+    u.order = o.src ? resumeGather(Game, u, o.src) : { kind: 'idle' };
+    return;
+  }
+
+  if (o.kind === 'harvest') {
+    const src = o.src;
+    const reach = CFG.TILE * 0.9;
+    if (Math.hypot(src.x - u.x, src.y - u.y) > reach) {
+      if (!moveUnit(Game, u, src.x, src.y, dt, reach)) return;
+    }
+    const tick = 1 / CFG.GATHER_RATE;
+    u.work += dt;
+    while (u.work >= tick) {
+      u.work -= tick;
+      const room = CFG.CARRY_MAX - u.carry;
+      if (room <= 0 || src.amount <= 0) break;
+      const got = Math.min(room, src.amount, tick * CFG.GATHER_RATE);
+      src.amount -= got;
+      u.carry += got;
+      u.carryRes = src.res;               // the dropoff needs to know what this is
+    }
+    if (u.carry >= CFG.CARRY_MAX || src.amount <= 0) {
+      const drop = findDropoff(Game, u, src);
+      if (!drop) { u.carry = 0; u.order = { kind: 'idle' }; return; }
+      u.order = { kind: 'go_deposit', b: drop.id, src: nextSource(Game, u, src) };
+    }
+    return;
+  }
+}
+
+/** Move `u` toward (x,y); returns true on arrival. Slides along water edges. */
+function moveUnit(Game, u, x, y, dt, stop) {
+  const s = stop || 1;
+  const dx = x - u.x, dy = y - u.y;
+  const d = Math.hypot(dx, dy);
+  if (d <= s) return true;
+  const stepLen = Math.min(d - s * 0.5, u.speed * dt);
+  const nx = u.x + (dx / d) * stepLen, ny = u.y + (dy / d) * stepLen;
+  if (walkable(Game, nx, ny)) { u.x = nx; u.y = ny; return (d - stepLen) <= s; }
+  if (walkable(Game, nx, u.y)) { u.x = nx; return false; }        // slide on X
+  if (walkable(Game, u.x, ny)) { u.y = ny; return false; }        // slide on Y
+  return false;
+}
+
+function walkable(Game, px, py) {
+  const tx = Math.floor(px / CFG.TILE), ty = Math.floor(py / CFG.TILE);
+  if (tx < 0 || ty < 0 || tx >= Game.world.w || ty >= Game.world.h) return false;
+  return Game.world.type[ty * Game.world.w + tx] !== T.WATER;
+}
+
+/** Cheap O(n^2) separation -- AoE2 uses a collision map; fine at this scale. */
+function separate(Game) {
+  const us = Game.units;
+  for (let i = 0; i < us.length; i++) {
+    const a = us[i];
+    if (a.dead) continue;
+    for (let j = i + 1; j < us.length; j++) {
+      const b = us[j];
+      if (b.dead) continue;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 === 0) { a.x += (i % 2 ? 0.5 : -0.5); continue; }
+      if (d2 < CFG.UNIT_SEP * CFG.UNIT_SEP) {
+        const d = Math.sqrt(d2), push = (CFG.UNIT_SEP - d) / 2;
+        a.x -= (dx / d) * push; a.y -= (dy / d) * push;
+        b.x += (dx / d) * push; b.y += (dy / d) * push;
+      }
+    }
+  }
+}
+
+/** Where a carry goes: Town Center beats farm for non-food, nearest otherwise. */
+function findDropoff(Game, unit, src) {
+  let best = null, bestScore = Infinity;
+  for (const b of Game.buildings) {
+    if (b.team !== unit.team || !b.built) continue;
+    if (b.kind === 'house') continue;
+    if (src && src.kind === 'farm' && b.id === src.b) continue;   // never its own farm
+    if (src && src.res !== 'food' && b.kind === 'farm') continue;
+    const d = Math.hypot(b.x - unit.x, b.y - unit.y);
+    const score = d + (b.kind === 'town_center' ? 0 : 300);
+    if (score < bestScore) { bestScore = score; best = b; }
+  }
+  return best;
+}
+
+function deposit(Game, unit, drop) {
+  const amount = unit.carry;
+  if (unit.carryRes) Game.res[unit.team][unit.carryRes] += amount;
+  unit.carry = 0;
+  unit.carryRes = null;
+}
+
+/** Keep a villager employed: same tile while it has stock, otherwise the
+ *  nearest tile of the same resource, then any resource at all. */
+function nextSource(Game, u, src) {
+  if (src.amount > 0) return src;
+  if (src.kind !== 'tile') return null;
+  const alt = findAlternative(Game.world, u, src.res, 14) || findAlternative(Game.world, u, null, 20);
+  return alt ? sourceFromTile(Game.world, u, alt.tx, alt.ty) : null;
+}
+
+/** After depositing, re-point at the source (tiles revalidate, farms check field). */
+function resumeGather(Game, u, src) {
+  if (src.kind === 'tile') {
+    const s = sourceFromTile(Game.world, u, src.tx, src.ty);
+    return s ? { kind: 'harvest', src: s } : { kind: 'idle' };
+  }
+  const b = Game.buildings.find(x => x.id === src.b);
+  if (!b || !b.built || b.field <= 0) return { kind: 'idle' };
+  return { kind: 'harvest', src: sourceFromFarm(b) };
+}
+
+/** Right-click resolution for one unit: enemy > farm > resource > move. */
+function orderForUnit(Game, u, wx, wy) {
+  const world = Game.world;
+  if (wx < 0 || wy < 0 || wx >= world.w * CFG.TILE || wy >= world.h * CFG.TILE) return null;
+  const tx = Math.floor(wx / CFG.TILE), ty = Math.floor(wy / CFG.TILE);
+
+  const enemy = Game.units.find(v => v.team !== u.team && !v.dead &&
+    Math.hypot(v.x - wx, v.y - wy) < CFG.TILE * 0.8);
+  if (enemy) return { kind: 'attack', target: enemy.id };
+
+  if (u.kind === 'villager') {
+    const farm = Game.buildings.find(b => b.team === u.team && b.built && b.kind === 'farm' &&
+      b.field > 0 && tx >= b.tx && tx < b.tx + b.w && ty >= b.ty && ty < b.ty + b.h);
+    if (farm) return { kind: 'harvest', src: sourceFromFarm(farm) };
+    if (RES_OF_TILE[world.type[ty * world.w + tx]]) {
+      const s = sourceFromTile(Game.world, u, tx, ty);
+      if (s) return { kind: 'harvest', src: s };
+    }
+  }
+  return { kind: 'move', x: wx, y: wy };
+}
+
+/** Right-click: hand an order to everything selected, spread out a little. */
+function issueOrder(Game, wx, wy) {
+  const sel = selectedUnits(Game);
+  if (!sel.length) return;
+  const enemy = Game.units.find(v => v.team !== sel[0].team && !v.dead &&
+    Math.hypot(v.x - wx, v.y - wy) < CFG.TILE * 0.8);
+  let n = 0;
+  for (const u of sel) {
+    let o = enemy ? { kind: 'attack', target: enemy.id } : orderForUnit(Game, u, wx, wy);
+    if (!o) continue;
+    if (u.kind !== 'villager' && o.kind === 'harvest') o = { kind: 'move', x: wx, y: wy };
+    u.order = spread(o, n);
+    n++;
+  }
+  if (n) Game.pingAt = Game.time;
+}
+
+/** Spread move destinations so a group does not walk as one blob. */
+function spread(o, i) {
+  if (o.kind !== 'move') return o;
+  const a = i * 2.39996, r = 9 * Math.sqrt(i);
+  return { kind: 'move', x: o.x + Math.cos(a) * r, y: o.y + Math.sin(a) * r };
+}
+
+/** Build button / click-to-place. */
+function build(Game, kind, atX, atY) {
+  const def = BLD[kind];
+  if (Game.placing && atX === undefined) return;
+  const sel = selectedUnits(Game);
+  const v = sel.find(u => u.kind === 'villager') ||
+            (Game.units.find(u => u.team === 0 && u.kind === 'villager'));
+  if (!v) return toast(Game, 'No villager available');
+  if (!canAfford(Game, 0, def.cost)) return toast(Game, 'Not enough ' + missing(Game, 0, def.cost));
+  let site = null;
+  if (atX !== undefined && atY !== undefined) {
+    const tx = Math.floor(atX / CFG.TILE), ty = Math.floor(atY / CFG.TILE);
+    if (siteFree(Game, tx, ty, def.w, def.h) && near(Game, v, tx, ty, 7)) site = { tx, ty };
+  }
+  if (!site) site = findSite(Game.world, Math.floor(v.x / CFG.TILE), Math.floor(v.y / CFG.TILE), def.w);
+  spend(Game, 0, def.cost);
+  const b = makeBuilding(Game, kind, 0, site.tx, site.ty);
+  v.order = { kind: 'build', b: b.id };
+  Game.placing = null;
+  toast(Game, def.label + ' started');
+  return b;
+}
+
+function near(Game, u, tx, ty, dist) {
+  return Math.abs(tx - Math.floor(u.x / CFG.TILE)) <= dist && Math.abs(ty - Math.floor(u.y / CFG.TILE)) <= dist;
+}
+
+/** Is a wxh footprint buildable? grass only, no overlap, in bounds. */
+function siteFree(Game, tx, ty, w, h) {
+  const world = Game.world;
+  if (tx < 0 || ty < 0 || tx + w > world.w || ty + h > world.h) return false;
+  for (let dy = 0; dy < h; dy++) {
+    for (let dx = 0; dx < w; dx++) {
+      if (world.type[(ty + dy) * world.w + (tx + dx)] !== T.GRASS) return false;
+    }
+  }
+  for (const b of Game.buildings) {
+    if (tx < b.tx + b.w && tx + w > b.tx && ty < b.ty + b.h && ty + h > b.ty) return false;
+  }
+  return true;
+}
+
+/** Train button. */
+function train(Game, bld, kind) {
+  const def = BLD[bld.kind];
+  if (!def.trains || def.trains.indexOf(kind) < 0) return toast(Game, KINDS[kind].label + ' needs a ' + def.label);
+  if (bld.built < 1) return toast(Game, 'Still building');
+  if (bld.queue.length >= 5) return toast(Game, 'Queue full');
+  if (!canAfford(Game, bld.team, KINDS[kind].cost)) return toast(Game, 'Not enough ' + missing(Game, bld.team, KINDS[kind].cost));
+  if (popUsed(Game, bld.team) >= popCap(Game, bld.team)) return toast(Game, 'Need more houses');
+  spend(Game, bld.team, KINDS[kind].cost);
+  bld.queue.push({ kind, t: KINDS[kind].time });
+  return bld;
+}
+
+function upgradeAge(Game) {
+  if (Game.age >= AGES.length - 1) return toast(Game, 'Imperial Age reached');
+  const cost = { food: Game.age === 0 ? CFG.AGE_FOOD : CFG.AGE_FOOD * 2 };
+  if (!canAfford(Game, 0, cost)) return toast(Game, 'Need ' + cost.food + ' food');
+  spend(Game, 0, cost);
+  Game.age++;
+  Game.ageBonus = Game.age;
+  toast(Game, AGES[Game.age] + ' reached');
+}
+
+/* --------------------------- economy helpers --------------------------- */
+
+function popCap(Game, team) {
+  let cap = 0;
+  for (const b of Game.buildings) if (b.team === team && b.built) cap += BLD[b.kind].pop || 0;
+  return cap;
+}
+
+function popUsed(Game, team) {
+  let n = 0;
+  for (const u of Game.units) if (u.team === team && !u.dead && u.kind === 'villager') n++;
+  return n;
+}
+
+function selectedUnits(Game) {
+  const out = [];
+  for (const id of Game.selection) {
+    const u = Game.units.find(x => x.id === id && !x.dead);
+    if (u) out.push(u);
+  }
+  return out;
+}
+
+function canAfford(Game, team, cost) { return !missing(Game, team, cost); }
+
+function missing(Game, team, cost) {
+  for (const k in cost) if ((Game.res[team][k] || 0) < cost[k]) return k;
+  return '';
+}
+
+function spend(Game, team, cost) { for (const k in cost) Game.res[team][k] -= cost[k]; }
+
+/* ------------------------------ enemy AI ------------------------------- */
+
+function aiStep(Game, dt) {
+  if (!Game.started) return;
+  Game.wave += dt;
+  if (Game.wave < CFG.WAVE_EVERY) return;
+  Game.wave = 0;
+  const tc = Game.buildings.find(b => b.team === 1 && b.built);
+  if (!tc) return;
+
+  if (popUsed(Game, 1) >= popCap(Game, 1)) {
+    /* pop is full: send every idle warrior at the closest blue unit */
+    const prey = nearestEnemy(Game, 1);
+    let sent = 0;
+    for (const u of Game.units) {
+      if (u.team !== 1 || u.kind !== 'militia' || u.dead) continue;
+      const live = u.order.kind === 'attack' && Game.units.some(z => z.id === u.order.target && !z.dead);
+      if (live) continue;
+      if (!prey) continue;
+      u.order = { kind: 'attack', target: prey.id };
+      sent++;
+    }
+    if (sent) toast(Game, 'Red attack wave!');
+    return;
+  }
+  if (tc.queue.length) return;
+  if (popUsed(Game, 1) < 5 && canAfford(Game, 1, KINDS.villager.cost)) queueTrain(Game, tc, 'villager');
+  else if (canAfford(Game, 1, KINDS.militia.cost)) queueTrain(Game, tc, 'militia');
+}
+
+function nearestEnemy(Game, team) {
+  let best = null, bd = Infinity;
+  for (const u of Game.units) {
+    if (u.team === team || u.dead) continue;
+    const home = Game.buildings.find(b => b.team === team && b.built);
+    if (!home) return u;
+    const d = (u.x - home.x) ** 2 + (u.y - home.y) ** 2;
+    if (d < bd) { bd = d; best = u; }
+  }
+  return best;
+}
+
+function queueTrain(Game, bld, kind) {
+  spend(Game, bld.team, KINDS[kind].cost);
+  bld.queue.push({ kind, t: KINDS[kind].time });
+}
+
+/* ------------------------------- toast --------------------------------- */
+
+function toast(Game, msg) {
+  Game.toastMsg = msg;
+  Game.toastAt = Game.time;
+  const el = Game.dom && Game.dom.toast;
+  if (el) {
+    if (el.textContent !== msg) el.textContent = msg;
+    if (el.classList && el.classList.add) el.classList.add('show');
+  }
+}
+
+/* ------------------------------ 5. render ------------------------------ */
+
+function beginCanvas(canvas, w, h) {
+  let ctx = null;
+  try { if (canvas && canvas.getContext) ctx = canvas.getContext('2d'); } catch (e) { ctx = null; }
+  if (!ctx) return { ok: false, ctx: null, w: w, h: h, canvas: canvas };
+  canvas.width = w; canvas.height = h;
+  return { ok: true, ctx, w, h, canvas };
+}
+
+function drawWorld(Game, view) {
+  const c = view.ctx;
+  if (!c) return;
+  const cam = Game.cam, TS = CFG.TILE, w = Game.world;
+  const x0 = Math.max(0, Math.floor(cam.x / TS)), y0 = Math.max(0, Math.floor(cam.y / TS));
+  const x1 = Math.min(w.w - 1, Math.ceil((cam.x + view.w) / TS));
+  const y1 = Math.min(w.h - 1, Math.ceil((cam.y + view.h) / TS));
+  for (let ty = y0; ty <= y1; ty++) {
+    for (let tx = x0; tx <= x1; tx++) {
+      const i = ty * w.w + tx, t = w.type[i];
+      const px = Math.floor(tx * TS - cam.x), py = Math.floor(ty * TS - cam.y);
+      c.fillStyle = PAL[t][w.shade[i] % PAL[t].length];
+      c.fillRect(px, py, TS + 1, TS + 1);
+      if (t === T.FOREST) drawTree(c, px, py, w.shade[i]);
+      else if (t === T.GOLD) drawOre(c, px, py, '#f0d264');
+      else if (t === T.STONE) drawOre(c, px, py, '#b9bcc4');
+      else if (t === T.BERRY) drawBerry(c, px, py);
+    }
+  }
+}
+
+function drawTree(c, x, y, s) {
+  c.fillStyle = '#1f3519';
+  c.beginPath(); c.arc(x + 4 + (s % 3) * 2, y + 5 + (s % 2) * 3, 4, 0, 6.283); c.fill();
+  c.fillStyle = '#2c4a24';
+  c.beginPath(); c.arc(x + 11 - (s % 3) * 2, y + 13 - (s % 2) * 2, 3.4, 0, 6.283); c.fill();
+}
+
+function drawOre(c, x, y, col) {
+  c.fillStyle = col;
+  c.beginPath();
+  c.moveTo(x + 4, y + 14); c.lineTo(x + 8, y + 5); c.lineTo(x + 14, y + 12); c.lineTo(x + 10, y + 17);
+  c.closePath(); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.28)';
+  c.fillRect(x + 8, y + 6, 2, 3);
+}
+
+function drawBerry(c, x, y) {
+  c.fillStyle = '#5d7a46';
+  c.beginPath(); c.arc(x + 11, y + 12, 5, 0, 6.283); c.fill();
+  c.fillStyle = '#c0465a';
+  for (const p of [[7, 9], [12, 8], [10, 13], [14, 12]]) {
+    c.beginPath(); c.arc(x + p[0], y + p[1], 1.4, 0, 6.283); c.fill();
+  }
+}
+
+function drawBuildings(Game, view) {
+  const c = view.ctx;
+  if (!c) return;
+  const TS = CFG.TILE, cam = Game.cam;
+  for (const b of Game.buildings) {
+    const x = b.tx * TS - cam.x, y = b.ty * TS - cam.y, w = b.w * TS, h = b.h * TS;
+    if (x > view.w || y > view.h || x + w < 0 || y + h < 0) continue;
+    const team = TEAM[b.team];
+    if (b.built < 1) {
+      c.fillStyle = 'rgba(200,165,88,.16)'; c.fillRect(x, y, w, h);
+      c.strokeStyle = team.main; c.lineWidth = 1; c.strokeRect(x + .5, y + .5, w - 1, h - 1);
+      c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(x, y + h - 4, w, 4);
+      c.fillStyle = '#c8a558'; c.fillRect(x, y + h - 4, w * b.built, 4);
+      continue;
+    }
+    c.fillStyle = team.dark; c.fillRect(x + 1, y + 1, w - 2, h - 2);
+    c.fillStyle = team.main;
+    if (b.kind === 'town_center') {
+      c.fillRect(x + 3, y + 3, w - 6, h - 6);
+      c.fillStyle = team.light; c.fillRect(x + w / 2 - 4, y + 3, 8, h - 6);
+    } else if (b.kind === 'house') {
+      c.fillRect(x + 3, y + 3, w - 6, h - 6);
+      c.fillStyle = team.light;
+      c.beginPath(); c.moveTo(x + 2, y + h / 2); c.lineTo(x + w / 2, y + 2); c.lineTo(x + w - 2, y + h / 2);
+      c.closePath(); c.fill();
+    } else if (b.kind === 'farm') {
+      const dry = b.field <= 0;
+      c.fillStyle = dry ? '#6b5c3a' : '#7d7a3d'; c.fillRect(x + 2, y + 2, w - 4, h - 4);
+      c.fillStyle = dry ? 'rgba(0,0,0,.25)' : '#93924a';
+      for (let i = 0; i < 4; i++) c.fillRect(x + 4, y + 4 + i * (h / 4), w - 8, Math.max(1, h / 9));
+    } else {
+      c.fillRect(x + 2, y + 2, w - 4, h - 4);
+      c.fillStyle = team.light;
+      c.fillRect(x + 4, y + 4, w - 8, 4);
+      c.fillRect(x + 4, y + h - 8, w - 8, 4);
+    }
+    if (b.queue.length) {
+      const total = KINDS[b.queue[0].kind].time;
+      c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(x, y - 6, w, 4);
+      c.fillStyle = '#5b8fd6'; c.fillRect(x, y - 6, w * (1 - b.queue[0].t / total), 4);
+    }
+    if (b.hp < b.maxHp) {
+      c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(x, y - 10, w, 3);
+      c.fillStyle = b.hp / b.maxHp > .5 ? '#6fbf73' : '#d1584f';
+      c.fillRect(x, y - 10, w * (b.hp / b.maxHp), 3);
+    }
+  }
+}
+
+function drawUnits(Game, view) {
+  const c = view.ctx;
+  if (!c) return;
+  const cam = Game.cam;
+  for (const u of Game.units) {
+    const x = u.x - cam.x, y = u.y - cam.y;
+    if (x < -20 || y < -20 || x > view.w + 20 || y > view.h + 20) continue;
+    const team = TEAM[u.team];
+    const sel = Game.selection.indexOf(u.id) >= 0;
+    if (u.kind === 'villager') {
+      c.fillStyle = '#2b2b2b'; c.beginPath(); c.arc(x, y, 6.5, 0, 6.283); c.fill();
+      c.fillStyle = team.main; c.beginPath(); c.arc(x, y, 5, 0, 6.283); c.fill();
+      c.fillStyle = team.light; c.beginPath(); c.arc(x - 1.2, y - 1.2, 2.2, 0, 6.283); c.fill();
+    } else {
+      c.save(); c.translate(x, y); c.rotate(0.78);
+      c.fillStyle = '#262626'; c.fillRect(-6.5, -6.5, 13, 13);
+      c.fillStyle = team.main; c.fillRect(-5, -5, 10, 10);
+      c.fillStyle = team.light; c.fillRect(-4, -4, 4, 4);
+      c.restore();
+    }
+    if (u.carry > 0) {
+      c.fillStyle = CARRY_COLOR[u.carryRes] || '#fff';
+      c.fillRect(x + 4, y - 6, 4, 4);
+    }
+    if (u.hp < u.maxHp) {
+      c.fillStyle = 'rgba(0,0,0,.6)'; c.fillRect(x - 7, y - 11, 14, 3);
+      c.fillStyle = u.hp / u.maxHp > .5 ? '#6fbf73' : '#d1584f';
+      c.fillRect(x - 7, y - 11, 14 * (u.hp / u.maxHp), 3);
+    }
+    if (sel) {
+      c.strokeStyle = '#8ff0ff'; c.lineWidth = 1;
+      c.beginPath(); c.arc(x, y, 9, 0, 6.283); c.stroke();
+      const p = orderTarget(Game, u);
+      if (p) {
+        c.strokeStyle = 'rgba(143,240,255,.55)';
+        c.beginPath(); c.moveTo(x, y); c.lineTo(p.x - cam.x, p.y - cam.y); c.stroke();
+      }
+    }
+  }
+}
+
+/** Screen point an order points at (for the cyan order line). */
+function orderTarget(Game, u) {
+  const o = u.order;
+  if (o.kind === 'move') return { x: o.x, y: o.y };
+  if (o.kind === 'harvest') return { x: o.src.x, y: o.src.y };
+  if (o.kind === 'go_deposit' || o.kind === 'build') {
+    const b = Game.buildings.find(z => z.id === o.b);
+    return b ? { x: b.x, y: b.y } : null;
+  }
+  if (o.kind === 'attack') {
+    const t = Game.units.find(z => z.id === o.target);
+    return t ? { x: t.x, y: t.y } : null;
+  }
+  return null;
+}
+
+function drawGhost(Game, view) {
+  const c = view.ctx;
+  if (!c || !Game.placing || !Game.cursor) return;
+  const def = BLD[Game.placing];
+  const tx = Math.floor(Game.cursor.x / CFG.TILE), ty = Math.floor(Game.cursor.y / CFG.TILE);
+  const ok = siteFree(Game, tx, ty, def.w, def.h);
+  c.globalAlpha = .6;
+  c.fillStyle = ok ? 'rgba(111,191,115,.6)' : 'rgba(209,88,79,.6)';
+  c.fillRect(tx * CFG.TILE, ty * CFG.TILE, def.w * CFG.TILE, def.h * CFG.TILE);
+  c.globalAlpha = 1;
+  c.strokeStyle = ok ? '#6fbf73' : '#d1584f';
+  c.strokeRect(tx * CFG.TILE + .5, ty * CFG.TILE + .5, def.w * CFG.TILE - 1, def.h * CFG.TILE - 1);
+}
+
+function drawDragBox(Game, view) {
+  const c = view.ctx;
+  if (!c || !Game.drag) return;
+  const x = Math.min(Game.drag.x0, Game.drag.x1), y = Math.min(Game.drag.y0, Game.drag.y1);
+  const w = Math.abs(Game.drag.x1 - Game.drag.x0), h = Math.abs(Game.drag.y1 - Game.drag.y0);
+  c.fillStyle = 'rgba(143,240,255,.12)'; c.fillRect(x, y, w, h);
+  c.strokeStyle = '#8ff0ff'; c.lineWidth = 1; c.strokeRect(x + .5, y + .5, w, h);
+}
+
+/** Minimap: cached terrain bitmap + unit dots + viewport rect. */
+function drawMinimap(Game, mm) {
+  if (!mm || !mm.ok) return;
+  const c = mm.ctx, S = mm.w / Game.world.w;
+  c.clearRect(0, 0, mm.w, mm.h);
+  if (!Game.mmBase) Game.mmBase = minimapTerrain(Game);
+  if (Game.mmBase) c.drawImage(Game.mmBase, 0, 0, mm.w, mm.h);
+  for (const b of Game.buildings) {
+    c.fillStyle = TEAM[b.team].main;
+    c.fillRect(b.tx * S, b.ty * S, Math.max(1, b.w * S), Math.max(1, b.h * S));
+  }
+  for (const u of Game.units) {
+    c.fillStyle = Game.selection.indexOf(u.id) >= 0 ? '#8ff0ff' : TEAM[u.team].light;
+    c.fillRect(u.x / CFG.TILE * S - .5, u.y / CFG.TILE * S - .5, Math.max(1, S), Math.max(1, S));
+  }
+  const vw = mm.w * Math.min(1, view_W(Game) / (Game.world.w * CFG.TILE));
+  const vh = mm.h * Math.min(1, view_H(Game) / (Game.world.h * CFG.TILE));
+  c.strokeStyle = '#ffffff'; c.lineWidth = 1;
+  c.strokeRect(Game.cam.x / (Game.world.w * CFG.TILE) * mm.w,
+               Game.cam.y / (Game.world.h * CFG.TILE) * mm.h, vw, vh);
+}
+
+function minimapTerrain(Game) {
+  const src = Game.world;
+  const stub = beginCanvas(mkCanvas(src.w, src.h), src.w, src.h);
+  if (!stub.ok) return null;
+  const c = stub.ctx;
+  for (let y = 0; y < src.h; y++) {
+    for (let x = 0; x < src.w; x++) {
+      c.fillStyle = PAL[src.type[y * src.w + x]][src.shade[y * src.w + x] % 3];
+      c.fillRect(x, y, 1, 1);
+    }
+  }
+  return stub.canvas;
+}
+
+function renderHud(Game) {
+  const d = Game.dom || {};
+  const setText = (el, val) => { if (el && el.textContent !== val) el.textContent = val; };
+  /* info / commands / queue hold markup: write innerHTML when the element has
+     one, otherwise fall back to textContent (keeps the node stub working) */
+  const setHTML = (el, val) => {
+    if (!el) return;
+    if (typeof el.innerHTML === 'string') { if (el.innerHTML !== val) el.innerHTML = val; return; }
+    setText(el, val);
+  };
+  setText(d.set_food, String(Math.floor(Game.res[0].food)));
+  setText(d.set_wood, String(Math.floor(Game.res[0].wood)));
+  setText(d.set_gold, String(Math.floor(Game.res[0].gold)));
+  setText(d.set_stone, String(Math.floor(Game.res[0].stone)));
+  setText(d.set_pop, popUsed(Game, 0) + '/' + popCap(Game, 0));
+  setText(d.set_age, AGES[Game.age]);
+  setHTML(d.info, infoHtml(Game));
+  setHTML(d.commands, commandsHtml(Game));
+  setHTML(d.queue, queueHtml(Game));
+}
+
+function infoHtml(Game) {
+  const sel = selectedUnits(Game);
+  if (Game.placing) return '<h4>Placing ' + BLD[Game.placing].label + '</h4>Click the map to place, Esc to cancel';
+  if (sel.length === 1) {
+    const u = sel[0];
+    return '<h4>' + KINDS[u.kind].label + '</h4>HP ' + Math.ceil(u.hp) + '/' + u.maxHp +
+      '<div class="hp"><i style="width:' + Math.max(0, 100 * u.hp / u.maxHp) + '%"></i></div>' +
+      '<br>Order: ' + u.order.kind + (u.carry ? ' (' + Math.floor(u.carry) + ' ' + u.carryRes + ')' : '');
+  }
+  if (sel.length) {
+    const n = {};
+    for (const u of sel) n[u.kind] = (n[u.kind] || 0) + 1;
+    return '<h4>' + sel.length + ' units</h4>' + Object.keys(n).map(k => n[k] + ' ' + KINDS[k].label).join('<br>');
+  }
+  const b = Game.selectedBuilding;
+  if (b) {
+    return '<h4>' + BLD[b.kind].label + '</h4>HP ' + Math.ceil(b.hp) + '/' + b.maxHp +
+      (b.field ? '<br>Field: ' + Math.ceil(b.field) : '');
+  }
+  return '<div class="hint">Left click or drag to select<br>Right click to move / attack / gather<br>WASD or screen edges pan<br>Ctrl+1..9 group, 1..9 recall</div>';
+}
+
+function commandsHtml(Game) {
+  const sel = selectedUnits(Game);
+  const b = Game.selectedBuilding;
+  const out = [];
+  if (b && b.built) {
+    for (const k of BLD[b.kind].trains || []) {
+      const ok = canAfford(Game, b.team, KINDS[k].cost) && popUsed(Game, b.team) < popCap(Game, b.team);
+      out.push('<button data-act="train" data-arg="' + k + '"' + (ok ? '' : ' disabled') + '>' +
+        KINDS[k].label + '<span class="c">' + fmtCost(KINDS[k].cost) + '</span></button>');
+    }
+  }
+  const villagers = sel.filter(u => u.kind === 'villager');
+  if (villagers.length && !b) {
+    for (const k in BLD) {
+      if (k === 'town_center') continue;
+      const def = BLD[k];
+      out.push('<button data-act="build" data-arg="' + k + '"' +
+        (Game.placing === k ? ' class="armed"' : '') +
+        (canAfford(Game, 0, def.cost) ? '' : ' disabled') + '>' +
+        def.label + '<span class="c">' + fmtCost(def.cost) + '</span></button>');
+    }
+  }
+  if (!sel.length && !b && Game.age < AGES.length - 1) {
+    const cost = Game.age === 0 ? CFG.AGE_FOOD : CFG.AGE_FOOD * 2;
+    out.push('<button data-act="age"' + (canAfford(Game, 0, { food: cost }) ? '' : ' disabled') + '>' +
+      AGES[Game.age + 1] + '<span class="c">' + cost + ' food</span></button>');
+    out.push('<button data-act="restart">New map</button>');
+  }
+  return out.join('') || '<div class="hint">No commands</div>';
+}
+
+function queueHtml(Game) {
+  const b = Game.selectedBuilding;
+  if (!b) return '<div class="hint">Select a building to see its queue</div>';
+  if (b.built < 1) {
+    return '<div class="hint">Building ' + BLD[b.kind].label + '</div><div class="bar"><i style="width:' +
+      Math.round(100 * b.built) + '%"></i></div>';
+  }
+  if (!b.queue.length) return '<div class="hint">' + BLD[b.kind].label + ': idle</div>';
+  const q = b.queue[0];
+  const pct = Math.max(0, Math.min(100, 100 * (1 - q.t / KINDS[q.kind].time)));
+  return '<div class="hint">Training ' + KINDS[q.kind].label + '</div><div class="bar"><i style="width:' +
+    pct + '%"></i></div><div class="hint">' + (b.queue.length - 1) + ' more queued</div>';
+}
+
+function fmtCost(cost) {
+  return Object.keys(cost).map(k => cost[k] + ' ' + k[0].toUpperCase()).join(' ');
+}
+
+function renderFrame(Game) {
+  if (!Game.view || !Game.view.ok) return;
+  if (Game.dom && Game.dom.toast && Game.time - Game.toastAt > 2.2 && Game.dom.toast.classList &&
+      Game.dom.toast.classList.remove) Game.dom.toast.classList.remove('show');
+  const c = Game.view.ctx;
+  c.clearRect(0, 0, Game.view.w, Game.view.h);
+  drawWorld(Game, Game.view);
+  drawBuildings(Game, Game.view);
+  drawUnits(Game, Game.view);
+  drawGhost(Game, Game.view);
+  drawDragBox(Game, Game.view);
+  drawMinimap(Game, Game.mm);
+  renderHud(Game);
+}
+
+/* ------------------------------ 6. input ------------------------------- */
+
+function pickUnit(Game, x, y) {
+  let best = null, bd = Infinity;
+  for (const u of Game.units) {
+    if (u.dead || u.team !== 0) continue;
+    const d = (u.x - x) ** 2 + (u.y - y) ** 2;
+    if (d < 64 && d < bd) { bd = d; best = u; }
+  }
+  return best;
+}
+
+function pickBuilding(Game, x, y) {
+  const tx = Math.floor(x / CFG.TILE), ty = Math.floor(y / CFG.TILE);
+  for (const b of Game.buildings) {
+    if (b.team === 0 && tx >= b.tx && tx < b.tx + b.w && ty >= b.ty && ty < b.ty + b.h) return b;
+  }
+  return null;
+}
+
+function unitsInBox(Game, ax, ay, bx, by) {
+  return Game.units.filter(u => !u.dead && u.team === 0 && u.x >= ax && u.x <= bx && u.y >= ay && u.y <= by);
+}
+
+function attachInput(Game, d) {
+  const view = Game.dom.view;
+  const rect = () => {
+    try { return view.getBoundingClientRect(); } catch (e) { return { left: 0, top: 0, width: view_W(Game), height: view_H(Game) }; }
+  };
+  const isView = (t) => !t || t === view || t === Game.dom.stage;
+  const toWorld = (e) => {
+    const r = rect();
+    const cw = view.width || r.width || 1, ch = view.height || r.height || 1;
+    const sx = (e.clientX - r.left) * (cw / (r.width || cw));
+    const sy = (e.clientY - r.top) * (ch / (r.height || ch));
+    return { x: sx + Game.cam.x, y: sy + Game.cam.y, sx, sy };
+  };
+
+  d.addEventListener('mousemove', (e) => {
+    const r = rect();
+    const w = toWorld(e);
+    Game.cursor = { x: w.x, y: w.y };
+    Game.mouse = { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width || view_W(Game), h: r.height || view_H(Game) };
+    if (Game.drag) { Game.drag.x1 = w.sx; Game.drag.y1 = w.sy; }
+  });
+
+  d.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || !isView(e.target)) return;
+    if (Game.placing) { build(Game, Game.placing, Game.cursor.x, Game.cursor.y); return; }
+    const w = toWorld(e);
+    Game.drag = { x0: w.sx, y0: w.sy, x1: w.sx, y1: w.sy };
+  });
+
+  d.addEventListener('mouseup', (e) => {
+    if (e.button !== 0 || !Game.drag) return;
+    const w = toWorld(e);
+    const drag = Game.drag;
+    Game.drag = null;
+    const dx = Math.abs(w.sx - drag.x0), dy = Math.abs(w.sy - drag.y0);
+    Game.selectedBuilding = null;
+    if (dx < 4 && dy < 4) {
+      const hit = pickUnit(Game, w.x, w.y);
+      Game.selection = hit ? [hit.id] : [];
+      if (!hit) Game.selectedBuilding = pickBuilding(Game, w.x, w.y);
+    } else {
+      let box = unitsInBox(Game, Math.min(drag.x0, w.sx) + Game.cam.x, Math.min(drag.y0, w.sy) + Game.cam.y,
+                                  Math.max(drag.x0, w.sx) + Game.cam.x, Math.max(drag.y0, w.sy) + Game.cam.y);
+      const v = box.filter(u => u.kind === 'villager');
+      if (box.length && v.length) box = v;      // AoE2 prefers villagers on mixed drags
+      Game.selection = box.map(u => u.id);
+    }
+  });
+
+  d.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (Game.placing) { Game.placing = null; return; }
+    const w = toWorld(e);
+    issueOrder(Game, w.x, w.y);
+  });
+
+  const keys = Game.keys;
+  const setKey = (k, v) => {
+    if (k === 'w' || k === 'arrowup') keys.up = v;
+    else if (k === 's' || k === 'arrowdown') keys.down = v;
+    else if (k === 'a' || k === 'arrowleft') keys.left = v;
+    else if (k === 'd' || k === 'arrowright') keys.right = v;
+  };
+  d.addEventListener('keydown', (e) => {
+    const k = (e.key || '').toLowerCase();
+    if (e.ctrlKey && /^[1-9]$/.test(k)) { Game.groups[k] = Game.selection.slice(); e.preventDefault(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (k === 'escape') { Game.placing = null; Game.selection = []; Game.selectedBuilding = null; return; }
+    if (/^[1-9]$/.test(k)) { Game.selection = (Game.groups[k] || []).slice(); return; }
+    if (k === 'h') { Game.placing = Game.placing === 'house' ? null : 'house'; return; }
+    if (k === 'f') { Game.placing = Game.placing === 'farm' ? null : 'farm'; return; }
+    if (k === 'b') { Game.placing = Game.placing === 'barracks' ? null : 'barracks'; return; }
+    if (k === 't') { upgradeAge(Game); return; }
+    setKey(k, true);
+  });
+  d.addEventListener('keyup', (e) => setKey((e.key || '').toLowerCase(), false));
+
+  /* the command bar is rebuilt every frame -> delegate clicks off its parent */
+  if (Game.dom.commands && Game.dom.commands.addEventListener) {
+    Game.dom.commands.addEventListener('click', (e) => {
+      let t = e.target;
+      while (t && t.tagName !== 'BUTTON' && t.parentNode) t = t.parentNode;
+      if (!t || t.tagName !== 'BUTTON') return;
+      const act = t.getAttribute('data-act'), arg = t.getAttribute('data-arg');
+      if (act === 'build') Game.placing = arg;
+      else if (act === 'train' && Game.selectedBuilding) train(Game, Game.selectedBuilding, arg);
+      else if (act === 'age') upgradeAge(Game);
+      else if (act === 'restart') resetGame(Game);
+    });
+  }
+
+  if (Game.dom.minimap && Game.dom.minimap.addEventListener) {
+    Game.dom.minimap.addEventListener('mousedown', (e) => {
+      const r = Game.dom.minimap.getBoundingClientRect();
+      const fx = (e.clientX - r.left) / (r.width || 1), fy = (e.clientY - r.top) / (r.height || 1);
+      Game.cam.x = clamp(fx * Game.world.w * CFG.TILE - view_W(Game) / 2,
+                         0, Math.max(0, Game.world.w * CFG.TILE - view_W(Game)));
+      Game.cam.y = clamp(fy * Game.world.h * CFG.TILE - view_H(Game) / 2,
+                         0, Math.max(0, Game.world.h * CFG.TILE - view_H(Game)));
+      e.stopPropagation();
+    });
+  }
+
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('resize', () => {
+      Game.view = beginCanvas(Game.dom.view, sizeW(Game.dom), sizeH(Game.dom));
+      Game.mmBase = null;
+    });
+  }
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+/* ------------------------------- 7. boot ------------------------------- */
+
+/** Canvas factory that also works in node (the harness needs an offscreen
+ *  bitmap for the minimap). */
+function mkCanvas(w, h) {
+  if (typeof document !== 'undefined' && document.createElement) {
+    const el = document.createElement('canvas');
+    el.width = w; el.height = h;
+    return el;
+  }
+  return stubCanvas(w, h);
+}
+
+function stubCanvas(w, h) {
+  const canvas = { width: w, height: h, clientWidth: w, clientHeight: h };
+  const store = { canvas };
+  canvas.getContext = () => new Proxy({}, {
+    get(t, k) { return k in t ? t[k] : () => ({ width: 10 }); },
+    set(t, k, v) { t[k] = v; return true; },
+  });
+  canvas.addEventListener = () => {};
+  canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: w, height: h });
+  return canvas;
+}
+
+function view_W(Game) { return Game.view && Game.view.w ? Game.view.w : 1280; }
+function view_H(Game) { return Game.view && Game.view.h ? Game.view.h : 720; }
+function sizeW(dom) {
+  const el = dom.stage || dom.view;
+  return (el && el.clientWidth) || (typeof window !== 'undefined' && window.innerWidth) || 1280;
+}
+function sizeH(dom) {
+  const el = dom.stage || dom.view;
+  return (el && el.clientHeight) || (typeof window !== 'undefined' && window.innerHeight) || 720;
+}
+
+function createState() {
+  const Game = {
+    world: null, units: [], buildings: [], blocks: new Map(), occupied: new Set(),
+    res: [{ food: 0, wood: 0, gold: 0, stone: 0 }, { food: 0, wood: 0, gold: 0, stone: 0 }],
+    selection: [], selectedBuilding: null, groups: {}, keys: {},
+    cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, placing: null,
+    time: 0, wave: 0, age: 0, ageBonus: 0, nextId: 1, started: false,
+    dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0,
+  };
+  Game.toast = (m) => toast(Game, m);
+  resetGame(Game);
+  return Game;
+}
+
+function resetGame(Game) {
+  Game.world = makeWorld(CFG.SEED);
+  Game.units = [];
+  Game.buildings = [];
+  Game.nextId = 1;
+  Game.time = 0; Game.wave = 0; Game.age = 0; Game.ageBonus = 0;
+  Game.selection = []; Game.selectedBuilding = null; Game.placing = null;
+  Game.mmBase = null;
+  Game.res[0] = Object.assign({}, CFG.START);
+  Game.res[1] = Object.assign({}, CFG.START);
+
+  const a = findSite(Game.world, Math.round(CFG.MAP_W * 0.30), Math.round(CFG.MAP_H * 0.52), 3);
+  const b = findSite(Game.world, Math.round(CFG.MAP_W * 0.72), Math.round(CFG.MAP_H * 0.46), 3);
+  const tcA = makeBuilding(Game, 'town_center', 0, a.tx, a.ty);
+  const tcB = makeBuilding(Game, 'town_center', 1, b.tx, b.ty);
+  tcA.built = 1; tcA.hp = tcA.maxHp;
+  tcB.built = 1; tcB.hp = tcB.maxHp;
+
+  /* starting squad per side: 4 villagers on the resources + 1 warrior */
+  for (const team of [0, 1]) {
+    const home = team === 0 ? a : b;
+    for (let i = 0; i < 4; i++) {
+      const v = makeUnit(Game, 'villager', team,
+        (home.tx + (i % 2)) * CFG.TILE + 4, (home.ty + 1 + ((i / 2) | 0)) * CFG.TILE + 4);
+      assignStarter(Game, v);
+    }
+    makeUnit(Game, 'militia', team, (home.tx + 4) * CFG.TILE + 4, (home.ty + 4) * CFG.TILE + 4);
+  }
+
+  Game.cam.x = clamp(a.tx * CFG.TILE - 300, 0, Math.max(0, Game.world.w * CFG.TILE - view_W(Game)));
+  Game.cam.y = clamp(a.ty * CFG.TILE - 200, 0, Math.max(0, Game.world.h * CFG.TILE - view_H(Game)));
+}
+
+/** Put a starting villager on the nearest harvestable tile. */
+function assignStarter(Game, v) {
+  const ux = Math.floor(v.x / CFG.TILE), uy = Math.floor(v.y / CFG.TILE);
+  for (let r = 1; r <= 12; r++) {
+    const t = ringRes(Game.world, ux, uy, r, null);
+    if (t) { v.order = { kind: 'harvest', src: sourceFromTile(Game.world, v, t.tx, t.ty) }; return; }
+  }
+}
+
+function boot(doc) {
+  const Game = createState();
+  const d = doc || (typeof document !== 'undefined' ? document : null);
+  if (!d) return Game;
+  const viewEl = d.getElementById('view');
+  if (!viewEl) return Game;
+
+  Game.dom = {
+    view: viewEl,
+    minimap: d.getElementById('minimap'),
+    stage: d.getElementById('stage'),
+    info: d.getElementById('info'),
+    commands: d.getElementById('commands'),
+    queue: d.getElementById('queue'),
+    toast: d.getElementById('toast'),
+  };
+  for (const k of ['food', 'wood', 'gold', 'stone', 'pop', 'age']) {
+    const box = d.getElementById('r_' + k);
+    if (box && box.querySelector) {
+      const b = box.querySelector('b');
+      if (b) Game.dom['set_' + k] = b;
+    }
+  }
+  Game.view = beginCanvas(viewEl, sizeW(Game.dom), sizeH(Game.dom));
+  Game.mm = beginCanvas(Game.dom.minimap, 168, 168);
+  if (!Game.view.ok) return Game;
+
+  attachInput(Game, d);
+  Game.started = true;
+  renderFrame(Game);
+  startLoop(Game);
+  return Game;
+}
+
+function now() {
+  return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+}
+
+function startLoop(Game) {
+  if (typeof window === 'undefined' || !window.requestAnimationFrame) return;
+  let last = now();
+  const frame = () => {
+    const t = now();
+    let dt = (t - last) / 1000;
+    last = t;
+    if (dt > 0.1) dt = 0.1;                     // tab-switch guard
+    Game.frame++;
+    stepGame(Game, dt);
+    renderFrame(Game);
+    window.requestAnimationFrame(frame);
+  };
+  window.requestAnimationFrame(frame);
+}
+
+/** Per-frame work: camera panning, then the simulation. */
+function stepGame(Game, dt) {
+  const s = CFG.PAN_SPEED * dt, k = Game.keys;
+  if (k.up) Game.cam.y -= s;
+  if (k.down) Game.cam.y += s;
+  if (k.left) Game.cam.x -= s;
+  if (k.right) Game.cam.x += s;
+  if (Game.mouse && Game.mouse.w && !Game.drag) {
+    const m = Game.mouse;
+    if (m.y < CFG.EDGE) Game.cam.y -= s; else if (m.y > m.h - CFG.EDGE) Game.cam.y += s;
+    if (m.x < CFG.EDGE) Game.cam.x -= s; else if (m.x > m.w - CFG.EDGE) Game.cam.x += s;
+  }
+  Game.cam.x = clamp(Game.cam.x, 0, Math.max(0, Game.world.w * CFG.TILE - view_W(Game)));
+  Game.cam.y = clamp(Game.cam.y, 0, Math.max(0, Game.world.h * CFG.TILE - view_H(Game)));
+  stepSim(Game, dt);
+}
+
+/* --------------------------- public surface ---------------------------- */
+
+const AoE2 = {
+  CFG, KINDS, BLD, AGES, T, PAL, TEAM, RES_OF_TILE,
+  makeWorld, findSite, tileRes, sourceFromTile, sourceFromFarm, workSpot,
+  makeUnit, makeBuilding, createState, boot, stepGame, stepSim, renderFrame,
+  build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
+  popCap, popUsed, selectedUnits, canAfford, spend, resetGame,
+};
+
+if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;
+if (typeof window !== 'undefined') {
+  window.AoE2 = AoE2;
+  if (typeof document !== 'undefined' && document.getElementById('view')) window.Game = boot(document);
+}
+</script>
+</body>
+</html>
