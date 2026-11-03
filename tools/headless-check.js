@@ -116,9 +116,13 @@ global.window = {
 // index.html's loadAtlas() does `new Image(); img.src = 'assets/sprites.png'`.
 // Node has no Image, so the sandbox gets one that decodes the real file through
 // @napi-rs/canvas synchronously (a browser fires onload later; the game only
-// reads the field on the next frame, so firing inline is equivalent). Without a
-// canvas backend there is no Image at all and the game must still boot on its
-// procedural fallback -- which is what loadAtlas guards for.
+// reads the field on the next frame, so firing inline is equivalent).
+// Caveat measured on @napi-rs/canvas 1.1.0: an Image built this way reports the
+// right width/height but paints nothing (only loadImage() decodes for
+// drawImage), so this stub proves the constructor/onload wiring while
+// tools/render-preview.js injects a properly decoded sheet via setAtlas.
+// With no canvas backend there is no Image at all and the game must still boot
+// on its procedural fallback -- which is what loadAtlas guards for.
 const napiImage = (() => {
   for (const t of [path.join(__dirname, 'node_modules', '@napi-rs', 'canvas'), '@napi-rs/canvas']) {
     try { return require(t); } catch (e) { /* next */ }
@@ -229,10 +233,13 @@ const cleared = typeof AoE2.setAtlas === 'function' ? AoE2.setAtlas(atlasState, 
 check(cleared === null && atlasState.sprites.atlas === null,
   'sprites: setAtlas clears the atlas source', describeAtlas(atlasState));
 // and boot() must have used it for the committed sheet whenever a backend exists
-check(!!Game.sprites && !!Game.sprites.atlas === !!napiImage,
+const bootedAtlas = Game.sprites && Game.sprites.atlas;
+check(!!bootedAtlas === !!napiImage && (!bootedAtlas ||
+    (bootedAtlas.width === sheet.w && bootedAtlas.height === sheet.h)),
   'sprites: boot loadAtlas wired assets/sprites.png',
-  Game.sprites && Game.sprites.atlas
-    ? 'loaded ' + Game.sprites.atlas.src + ' ' + Game.sprites.atlas.width + 'x' + Game.sprites.atlas.height
+  bootedAtlas
+    ? 'loaded ' + bootedAtlas.src + ' ' + bootedAtlas.width + 'x' + bootedAtlas.height +
+      ', matches SPRITE_SHEET'
     : (napiImage ? 'nothing loaded' : 'no canvas backend in this sandbox'));
 
 /* ---- 6. simulate 30s: economy + movement invariants ----------------- */

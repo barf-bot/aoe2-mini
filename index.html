@@ -954,12 +954,25 @@ function drawUnits(Game, view) {
   const c = view.ctx;
   if (!c) return;
   const cam = Game.cam;
+  const atlas = Game.sprites && Game.sprites.atlas; // assets/sprites.png, see loadAtlas
   for (const u of Game.units) {
     const x = u.x - cam.x, y = u.y - cam.y;
     if (x < -20 || y < -20 || x > view.w + 20 || y > view.h + 20) continue;
     const team = TEAM[u.team];
     const sel = Game.selection.indexOf(u.id) >= 0;
-    if (u.kind === 'villager') {
+    const frame = spriteFor(u.kind, u.team);
+    if (atlas && frame) {
+      // The atlas cell, mirrored when the unit walks left and bobbing 1px on its
+      // 8 Hz walk clock (8 steps/s); idle units hold still. Drawn at integer
+      // pixels so the 24px art stays crisp instead of anti-aliasing itself soft.
+      const bob = u.order.kind === 'idle' ? 0 : Math.floor(u.anim * 8) % 2;
+      c.save();
+      c.translate(Math.round(x), Math.round(y) + bob);
+      if (u.face < 0) c.scale(-1, 1);
+      c.drawImage(atlas, frame.sx, frame.sy, frame.sw, frame.sh,
+        -frame.dw / 2, -frame.dh / 2, frame.dw, frame.dh);
+      c.restore();
+    } else if (u.kind === 'villager') {
       c.fillStyle = '#2b2b2b'; c.beginPath(); c.arc(x, y, 6.5, 0, 6.283); c.fill();
       c.fillStyle = team.main; c.beginPath(); c.arc(x, y, 5, 0, 6.283); c.fill();
       c.fillStyle = team.light; c.beginPath(); c.arc(x - 1.2, y - 1.2, 2.2, 0, 6.283); c.fill();

@@ -60,7 +60,7 @@ regenerated and visually inspected before the render task is ticked.
       `u.anim` (seconds spent moving, frozen when idle) - proved by: new checks `units:
       face follows movement direction` and `units: walk phase frozen while idle`.
 
-- [ ] 5. Draw units from the atlas - files: `index.html` (section 5 `drawUnits`),
+- [x] 5. Draw units from the atlas - files: `index.html` (section 5 `drawUnits`),
       `preview.png` - change: built sprites via `drawImage` with mirror-on-left and a 1px
       bob while walking; selection ring, hp bar and carry dot stay as they are; falls back
       to the old shapes without an atlas - proved by: `node tools/render-preview.js`

@@ -28,21 +28,12 @@ function loadCanvas() {
 }
 const napi = loadCanvas();
 
-/* index.html's loadAtlas() needs `new Image()`. With a napi backend, hand it one
- * that decodes the real assets/sprites.png (same contract as the stub in
- * tools/headless-check.js); without a backend there is no Image and the game
- * boots on its procedural drawing path, which is what that path is for. */
-if (napi) {
-  global.Image = class Image extends napi.Image {
-    constructor() { super(); this.onload = null; this._src = ''; }
-    set src(src) {
-      this._src = src;
-      super.src = fs.readFileSync(path.isAbsolute(src) ? src : path.join(ROOT, src));
-      if (this.onload) this.onload();
-    }
-    get src() { return this._src; }
-  };
-}
+/* No Image stub here, unlike tools/headless-check.js: @napi-rs/canvas 1.1.0
+ * decodes `new Image().src = buffer` into an image that reports 96x24 and
+ * complete:true but paints nothing, so the atlas is loaded with loadImage()
+ * below and handed to the game through setAtlas -- the same injection point a
+ * browser's img.onload uses. (The check sandbox keeps the stub because its
+ * canvas swallows draw arguments; there the constructor path is what matters.) */
 
 /* ---------- DOM stub (same contract as tools/headless-check.js) ---------- */
 function stubCtx(canvas) {
@@ -109,19 +100,8 @@ const SECONDS = Number(arg('seconds', 8));
 const OUT = path.resolve(arg('out', path.join(ROOT, 'preview.png')));
 
 /* ---------- mode 1: real pixels ---------- */
-if (napi) {
-  const realView = napi.createCanvas(DIMS.view[0], DIMS.view[1]);
-  const doc = buildDom(realView);
-  global.document = doc;
-  global.window = { innerWidth: DIMS.view[0], innerHeight: DIMS.view[1],
-    addEventListener() {}, requestAnimationFrame() { return 0; } };
-
-  const jsPath = path.join(__dirname, '.extracted-preview.js');
-  fs.writeFileSync(jsPath, HTML_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]);
-  const G = require(jsPath);
-  const Game = global.window.Game;
-  fs.unlinkSync(jsPath);
-
+/** 8s of simulated play, then paint the view into realView and write OUT. */
+function simulateAndRender(G, Game, realView) {
   const villagers = Game.units.filter((u) => u.team === 0 && u.kind === 'villager');
   if (villagers.length) G.issueOrder(Game, villagers[0].order.src ? villagers[0].order.src.x : villagers[0].x,
     villagers[0].order.src ? villagers[0].order.src.y : villagers[0].y);
@@ -138,15 +118,37 @@ if (napi) {
   process.exit(0);
 }
 
-/* ---------- mode 2: no canvas backend, at least prove the draw calls run ---------- */
-const doc = buildDom(null);
-global.document = doc;
-global.window = { innerWidth: 1200, innerHeight: 700, addEventListener() {}, requestAnimationFrame() { return 0; } };
-const jsPath = path.join(__dirname, '.extracted-preview.js');
-fs.writeFileSync(jsPath, HTML_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]);
-const G = require(jsPath);
-const Game = global.window.Game;
-fs.unlinkSync(jsPath);
-for (let i = 0; i < Math.round(SECONDS * 30); i++) G.stepGame(Game, 1 / 30);
-G.renderFrame(Game);
-console.log('stub-canvas render OK (install @napi-rs/canvas in tools/node_modules for a PNG)');
+if (napi) {
+  const realView = napi.createCanvas(DIMS.view[0], DIMS.view[1]);
+  const doc = buildDom(realView);
+  global.document = doc;
+  global.window = { innerWidth: DIMS.view[0], innerHeight: DIMS.view[1],
+    addEventListener() {}, requestAnimationFrame() { return 0; } };
+
+  const jsPath = path.join(__dirname, '.extracted-preview.js');
+  fs.writeFileSync(jsPath, HTML_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]);
+  const G = require(jsPath);
+  const Game = global.window.Game;
+  fs.unlinkSync(jsPath);
+
+  const sheet = path.join(ROOT, 'assets', 'sprites.png');
+  Promise.resolve(fs.existsSync(sheet) ? napi.loadImage(sheet) : null)
+    .then((atlas) => {
+      if (atlas) G.setAtlas(Game, atlas);          // browser-equivalent: img.onload -> setAtlas
+      return simulateAndRender(G, Game, realView);
+    })
+    .catch((e) => { console.error('FAIL preview: ' + (e && e.stack || e)); process.exit(1); });
+} else {
+  /* ---------- mode 2: no canvas backend, at least prove the draw calls run ---------- */
+  const doc = buildDom(null);
+  global.document = doc;
+  global.window = { innerWidth: 1200, innerHeight: 700, addEventListener() {}, requestAnimationFrame() { return 0; } };
+  const jsPath = path.join(__dirname, '.extracted-preview.js');
+  fs.writeFileSync(jsPath, HTML_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]);
+  const G = require(jsPath);
+  const Game = global.window.Game;
+  fs.unlinkSync(jsPath);
+  for (let i = 0; i < Math.round(SECONDS * 30); i++) G.stepGame(Game, 1 / 30);
+  G.renderFrame(Game);
+  console.log('stub-canvas render OK (install @napi-rs/canvas in tools/node_modules for a PNG)');
+}
