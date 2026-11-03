@@ -1,6 +1,6 @@
 # Unit sprites (atlas v1)
 
-Status: awaiting go
+Status: done
 
 ## Design
 
