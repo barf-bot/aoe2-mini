@@ -1177,7 +1177,16 @@ function attachInput(Game, d) {
     const r = rect();
     const w = toWorld(e);
     Game.cursor = { x: w.x, y: w.y };
-    Game.mouse = { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width || view_W(Game), h: r.height || view_H(Game) };
+    // Feed the edge-scroll only while the pointer is over the canvas: coords measured
+    // against the view go out of range when the pointer sits on header/footer chrome,
+    // and stepGame read that as "cursor pinned to a screen edge" (a hover on the
+    // resource bar or a command icon used to pan the camera). During a drag we keep
+    // tracking; stepGame already skips edge-scroll while dragging.
+    if (isView(e.target) || Game.drag) {
+      Game.mouse = { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width || view_W(Game), h: r.height || view_H(Game) };
+    } else {
+      Game.mouse = null;
+    }
     if (Game.drag) { Game.drag.x1 = w.sx; Game.drag.y1 = w.sy; }
   });
 

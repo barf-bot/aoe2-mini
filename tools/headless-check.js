@@ -314,6 +314,33 @@ const mmBefore = Game.cam.x;
 doc.getElementById('minimap').fire('mousedown', { clientX: 84, clientY: 84, target: doc.getElementById('minimap') });
 check(Game.cam.x !== mmBefore, 'input: minimap click moves the camera', mmBefore + ' -> ' + Math.round(Game.cam.x));
 
+/* ---- 10b. edge-scroll must ignore pointer on HUD chrome -------------- */
+// Regression (reported): "the screen starts to move when the mouse just wants
+// to click on the icons or when you want to hover something". The document
+// mousemove wrote Game.mouse even while the pointer was over the header or
+// footer; view-relative coords then left the canvas rect (negative y over the
+// header) and stepGame read that as "cursor pinned to a screen edge" and
+// panned. mousedown guards with isView; mousemove used to not.
+const headerEl = doc.getElementById('header');
+const cmdBarEl = doc.getElementById('commands');
+Game.cam.x = 500; Game.cam.y = 300;
+doc.fire('mousemove', { clientX: 3, clientY: 3, target: view });
+AoE2.stepGame(Game, DT);
+check(Game.cam.x < 500 && Game.cam.y < 300,
+  'input: cursor on the canvas top-left corner still pans up+left (kept)',
+  Math.round(Game.cam.x) + ',' + Math.round(Game.cam.y));
+const camH = Game.cam.y;
+doc.fire('mousemove', { clientX: 300, clientY: -18, target: headerEl });
+AoE2.stepGame(Game, DT);
+check(Game.cam.y === camH && Game.mouse === null,
+  'input: hovering the header bar does not pan (off-canvas coords)', camH + ' -> ' + Game.cam.y);
+doc.fire('mousemove', { clientX: 300, clientY: 300, target: view });
+const camF = Game.cam.y;
+doc.fire('mousemove', { clientX: 300, clientY: 712, target: cmdBarEl });
+AoE2.stepGame(Game, DT);
+check(Game.cam.y === camF && Game.mouse === null,
+  'input: hovering the footer command bar does not pan', camF + ' -> ' + Game.cam.y);
+
 /* ---- 11. command bar buttons ---------------------------------------- */
 Game.selection = [];
 Game.dom.commands.innerHTML = '';
