@@ -55,7 +55,7 @@ regenerated and visually inspected before the render task is ticked.
       sandbox, per the execute rules) - proved by: all existing checks pass plus a check
       that `setAtlas` stores and clears the source; no visual change yet.
 
-- [ ] 4. Face and walk bookkeeping - files: `index.html` (section 4 `makeUnit`,
+- [x] 4. Face and walk bookkeeping - files: `index.html` (section 4 `makeUnit`,
       `updateUnit`, `moveUnit`) - change: `u.face` (`+1`/`-1`, set from movement dx),
       `u.anim` (seconds spent moving, frozen when idle) - proved by: new checks `units:
       face follows movement direction` and `units: walk phase frozen while idle`.

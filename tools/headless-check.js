@@ -272,6 +272,30 @@ check(carrying > 0 || Game.res[0].food > food0 + 9, 'economy: carry loop runs (u
   carrying + ' villagers carrying');
 check(!Game.units.some(u => isNaN(u.x) || isNaN(u.y) || isNaN(u.hp)), 'sim: no NaN positions or hp', 'all finite');
 
+/* ---- 6b. facing and walk phase (the sprite fields) ------------------ */
+// drawUnits mirrors the sprite on u.face and bobs it with u.anim, so both have
+// to be state the sim keeps. Its own state: stepping the shared Game here would
+// advance training timers that section 8 asserts on.
+const faceState = AoE2.createState();
+const faceStep = (n) => { for (let i = 0; i < n; i++) AoE2.stepGame(faceState, DT); };
+const secs = (v) => (typeof v === 'number' ? v.toFixed(2) + 's' : String(v));
+const marcher = faceState.units.find(u => u.team === 0 && u.kind === 'militia');
+const bornAt = marcher.anim;
+marcher.order = { kind: 'move', x: marcher.x - 40, y: marcher.y };
+faceStep(24);
+const faceLeft = marcher.face, walkAt = marcher.anim;
+marcher.order = { kind: 'move', x: marcher.x + 40, y: marcher.y };
+faceStep(24);
+check(bornAt === 0 && faceLeft === -1 && marcher.face === 1 && walkAt > bornAt,
+  'units: face follows movement direction',
+  `face left=${faceLeft} right=${marcher.face}, anim ${secs(bornAt)} -> ${secs(walkAt)}`);
+marcher.order = { kind: 'idle' };
+const restedAt = marcher.anim;
+faceStep(30);
+check(typeof restedAt === 'number' && marcher.anim === restedAt,
+  'units: walk phase frozen while idle',
+  secs(restedAt) + ' -> ' + secs(marcher.anim) + ' over 1s of standing');
+
 /* ---- 7. construction ------------------------------------------------ */
 function freeSpotAround(world, Game, tx, ty, w, h, maxR) {
   for (let r = 1; r <= maxR; r++) {

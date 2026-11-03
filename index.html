@@ -395,6 +395,7 @@ function makeUnit(Game, kind, team, x, y) {
   const u = {
     id: Game.nextId++, kind, team, x, y,
     hp: k.hp, maxHp: k.hp, speed: k.speed, atk: k.atk, atkTime: k.atkTime, r: k.r,
+    face: 1, anim: 0, // sprite mirror + walking clock, both set by moveUnit
     order: { kind: 'idle' }, carry: 0, carryRes: null, work: 0, cd: 0, dead: false,
   };
   Game.units.push(u);
@@ -561,6 +562,10 @@ function moveUnit(Game, u, x, y, dt, stop) {
   const dx = x - u.x, dy = y - u.y;
   const d = Math.hypot(dx, dy);
   if (d <= s) return true;
+  // walking somewhere: mirror the sprite toward the walk and run the clock that
+  // drives the step bob -- an idle unit never gets here, so its pose stays put.
+  if (dx > 0) u.face = 1; else if (dx < 0) u.face = -1;
+  u.anim += dt;
   const stepLen = Math.min(d - s * 0.5, u.speed * dt);
   const nx = u.x + (dx / d) * stepLen, ny = u.y + (dy / d) * stepLen;
   if (walkable(Game, nx, ny)) { u.x = nx; u.y = ny; return (d - stepLen) <= s; }
