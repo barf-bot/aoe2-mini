@@ -111,7 +111,7 @@ completing. Plus a regenerated `preview.png` to eyeball the cluster.
     re-authored to stand the villager 2 tiles off the dead tile with a live same-resource
     tile 3 tiles the other way, so it still proves the retarget under the 5-tile cap.
 
-- [ ] T5: One builder per building (the multi-build bug)
+- [x] T5: One builder per building (the multi-build bug)
   - files: `index.html` §4 `build` (861-881); `tools/headless-check.js` §7 (432-464)
   - change: `build()` stops using `sel.find(u => u.kind === 'villager')` — the same first
     villager on every placement, yanked off his first site and leaving it stalled at

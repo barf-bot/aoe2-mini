@@ -665,6 +665,32 @@ check(house.hp === house.maxHp, 'build: hp scales with progress to full', house.
 check(AoE2.popCap(Game, 0) === 10, 'pop: house raises the cap to 10', String(AoE2.popCap(Game, 0)));
 check(AoE2.siteFree(Game, house.tx, house.ty, 2, 2) === false, 'site: occupied land rejected after building', 'rejected');
 
+// T5 multi-build: build() used to hand every new site to sel.find(villager) —
+// the same first villager — so the second placement yanked him off his first
+// site and left it stalled at partial forever. Two placements from one
+// 4-villager selection must recruit two different idle builders, and the sim
+// must then finish both buildings. The farm pad goes next to the SECOND
+// villager's tile (straight-line walking cannot always reach a pad across a
+// live resource tile — roadmap P0.2 keeps that out of this check).
+const mb = AoE2.createState();
+const mv = mb.units.filter((u) => u.team === 0 && u.kind === 'villager');
+mb.selection = mv.map((u) => u.id);
+const mbHouseSpot = freeSpotAround(mb.world, mb, tOf(mv[0].x), tOf(mv[0].y), 2, 2, 8);
+const mbHouse = mbHouseSpot && AoE2.build(mb, 'house', mbHouseSpot.tx * AoE2.CFG.TILE + 4, mbHouseSpot.ty * AoE2.CFG.TILE + 4);
+const mbFarmSpot = mbHouse && freeSpotAround(mb.world, mb, tOf(mv[1].x), tOf(mv[1].y), 2, 2, 8);
+const mbFarm = mbFarmSpot && AoE2.build(mb, 'farm', mbFarmSpot.tx * AoE2.CFG.TILE + 4, mbFarmSpot.ty * AoE2.CFG.TILE + 4);
+const buildersOn = (bid) => mb.units.filter((u) => u.order.kind === 'build' && u.order.b === bid).map((u) => u.id);
+const mbBuilders = mbHouse && mbFarm ? [buildersOn(mbHouse.id), buildersOn(mbFarm.id)] : null;
+for (let i = 0; i < 30 * 20; i++) AoE2.stepGame(mb, DT);
+check(!!mbHouse && !!mbFarm && !!mbBuilders &&
+      mbBuilders[0].length === 1 && mbBuilders[1].length === 1 &&
+      mbBuilders[0][0] !== mbBuilders[1][0] && mbHouse.built >= 1 && mbFarm.built >= 1,
+  'build: two placements from a 4-villager selection get two distinct builders and both complete',
+  !mbHouse || !mbFarm
+    ? 'placement failed: ' + [!mbHouse && 'house', !mbFarm && 'farm'].filter(Boolean).join(' ')
+    : 'house builder [' + mbBuilders[0].join(',') + '] farm builder [' + mbBuilders[1].join(',') + ']' +
+      ' built ' + Math.round(mbHouse.built * 100) + '%/' + Math.round(mbFarm.built * 100) + '%');
+
 /* ---- 7b. camps + drop-off routing (v2 task 3) ----------------------- */
 // Lumber/Mining camps and the Mill join BLD at their AoE2 costs and sizes, and
 // a carrying villager must walk to the DEDICATED building for what they carry

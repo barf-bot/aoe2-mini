@@ -70,13 +70,19 @@ this file disagree, the code is right and this file is a bug.
 | Mining Camp | 950 | 1×1 | 100 wood | 8 s | — | — |
 | Mill | 1100 | 2×2 | 175 wood | 10 s | — | — |
 
-- Drop-off routing (`findDropoff`, `index.html:760`): wood goes to the Lumber Camp,
+- Drop-off routing (`findDropoff`, `index.html:860`): wood goes to the Lumber Camp,
   gold/stone to the Mining Camp and food to the Mill — each falling back to the Town
   Center (and food also to farms) when the dedicated building doesn't exist. A farm
   never receives its own harvest.
 
-- Placement needs a free, walkable footprint (`siteFree`) and enough resources; a villager
-  is then assigned to build it and the building's HP scales with progress until complete.
+- Placement needs a free, walkable footprint (`siteFree`, `index.html:1039`) and enough
+  resources. The builder (`pickBuilder` via `build`, `index.html:993`) is the nearest
+  idle villager in the current selection, else the nearest idle team-0 villager: a
+  villager already building a finished-or-missing building or on a harvest/move order is
+  free (the order is abandoned), while one assigned to a building with `built < 1` is
+  never yanked off — so each placement gets its own builder and parallel construction
+  works. With no idle villager the placement is refused (`All villagers are building`).
+  The building's HP scales with progress until complete.
 - Training: a building can only train what's in its `trains` list ("Militia needs a Town
   Center" when wrong), must be finished (`Still building`), max 5 in queue (`Queue full`),
   must be affordable, and must have population room (`Need more houses`).

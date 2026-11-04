@@ -69,6 +69,18 @@ commits on `main`.
   the table shape, cell uniqueness and the order→animation mapping (75 → 81 checks).
 
 ### Fixed
+- **Placing a second building while several villagers were selected stalled the first
+  one** (T5, the multi-build bug). `build()` always handed the new site to
+  `sel.find(u => u.kind === 'villager')` — the *same* first villager on every placement —
+  so each new building yanked its predecessor's builder off the unfinished site and left
+  it stalled at partial forever. A new `pickBuilder` now assigns the nearest **idle**
+  villager in the selection (falling back to the nearest idle team-0 villager, as
+  before); a villager whose order points at a building with `built < 1` is never taken
+  off his site, a harvest/move order is simply abandoned, and with no idle villager the
+  placement is refused with `All villagers are building`. Harness §7 gained the
+  `build: two placements from a 4-villager selection get two distinct builders and both
+  complete` check; the existing single-placement construction checks stay green
+  (110 → 111 checks).
 - **Villagers stopped collecting food once the berry tile ran dry** (the "food stalls at
   420" report). Two causes: `assignStarter` gave every starting villager the *same*
   nearest tile, and `resumeGather` re-validated that exact tile after depositing — when
