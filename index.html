@@ -122,24 +122,60 @@ const KINDS = {
               cost:{food:60, gold:20}, time:6, buildable:false },
 };
 
-/* Sprite atlas v1 -- every unit x team frame lives in ONE image,
- * assets/sprites.png. tools/gen-atlas.js renders this table into that sheet, so
- * the art and the code cannot drift: sx/sy/sw/sh = the cell inside the sheet,
- * dw/dh = the size the cell is drawn on screen. Cells are ordered like TEAM
- * (index 0 = Blue, 1 = Red), left to right. New unit kinds must add a cell or
- * the `sprites: frame table covers every unit kind x team` check fails.
+/* Sprite atlas v2 -- every unit frame lives in ONE image, assets/sprites.png.
+ * SPRITES maps kind -> animation -> [Blue, Red] cells (the cell columns run
+ * left to right, row 0 = Blue, row 1 = Red, exactly like TEAM);
+ * tools/gen-atlas.js renders the table into the sheet, so the art and the code
+ * cannot drift: sx/sy/sw/sh = the cell inside the sheet, dw/dh = the size the
+ * cell is drawn on screen. Which cell a unit plays right now is unitAnim(u)
+ * (section 5): villagers get distinct two-frame work animations per resource
+ * (farm/chop/mine) plus civilian idle/walk -- no more helmeted warrior
+ * silhouette -- and militia get idle/walk plus attack_a/attack_b swings.
+ * New unit kinds or animations must add cells or the
+ * `sprites: every registered anim x team has a unique in-sheet cell` check
+ * fails.
  */
-const SPRITE_SHEET = { w: 96, h: 24 };
+const SPRITE_SHEET = { w: 288, h: 48 };
 const SPRITES = {
-  villager: [{ sx: 0,  sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },   // Blue
-             { sx: 24, sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 }],  // Red
-  militia:  [{ sx: 48, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 },   // Blue
-             { sx: 72, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 }],  // Red
+  villager: {
+    idle:   [{ sx: 0,   sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
+             { sx: 0,   sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
+    walk:   [{ sx: 24,  sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
+             { sx: 24,  sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
+    farm_a: [{ sx: 48,  sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
+             { sx: 48,  sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
+    farm_b: [{ sx: 72,  sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
+             { sx: 72,  sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
+    chop_a: [{ sx: 96,  sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
+             { sx: 96,  sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
+    chop_b: [{ sx: 120, sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
+             { sx: 120, sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
+    mine_a: [{ sx: 144, sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
+             { sx: 144, sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
+    mine_b: [{ sx: 168, sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
+             { sx: 168, sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
+  },
+  militia: {
+    idle:     [{ sx: 192, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 },
+               { sx: 192, sy: 24, sw: 24, sh: 24, dw: 22, dh: 22 }],
+    walk:     [{ sx: 216, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 },
+               { sx: 216, sy: 24, sw: 24, sh: 24, dw: 22, dh: 22 }],
+    attack_a: [{ sx: 240, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 },
+               { sx: 240, sy: 24, sw: 24, sh: 24, dw: 22, dh: 22 }],
+    attack_b: [{ sx: 264, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 },
+               { sx: 264, sy: 24, sw: 24, sh: 24, dw: 22, dh: 22 }],
+  },
 };
 
-/** The atlas cell for (kind, team), or null when that unit has no art yet. */
-function spriteFor(kind, team) {
-  const cells = SPRITES[kind];
+/* Which work animation each gathered resource uses (unitAnim picks it from the
+ * unit's order source). Stone mines like gold, exactly like AoE2. */
+const WORK_ANIM = { food: 'farm', wood: 'chop', gold: 'mine', stone: 'mine' };
+
+/** The atlas cell for (kind, team, anim), or null when that frame has no art.
+ *  Anim defaults to idle so callers of the v1 signature keep working. */
+function spriteFor(kind, team, anim) {
+  const table = SPRITES[kind];
+  const cells = table && table[anim || 'idle'];
   if (!Array.isArray(cells)) return null;
   const c = cells[team];
   return (c && typeof c.sx === 'number' && typeof c.sw === 'number') ? c : null;
@@ -968,6 +1004,25 @@ function drawBuildings(Game, view) {
   }
 }
 
+/** The SPRITES animation a unit plays right now, from its order (pure, so
+ *  section 5b2 pins it). Work/swing frames alternate a<->b at 4 Hz off the
+ *  activity clock u.anim; idle units hold their single idle cell. */
+function unitAnim(u) {
+  const o = u.order;
+  const swing = () => (Math.floor(u.anim * 4) % 2 ? 'b' : 'a');
+  if (u.kind === 'militia') {
+    if (o.kind === 'attack') return 'attack_' + swing();
+    return (o.kind === 'move' || u.anim > 0) ? 'walk' : 'idle';
+  }
+  switch (o.kind) {
+    case 'harvest':   return (WORK_ANIM[o.src && o.src.res] || 'farm') + '_' + swing();
+    case 'build':     return 'farm_' + swing();  // generic hammering pose
+    case 'move':
+    case 'go_deposit': return 'walk';
+    default:          return 'idle';
+  }
+}
+
 function drawUnits(Game, view) {
   const c = view.ctx;
   if (!c) return;
@@ -978,12 +1033,14 @@ function drawUnits(Game, view) {
     if (x < -20 || y < -20 || x > view.w + 20 || y > view.h + 20) continue;
     const team = TEAM[u.team];
     const sel = Game.selection.indexOf(u.id) >= 0;
-    const frame = spriteFor(u.kind, u.team);
+    const anim = unitAnim(u);                          // which cell this unit plays
+    const frame = spriteFor(u.kind, u.team, anim);
     if (atlas && frame) {
       // The atlas cell, mirrored when the unit walks left and bobbing 1px on its
-      // 8 Hz walk clock (8 steps/s); idle units hold still. Drawn at integer
-      // pixels so the 24px art stays crisp instead of anti-aliasing itself soft.
-      const bob = u.order.kind === 'idle' ? 0 : Math.floor(u.anim * 8) % 2;
+      // 8 Hz walk clock (8 steps/s) only while walking; standing and working
+      // frames hold still -- the a/b work cells are their own animation. Drawn
+      // at integer pixels so the 24px art stays crisp instead of softening.
+      const bob = anim === 'walk' ? Math.floor(u.anim * 8) % 2 : 0;
       c.save();
       c.translate(Math.round(x), Math.round(y) + bob);
       if (u.face < 0) c.scale(-1, 1);
@@ -1552,9 +1609,10 @@ function stepGame(Game, dt) {
 
 const AoE2 = {
   CFG, KINDS, BLD, AGES, T, PAL, TEAM, RES_OF_TILE,
-  SPRITE_SHEET, SPRITES, spriteFor,
+  SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor,
   makeWorld, findSite, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
+  unitAnim,
   build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   popCap, popUsed, selectedUnits, canAfford, spend, resetGame,
   findDropoff, nextSource, resumeGather, workersOnTile,

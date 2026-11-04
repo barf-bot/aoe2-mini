@@ -226,27 +226,85 @@ check(Math.floor(st2.res[0].food) === rf0 + 7 && rv0.order.kind === 'harvest',
   rv0.order.kind + ' food+' + (Math.floor(st2.res[0].food) - rf0));
 
 /* ---- 5b. sprite frame table ----------------------------------------- */
-// The atlas layout is data, not code: one sheet, one cell per kind x team.
-// Adding a unit kind without giving it a cell must fail here (the archer is
-// on the roadmap exactly so this check fires when it lands).
+// The atlas layout is data, not code: one sheet, one cell per registered
+// animation x team, each reachable through spriteFor. Adding a unit kind or
+// animation without its cells must fail here (the archer is on the roadmap
+// exactly so this check fires when it lands).
 const sheet = AoE2.SPRITE_SHEET || {};
 let spriteErr = '';
 const rects = new Set();
+let cellCount = 0;
 outer:
 for (const kind of Object.keys(AoE2.KINDS)) {
-  for (let team = 0; team < AoE2.TEAM.length; team++) {
-    const f = typeof AoE2.spriteFor === 'function' ? AoE2.spriteFor(kind, team) : null;
-    const okCell = !!f && f.sx >= 0 && f.sy >= 0 && f.sw > 0 && f.sh > 0 &&
-      f.dw > 0 && f.dh > 0 && f.sx + f.sw <= sheet.w && f.sy + f.sh <= sheet.h;
-    if (!okCell) { spriteErr = kind + '/' + AoE2.TEAM[team].name; break outer; }
-    rects.add(f.sx + ',' + f.sy + ' ' + f.sw + 'x' + f.sh);
+  const table = AoE2.SPRITES[kind];
+  if (!table || Array.isArray(table) || typeof table !== 'object') {
+    spriteErr = kind + ': SPRITES entry missing or not an {anim: [Blue, Red]} table';
+    break outer;
+  }
+  for (const anim of Object.keys(table)) {
+    const cells = table[anim];
+    if (!Array.isArray(cells) || cells.length !== AoE2.TEAM.length) {
+      spriteErr = kind + '.' + anim + ': expected one cell per team'; break outer;
+    }
+    for (let team = 0; team < cells.length; team++) {
+      const f = cells[team];
+      const ok = !!f && typeof f.sx === 'number' && typeof f.sy === 'number' &&
+        typeof f.sw === 'number' && typeof f.sh === 'number' &&
+        f.sw > 0 && f.sh > 0 && f.dw > 0 && f.dh > 0 &&
+        f.sx >= 0 && f.sy >= 0 && f.sx + f.sw <= sheet.w && f.sy + f.sh <= sheet.h;
+      if (!ok) { spriteErr = kind + '.' + anim + '/' + AoE2.TEAM[team].name; break outer; }
+      if (AoE2.spriteFor(kind, team, anim) !== f) {
+        spriteErr = `spriteFor('${kind}', ${team}, '${anim}') returns a different cell`; break outer;
+      }
+      rects.add(f.sx + ',' + f.sy + ' ' + f.sw + 'x' + f.sh);
+      cellCount++;
+    }
   }
 }
-const pairs = Object.keys(AoE2.KINDS).length * AoE2.TEAM.length;
-if (!spriteErr && rects.size !== pairs) spriteErr = 'overlapping/duplicate cells';
-check(!spriteErr, 'sprites: frame table covers every unit kind x team',
-  spriteErr ? 'bad cell: ' + spriteErr
-    : pairs + ' cells inside the ' + sheet.w + 'x' + sheet.h + ' sheet');
+for (const kind of Object.keys(AoE2.SPRITES)) {              // catch stray table entries
+  if (!AoE2.KINDS[kind]) { spriteErr = 'SPRITES entry for unknown kind ' + kind; break; }
+}
+const vIdle = (AoE2.SPRITES.villager || {}).idle;
+if (!spriteErr && vIdle && AoE2.spriteFor('villager', 0) !== vIdle[0]) {
+  spriteErr = 'spriteFor(kind, team) no longer defaults to the idle frame';
+}
+if (!spriteErr && rects.size !== cellCount) spriteErr = 'overlapping/duplicate cells';
+check(!spriteErr, 'sprites: every registered anim x team has a unique in-sheet cell',
+  spriteErr ? 'bad: ' + spriteErr
+    : cellCount + ' cells inside the ' + sheet.w + 'x' + sheet.h + ' sheet');
+
+/* ---- 5b2. animation selection ---------------------------------------- */
+// Which cell a unit actually plays (task 2): the pure unitAnim(u). Villagers
+// must show the tool animation matching what they harvest, militia their
+// swing, and the a/b frames must actually alternate.
+const animGame = AoE2.createState();
+const av = animGame.units.find(u => u.team === 0 && u.kind === 'villager');
+const am = animGame.units.find(u => u.team === 0 && u.kind === 'militia');
+const workErr = ['food', 'wood', 'gold', 'stone'].map((res) => {
+  av.order = { kind: 'harvest', src: { kind: 'tile', res } };
+  av.anim = 0;    const a = AoE2.unitAnim(av);
+  av.anim = 0.3;  const b = AoE2.unitAnim(av);
+  const exp = AoE2.WORK_ANIM[res];
+  return a === exp + '_a' && b === exp + '_b' ? '' : `${res}:${a}/${b}`;
+}).filter(Boolean).join(' ');
+check(!workErr, 'anim: harvest orders play the resource tool animation, a/b alternating at 4 Hz',
+  workErr || 'food->farm wood->chop gold/stone->mine');
+av.anim = 0;
+av.order = { kind: 'idle' };
+check(AoE2.unitAnim(av) === 'idle', 'anim: idle villager holds its idle cell', AoE2.unitAnim(av));
+av.order = { kind: 'go_deposit', b: 'x', src: { kind: 'tile', res: 'food' } };
+check(AoE2.unitAnim(av) === 'walk', 'anim: a carrying villager shows the walk cell', AoE2.unitAnim(av));
+av.order = { kind: 'build', b: 'x' };
+check(AoE2.unitAnim(av).indexOf('farm') === 0, 'anim: a villager building hammers (farm pose)',
+  AoE2.unitAnim(av));
+const enemy = animGame.units.find(u => u.team === 1);
+am.order = { kind: 'attack', target: enemy.id };
+am.anim = 0;    const s0 = AoE2.unitAnim(am);
+am.anim = 0.3;
+check(s0 === 'attack_a' && AoE2.unitAnim(am) === 'attack_b',
+  'anim: attacking militia swing attack_a/attack_b', s0 + '/' + AoE2.unitAnim(am));
+am.anim = 0; am.order = { kind: 'move', x: 0, y: 0 };
+check(AoE2.unitAnim(am) === 'walk', 'anim: ordered militia walk', AoE2.unitAnim(am));
 
 /* ---- 5c. atlas wiring ----------------------------------------------- */
 // setAtlas is the single injection point for the sheet, so the renderer has one

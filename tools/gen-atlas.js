@@ -8,7 +8,9 @@
        tools/headless-check.js asserts it covers every unit kind x team, so a
        new unit kind forces new art.
      - the pixels (ART below) live here and nowhere else: one 12x12 grid per
-       unit kind, one colour per art pixel, blown up 2x into the 24x24 cell.
+       unit kind x animation (villager idle/walk/farm/chop/mine frames, militia
+       idle/walk/attack frames), one colour per art pixel, blown up 2x into the
+       24x24 cell.
      - team colours come from TEAM in index.html, so a recolour is one edit.
 
    usage: node tools/gen-atlas.js [--out assets/sprites.png]
@@ -66,31 +68,94 @@ if (!G || !G.SPRITE_SHEET || !G.SPRITES || typeof G.spriteFor !== 'function') {
  * Both figures face right; drawUnits mirrors them when a unit walks left.
  */
 const GRID = 12;
+/* Villager bodies are civilian from v2 on: bare head with hair (no helmet),
+ * plain tunic, tool in the right hand per work frame. The walking frames
+ * stride; work frames alternate a (tool raised) / b (tool landed) so the
+ * animation lives in the art, not in code-side offsets. */
 const ART = {
-  villager: [
-    // hooded head: outline, hood, sheen, a slice of face showing
-    [3, 0, 6, 6, 'K'], [4, 1, 4, 4, 'M'], [4, 1, 4, 1, 'L'], [5, 3, 2, 1, 'S'],
-    // body: outline, tunic, shaded right column
-    [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
-    // legs
-    [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
-    // hoe shaft in the far hand
-    [10, 2, 1, 6, 'W'],
-  ],
-  militia: [
-    // helm: outline, steel dome, sheen, face slit with an eye
-    [3, 0, 6, 5, 'K'], [4, 1, 4, 2, 'G'], [4, 1, 4, 1, 'L'], [4, 3, 4, 1, 'S'], [6, 3, 1, 1, 'K'],
-    // body: outline, tunic, shaded right column, belt
-    [2, 5, 8, 5, 'K'], [3, 6, 6, 3, 'M'], [7, 6, 1, 3, 'D'], [3, 8, 6, 1, 'D'],
-    // legs
-    [3, 10, 2, 2, 'K'], [7, 10, 2, 2, 'K'],
-    // sword: blade in the right hand, crossguard
-    [10, 2, 1, 7, 'G'], [9, 8, 2, 1, 'K'],
-  ],
+  villager: {
+    idle: [
+      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
+      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
+    ],
+    walk: [
+      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
+      [2, 10, 2, 2, 'D'], [8, 10, 2, 2, 'D'],                     // striding legs
+    ],
+    farm_a: [                                                       // sickle raised
+      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
+      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
+      [8, 5, 1, 2, 'S'], [9, 3, 2, 1, 'G'], [10, 4, 1, 1, 'G'],   // arm + sickle curve
+    ],
+    farm_b: [                                                       // sickle swung down
+      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
+      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
+      [8, 8, 1, 1, 'S'], [9, 8, 2, 1, 'G'],                        // arm down, blade at hip
+    ],
+    chop_a: [                                                       // axe raised
+      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
+      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
+      [8, 6, 1, 1, 'S'], [9, 2, 1, 6, 'W'], [8, 1, 2, 1, 'G'],    // shaft + axe head
+    ],
+    chop_b: [                                                       // axe at the stump
+      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
+      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
+      [8, 6, 1, 3, 'S'], [8, 9, 3, 1, 'G'], [9, 9, 1, 2, 'W'],    // blade low, shaft down
+    ],
+    mine_a: [                                                       // pickaxe raised
+      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
+      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
+      [8, 6, 1, 1, 'S'], [9, 3, 1, 5, 'W'], [7, 2, 4, 1, 'G'],    // wide pick head
+    ],
+    mine_b: [                                                       // pickaxe at the ore
+      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
+      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
+      [8, 7, 1, 2, 'S'], [9, 8, 1, 3, 'W'], [8, 8, 3, 1, 'G'],    // head striking low
+    ],
+  },
+  militia: {
+    idle: [
+      // helm: outline, steel dome, sheen, face slit with an eye
+      [3, 0, 6, 5, 'K'], [4, 1, 4, 2, 'G'], [4, 1, 4, 1, 'L'], [4, 3, 4, 1, 'S'], [6, 3, 1, 1, 'K'],
+      // body: outline, tunic, shaded right column, belt
+      [2, 5, 8, 5, 'K'], [3, 6, 6, 3, 'M'], [7, 6, 1, 3, 'D'], [3, 8, 6, 1, 'D'],
+      // legs
+      [3, 10, 2, 2, 'K'], [7, 10, 2, 2, 'K'],
+      // sword: blade in the right hand, crossguard
+      [10, 2, 1, 7, 'G'], [9, 8, 2, 1, 'K'],
+    ],
+    walk: [
+      [3, 0, 6, 5, 'K'], [4, 1, 4, 2, 'G'], [4, 1, 4, 1, 'L'], [4, 3, 4, 1, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 5, 8, 5, 'K'], [3, 6, 6, 3, 'M'], [7, 6, 1, 3, 'D'], [3, 8, 6, 1, 'D'],
+      [2, 10, 2, 2, 'K'], [7, 10, 3, 2, 'K'],                      // striding legs
+      [10, 2, 1, 7, 'G'], [9, 8, 2, 1, 'K'],
+    ],
+    attack_a: [                                                     // sword raised
+      [3, 0, 6, 5, 'K'], [4, 1, 4, 2, 'G'], [4, 1, 4, 1, 'L'], [4, 3, 4, 1, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 5, 8, 5, 'K'], [3, 6, 6, 3, 'M'], [7, 6, 1, 3, 'D'], [3, 8, 6, 1, 'D'],
+      [3, 10, 2, 2, 'K'], [7, 10, 2, 2, 'K'],
+      [9, 0, 1, 6, 'G'], [8, 5, 2, 1, 'K'],                        // blade up behind the guard
+    ],
+    attack_b: [                                                     // sword thrust forward
+      [3, 0, 6, 5, 'K'], [4, 1, 4, 2, 'G'], [4, 1, 4, 1, 'L'], [4, 3, 4, 1, 'S'], [6, 3, 1, 1, 'K'],
+      [2, 5, 8, 5, 'K'], [3, 6, 6, 3, 'M'], [7, 6, 1, 3, 'D'], [3, 8, 6, 1, 'D'],
+      [3, 10, 2, 2, 'K'], [7, 10, 2, 2, 'K'],
+      [9, 6, 3, 1, 'G'], [8, 5, 1, 3, 'K'],                        // blade flat out, guard
+    ],
+  },
 };
 const SKIN = '#e8c39a';
 const STEEL = '#cfd6e2';
 const WOOD = '#8a6a3f';
+const HAIR = '#6a4a2f';
 
 /** Colour slot -> hex for one frame: team colours come from index.html. */
 function paletteFor(kind, team) {
@@ -98,7 +163,7 @@ function paletteFor(kind, team) {
   return {
     K: kind === 'militia' ? '#262626' : '#1f1f1f',
     M: t.main, D: t.dark, L: t.light,
-    S: SKIN, G: STEEL, W: WOOD,
+    S: SKIN, G: STEEL, W: WOOD, H: HAIR,
   };
 }
 
@@ -135,13 +200,16 @@ if ('imageSmoothingEnabled' in g) g.imageSmoothingEnabled = false;
 
 const drawn = [];
 for (const kind of Object.keys(G.KINDS)) {
+  const table = G.SPRITES[kind];
+  if (!table) fail(`KINDS.${kind} has no SPRITES entry in index.html`);
   if (!ART[kind]) fail(`KINDS.${kind} has no ART entry in tools/gen-atlas.js`);
-  for (let team = 0; team < G.TEAM.length; team++) {
-    const frame = G.spriteFor(kind, team);
-    if (!frame) fail(`spriteFor('${kind}', ${team}) returned nothing`);
-    const label = `${kind}/${G.TEAM[team].name}`;
-    paintCell(g, frame, ART[kind], paletteFor(kind, team), label);
-    drawn.push({ label, frame });
+  for (const anim of Object.keys(table)) {
+    if (!ART[kind][anim]) fail(`SPRITES.${kind}.${anim} has no ART entry in tools/gen-atlas.js`);
+    table[anim].forEach((frame, team) => {
+      const label = `${kind}/${G.TEAM[team].name}/${anim}`;
+      paintCell(g, frame, ART[kind][anim], paletteFor(kind, team), label);
+      drawn.push({ label, frame });
+    });
   }
 }
 

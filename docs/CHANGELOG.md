@@ -5,6 +5,17 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-04
 
+### Changed
+- **Sprite atlas v2** (villager redesign): villagers no longer wear the militia's helm —
+  bare head with hair, plain tunic, and the tool of whatever they are working at in hand.
+  `SPRITES` becomes `kind → animation → [Blue, Red]`: villagers get idle/walk plus
+  per-resource work frames (farm/chop/mine, a/b alternating at 4 Hz), militia get
+  idle/walk plus attack_a/attack_b. The sheet grew 96×24 → 288×48 (24 cells);
+  `spriteFor(kind, team, anim)` resolves a cell and the new pure `unitAnim(u)` decides
+  which animation a unit plays from its order. The 1px bob now applies only to walk
+  cells — work/swing frames animate through their own art. Harness sections 5b/5b2 pin
+  the table shape, cell uniqueness and the order→animation mapping (75 → 81 checks).
+
 ### Fixed
 - **Villagers stopped collecting food once the berry tile ran dry** (the "food stalls at
   420" report). Two causes: `assignStarter` gave every starting villager the *same*
