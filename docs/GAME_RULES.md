@@ -11,6 +11,7 @@ this file disagree, the code is right and this file is a bug.
 | Seed | `1337` — fixed map, so runs and tests are reproducible (`New map` reseeds) |
 | Terrain | grass, water, forest, gold, stone, berry (`T` enum) |
 | Tile yields | tree 60 wood · gold 800 · stone 450 · berry 150 (`CFG.RES`) |
+| Berry clusters | one connected 6-tile cluster per Town Center, every bush 5–8 tiles from its own keep (`berryCluster`, `index.html:356`) — no scattered berries any more |
 | Fog | explored/revealed per tile, drawn dimmed outside vision |
 | Teams | Blue (player, team 0) vs Red (AI, team 1) |
 | Starting stockpile | 100 food, 100 wood, 50 gold, 50 stone (`CFG.START`) |

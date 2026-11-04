@@ -74,7 +74,7 @@ completing. Plus a regenerated `preview.png` to eyeball the cluster.
     an occupied building tile) over the same 900 steps, plus
     `build: a unit caught under a new footprint is relocated to workPos`.
 
-- [ ] T3: One berry cluster per Town Center
+- [x] T3: One berry cluster per Town Center
   - files: `index.html` §2 `makeWorld` (280-350, the 7 berry `patch()` loop at 326-330
     and the ring berries at 343-347); `docs/GAME_RULES.md` (Map), `docs/CHANGELOG.md`;
     `tools/headless-check.js` §4 (158-183)

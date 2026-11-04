@@ -182,6 +182,38 @@ for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
 check(nearGold > 0, 'world: gold field beside the player Town Center', nearGold + ' gold tiles within 4');
 check(tc.built === 1 && tc.w === 3 && tc.h === 3, 'roster: Town Center is a built 3x3', 'ok');
 
+// T3: one berry cluster per Town Center — exactly 6 bushes 5-8 tiles from each keep.
+const berryTiles = [];
+for (let y = 0; y < w0.h; y++) {
+  for (let x = 0; x < w0.w; x++) {
+    if (w0.type[y * w0.w + x] === AoE2.T.BERRY) berryTiles.push({ x, y, amount: w0.amount[y * w0.w + x] });
+  }
+}
+const allTcs = Game.buildings.filter(b => b.kind === 'town_center');
+const ownTc = (t) => allTcs
+  .map((b) => ({ b, d: Math.max(Math.abs(t.x - b.tx), Math.abs(t.y - b.ty)) }))
+  .sort((p, q) => p.d - q.d)[0];
+const berryPerTeam = {};
+const berryDists = [];
+if (allTcs.length) {
+  for (const t of berryTiles) {
+    const own = ownTc(t);
+    berryPerTeam[own.b.team] = (berryPerTeam[own.b.team] || 0) + 1;
+    berryDists.push(own.d);
+  }
+}
+check(allTcs.length === 2 && berryPerTeam[0] === 6 && berryPerTeam[1] === 6,
+  'map: exactly 6 berry tiles per Town Center',
+  allTcs.length + ' town centers, berries per team ' + JSON.stringify(berryPerTeam) +
+  ' (' + berryTiles.length + ' berry tiles total)');
+check(berryDists.length > 0 && Math.min(...berryDists) >= 5 && Math.max(...berryDists) <= 8,
+  'map: every berry tile is 5-8 tiles from its own Town Center',
+  berryTiles.length + ' berries, own-TC Chebyshev range ' +
+  (berryDists.length ? Math.min(...berryDists) + '-' + Math.max(...berryDists) : 'none'));
+check(berryTiles.length > 0 && berryTiles.every((t) => t.amount === 150),
+  'map: each berry tile holds 150 food',
+  Array.from(new Set(berryTiles.map((t) => t.amount))).join(','));
+
 /* ---- 5. starting roster --------------------------------------------- */
 const blueVill = () => Game.units.filter(u => u.team === 0 && u.kind === 'villager');
 check(Game.buildings.filter(b => b.team === 1 && b.built).length === 1, 'roster: enemy Town Center exists', 'ok');

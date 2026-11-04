@@ -32,6 +32,12 @@ commits on `main`.
   "attacker took no damage" check becomes "may be countered" — enemies fight back now.
 
 ### Changed
+- **Berry clusters (T3):** every Town Center now owns exactly one connected 6-tile
+  berry cluster 5–8 tiles from its keep (`berryCluster`, exported from §2) — the 7
+  scattered berry patches and the 2 ring berries from `makeWorld` are gone, so each
+  start reads as one grove beside the keep instead of bushes all over the map, and the
+  4 starters reliably open on their own berries (harness §4 gained three `map:` berry
+  checks pinning 6-per-TC, the 5–8 band and the 150 food each; 104 → 107 checks).
 - **Tuning pass (T1):** the opening economy is halved — `CFG.START` 200/200/100/100 →
   100/100/50/50, villager `CARRY_MAX` 10 → 15, `GATHER_RATE` 3.0 → 1.5/s, villager and
   militia train times 5 s / 6 s → 2.5 s / 3 s, berry tiles 110 → 150 food. Numbers only,

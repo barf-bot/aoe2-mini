@@ -274,9 +274,10 @@ function hash2(x, y, seed) {
   return (h ^ (h >>> 16)) >>> 0;
 }
 
-/** Seeded map: grass base, water lakes, forest clumps, gold/stone/berry fields.
- *  Both castle sites are carved out first, and (like a real lobby) each gets a
- *  gold field right next to its Town Center. */
+/** Seeded map: grass base, water lakes, forest clumps, gold/stone fields and one
+ *  berry cluster per keep. Both castle sites are carved out first, and (like a
+ *  real lobby) each site gets its gold field and berry cluster around the Town
+ *  Center instead of scatter far away from home. */
 function makeWorld(seed) {
   const w = CFG.MAP_W, h = CFG.MAP_H, n = w * h;
   const world = { w, h, seed, type: new Uint8Array(n), amount: new Int32Array(n), shade: new Uint8Array(n) };
@@ -323,14 +324,9 @@ function makeWorld(seed) {
     if (onSite(cx, cy)) continue;
     patch(cx, cy, k < 2 ? T.STONE : T.GOLD, k < 2 ? CFG.RES.stone : CFG.RES.gold);
   }
-  for (let k = 0; k < 7; k++) {                                     // berries
-    const cx = 3 + ((rnd() * (w - 6)) | 0), cy = 3 + ((rnd() * (h - 6)) | 0);
-    if (onSite(cx, cy)) continue;
-    patch(cx, cy, T.BERRY, CFG.RES.berry);
-  }
-
-  /* the guaranteed start: gold 3 tiles off the keep, berries next to it */
-  let gold = 0, berry = 0;
+  /* the guaranteed start: gold 3 tiles off the keep (berries now come from the
+     clusters below, not from this ring) */
+  let gold = 0;
   const ring = [];
   for (let dy = -4; dy <= 4; dy++) {
     for (let dx = -4; dx <= 4; dx++) {
@@ -341,12 +337,64 @@ function makeWorld(seed) {
   ring.sort((a, b) => (Math.abs(a[0] - siteA.tx) + Math.abs(a[1] - siteA.ty)) -
                       (Math.abs(b[0] - siteA.tx) + Math.abs(b[1] - siteA.ty)));
   for (const [x, y] of ring) {
-    if (gold < 2 && put(x, y, T.GOLD, CFG.RES.gold)) { gold++; continue; }
-    if (berry < 2 && put(x, y, T.BERRY, CFG.RES.berry)) berry++;
-    if (gold >= 2 && berry >= 2) break;
+    if (put(x, y, T.GOLD, CFG.RES.gold) && ++gold >= 2) break;
   }
   for (let dx = -3; dx <= 3; dx += 2) put(siteB.tx + dx, siteB.ty - 2, T.GOLD, CFG.RES.gold);
+
+  /* one berry cluster per Town Center (replaces the 7 scattered berry patches
+     and the 2 ring berries) */
+  berryCluster(world, rnd, siteA);
+  berryCluster(world, rnd, siteB);
   return world;
+}
+
+/** One berry cluster per Town Center: exactly 6 grass tiles at Chebyshev
+ *  distance 5..8 from the keep, grown from a seeded anchor into one connected
+ *  blob so they read as a bushy patch, not 6 confetti. Only grass neighbours
+ *  inside the band are accepted (same rule as makeWorld's put); if a town's
+ *  neighbourhood cannot yield 6 tiles the band widens outward, never starves. */
+function berryCluster(world, rnd, site) {
+  const w = world.w, h = world.h, want = 6;
+  const grassAt = (x, y) => x >= 0 && y >= 0 && x < w && y < h && world.type[y * w + x] === T.GRASS;
+  const cheb = (x, y) => Math.max(Math.abs(x - site.tx), Math.abs(y - site.ty));
+  const NB = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  let best = null;
+  for (let hi = 8; hi <= 12 && (!best || best.length < want); hi++) {
+    const pool = [];                                   // grass tiles, Chebyshev 5..hi
+    for (let y = site.ty - hi; y <= site.ty + hi; y++) {
+      for (let x = site.tx - hi; x <= site.tx + hi; x++) {
+        if (cheb(x, y) >= 5 && grassAt(x, y)) pool.push(y * w + x);
+      }
+    }
+    if (pool.length < want) continue;                  // too little grass: widen
+    for (let a = 0; a < 6 && (!best || best.length < want); a++) {
+      const blob = [pool[(rnd() * pool.length) | 0]];  // seeded anchor
+      const taken = new Set(blob);
+      while (blob.length < want) {                     // grow: grass neighbours in the band
+        const opts = [];
+        for (const cell of blob) {
+          const cx = cell % w, cy = (cell / w) | 0;
+          for (const [dx, dy] of NB) {
+            const k = (cy + dy) * w + cx + dx;
+            if (!taken.has(k) && grassAt(cx + dx, cy + dy) && cheb(cx + dx, cy + dy) <= hi) {
+              if (cheb(cx + dx, cy + dy) >= 5) opts.push(k);
+            }
+          }
+        }
+        if (!opts.length) break;
+        const k = opts[(rnd() * opts.length) | 0];
+        taken.add(k);
+        blob.push(k);
+      }
+      if (!best || blob.length > best.length) best = blob;
+    }
+  }
+  if (!best) return [];
+  for (const k of best) {
+    world.type[k] = T.BERRY;
+    world.amount[k] = CFG.RES.berry;
+  }
+  return best;
 }
 
 /** Spiral search for a flat grassy size x size pad closest to (px,py). */
@@ -1818,7 +1866,7 @@ function stepGame(Game, dt) {
 const AoE2 = {
   CFG, KINDS, BLD, AGES, T, PAL, TEAM, RES_OF_TILE,
   SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor, BLD_SPRITES, bldSpriteFor,
-  makeWorld, findSite, tileRes, sourceFromTile, sourceFromFarm, workSpot,
+  makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, walkable, workPos, standingSpots, reachOf,
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
