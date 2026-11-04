@@ -13,6 +13,9 @@ prototypes stall.
 2. **A\* pathfinding around water.** Movement is straight-line + walkability today, so
    units stall on coastlines and stack against each other. *Done when:* a test paths a
    villager around a water inlet and the route length is within ~15% of optimal.
+   **Known limit the 2026-11-04 board-rules pass leaves in place:** terrain and buildings
+   went solid (T2), so straight-line movement against a now-solid tile can still
+   detour-stall around big blobs — the pass bought solidity, not pathfinding.
 3. **Ranged combat + a second unit line (archer).** Melee-only combat makes fights static
    and there is no ranged counter-play. *Done when:* arrows register at range with a
    projectile, and militia-vs-archer matchups resolve per the stat table.
@@ -21,8 +24,9 @@ prototypes stall.
 
 4. **Tech tree / blacksmith upgrades.** Attack/defence/speed upgrades per age; the
    `ageBonus` hook already exists as a multiplier.
-5. **More buildings**: lumber camp, mining camp, market, watch tower — the camp pattern
-   (work-radius + drop-off) is already modelled by farms.
+5. **More buildings**: lumber camp, mining camp and mill shipped 2026-11-04 (`BLD`,
+   hotkeys `L`/`G`/`M`, resource-based drop-off routing); market and watch tower remain —
+   the camp pattern (work-radius + drop-off) is now proven by the shipped camps.
 6. **Wooden barricade (Feudal Age wall segment) + gated choke points.** 1×1 segment
    placement, needs a `BLD.age` gate so buildings unlock by age; pathing through gaps.
    Folded into phase 2 of the 2026-11-04 board-rules plan.

@@ -8,13 +8,13 @@ current `main`.
 | § | Section | Lines | Contents |
 |---|---|---|---|
 | 1 | config | 99-258 | `CFG`, `KINDS`, `SPRITE_SHEET`/`SPRITES`/`WORK_ANIM`/`spriteFor`, `BLD_SPRITES`/`bldSpriteFor`, `BLD`, `AGES`, `T`, `PAL`, `TEAM`, `RES_OF_TILE`, `CARRY_COLOR` — every tunable number |
-| 2 | world / map | 259-409 | seeded generation (`mulberry32`, `hash2`, `makeWorld`), site search, resource tiles and sources |
-| 3 | entities | 410-528 | `setAtlas`, `sourceFromTile`/`sourceFromFarm`, `workSpot`, `makeUnit`, `makeBuilding`, `rebuildBlocks`, `workPos` |
-| 4 | simulation | 529-1018 | `stepSim`/`updateUnit` (the order state machine), movement, `hitUnit`/`hitBuilding`/`autoAcquire`, economy, orders, `build`, `train`, `upgradeAge`; sub-blocks `economy helpers` (925), `enemy AI` (957), `toast` (1007) — **pure logic, no DOM** |
-| 5 | render | 1019-1403 | `beginCanvas`, world/building/unit drawing (`drawBuildings`, `unitAnim`, `drawUnits`), ghost, drag box, minimap, HUD + command bar HTML |
-| 6 | input | 1404-1552 | picking, mouse, keyboard, delegated command-bar clicks |
-| 7 | boot | 1553-1750 | canvas sizing, `createState`, `resetGame`, `loadAtlas`, `boot`, the rAF loop |
-| — | public surface | 1751-1769 | the `AoE2` export banner + object, `module.exports` / `window.Game` wiring |
+| 2 | world / map | 259-457 | seeded generation (`mulberry32`, `hash2`, `makeWorld`), site search, `berryCluster`, resource tiles and sources |
+| 3 | entities | 458-604 | `setAtlas`, `sourceFromTile`/`sourceFromFarm`, `workSpot`, `makeUnit`, `makeBuilding`, `rebuildBlocks`, `workPos` |
+| 4 | simulation | 605-1169 | `stepSim`/`updateUnit` (the order state machine), movement, `hitUnit`/`hitBuilding`/`autoAcquire`, economy, orders, `build`, `train`, `upgradeAge`; sub-blocks `economy helpers` (1076), `enemy AI` (1108), `toast` (1158) — **pure logic, no DOM** |
+| 5 | render | 1170-1554 | `beginCanvas`, world/building/unit drawing (`drawBuildings`, `unitAnim`, `drawUnits`), ghost, drag box, minimap, HUD + command bar HTML |
+| 6 | input | 1555-1703 | picking, mouse, keyboard, delegated command-bar clicks |
+| 7 | boot | 1704-1907 | canvas sizing, `createState`, `resetGame`, `loadAtlas`, `boot`, the rAF loop |
+| — | public surface | 1908-1927 | the `AoE2` export banner + object, `module.exports` / `window.Game` wiring |
 
 ## The `Game` object
 
@@ -29,7 +29,7 @@ Game = { world, units[], buildings[], blocks(Map buildingId -> tiles), sprites{a
 ```
 
 `Game.sprites.atlas` is the one place the atlas is attached (`setAtlas`,
-`index.html:416`): `loadAtlas` fills it in the browser and the harnesses inject an image
+`index.html:464`): `loadAtlas` fills it in the browser and the harnesses inject an image
 there, so the renderer never has to wonder where the sheet came from.
 
 Coordinate systems: **tile** coords (`tx`,`ty`) for the world grid, **world pixels**
@@ -46,7 +46,7 @@ type lookup is a flat array index (`ty * world.w + tx`).
   behaviour is deterministic given the same seed (`CFG.SEED = 1337`).
 - Dead units are pruned out of `Game.units`; buildings persist.
 
-### Unit order state machine (`updateUnit`, index.html:602)
+### Unit order state machine (`updateUnit`, index.html:678)
 
 `idle` → `move` → `harvest` → `go_deposit` → (re-acquire source via `nextSource`) …
 plus `build` (works on a site until `built >= 1`) and `attack` (chase to
@@ -56,16 +56,16 @@ the right stockpile — that field being unset was a real bug (deposits silently
 
 Every unit also carries its rendering state: `u.face` (`+1`/`-1`) and `u.anim`, the
 activity clock behind every animation (walk, work, swing). `unitAnim(u)`
-(`index.html:1150`, section 5) maps it to the sprite cell to show; `moveUnit`
-(`index.html:689`) is the only writer of `u.face`, so units never flip for no reason.
+(`index.html:1301`, section 5) maps it to the sprite cell to show; `moveUnit`
+(`index.html:767`) is the only writer of `u.face`, so units never flip for no reason.
 
 ### Combat
 
 Damage comes from `KINDS[kind].atk`; ages scale it through `Game.ageBonus` (set to the age
-index on upgrade, `index.html:915`) — 1× at Dark Age, so 6 militia swings (6×11) kill a
+index on upgrade, `index.html:1072`) — 1× at Dark Age, so 6 militia swings (6×11) kill a
 60 hp villager. Attackers only damage the target they're ordered to attack — a unit
-(`hitUnit`, `index.html:558`) or a building (`hitBuilding`, `index.html:567`, which razes
-it at 0 hp). Idle fighters acquire on their own: `autoAcquire` (`index.html:582`) gives
+(`hitUnit`, `index.html:634`) or a building (`hitBuilding`, `index.html:643`, which razes
+it at 0 hp). Idle fighters acquire on their own: `autoAcquire` (`index.html:658`) gives
 them the nearest enemy unit within `CFG.ACQUIRE` tiles, else the nearest built enemy
 building within `CFG.BUILDING_ACQUIRE`, and a kill immediately retargets the next one.
 
@@ -74,17 +74,17 @@ building within `CFG.BUILDING_ACQUIRE`, and a kill immediately retargets the nex
 Terrain tiles come from `PAL` (three variants per terrain, chosen by a per-tile hash),
 trees/ore/berries are drawn as vector paths (`drawTree`, `drawOre`, `drawBerry`), and
 built buildings blit their team cell from the atlas (`drawBuildings`,
-`index.html:1075`); unbuilt ones keep the ghost footprint with a progress overlay while
+`index.html:1226`); unbuilt ones keep the ghost footprint with a progress overlay while
 `built < 1`, and a dry farm (empty `field`) keeps its procedural stubble.
 
 Units come from `assets/sprites.png`: `SPRITES` (`index.html:141`) maps every kind to
 its animation cells and `spriteFor(kind, team, anim)` (`index.html:178`) resolves one;
 `BLD_SPRITES` (`index.html:189`) holds the built-building cells (rows y48+ of the same
 sheet) and `bldSpriteFor(kind, team)` (`index.html:207`) resolves those, each cell drawn
-at the building's exact footprint. `unitAnim(u)` (`index.html:1150`) decides which
+at the building's exact footprint. `unitAnim(u)` (`index.html:1301`) decides which
 animation a unit plays from its order —
 villagers farm/chop/mine (a/b frames per harvested resource) plus idle/walk, militia
-idle/walk plus attack_a/attack_b — and `drawUnits` (`index.html:1166`) blits the cell at
+idle/walk plus attack_a/attack_b — and `drawUnits` (`index.html:1317`) blits the cell at
 integer pixels with `drawImage` and mirrors it with `scale(-1, 1)` when `u.face` is `-1`.
 The 1px walk bob applies only to walk cells; work/swing animations animate through their
 own a/b frames. The old team-coloured disc/square drawing stays as the
@@ -92,7 +92,7 @@ fallback whenever no atlas is loaded. On top of the sprite: selection ring, heal
 the carry dot tinted by `CARRY_COLOR`.
 
 Canvases go through `beginCanvas(canvas, w, h)`; sizes come from `sizeW/sizeH(dom)` with
-node-safe fallbacks (`view_W/view_H`, `index.html:1578`). The HUD (resource bar, info
+node-safe fallbacks (`view_W/view_H`, `index.html:1729`). The HUD (resource bar, info
 panel, command bar, queue) is DOM, rebuilt every frame from `infoHtml/commandsHtml/queueHtml`
 strings.
 

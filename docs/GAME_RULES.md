@@ -19,23 +19,34 @@ this file disagree, the code is right and this file is a bug.
 ## Economy
 
 - Villagers gather at **1.5 units/second** (`CFG.GATHER_RATE`) and carry **15** at a time
-  (`CFG.CARRY_MAX`), then walk to the nearest valid drop-off and deposit into the right
-  stockpile (`u.carryRes`).
+  (`CFG.CARRY_MAX`), then walk to the right drop-off (`findDropoff`, `index.html:860`)
+  and deposit into the matching stockpile (`u.carryRes`).
 - At most **2 villagers per resource tile** (`CFG.WORKERS_PER_TILE`). The 4 starters are
   placed food-first (berries), then wood, then anything — putting all four on one berry
   bush is what used to stall the economy at 420 food (the food-stall regression, fixed).
-- Drop-off rules: berries/gold/stone/forest go to the Town Center; a farm's own field is
-  the drop-off for farm food. Farms feed 170 food (`BLD.farm.field`) before going idle.
 - A tile that runs dry disappears (T4): `depleteTile` (`index.html:887`) runs on the
   harvest tick the moment a tile's `amount` reaches 0 and reverts the tile to `T.GRASS`
-  (the amount stays 0), so the bush, tree or ore node stops being drawn and — per
-  `walkable` (`index.html:786`) — stops blocking movement. Farms are not tiles: a field
-  empties in place and nothing there turns to grass.
+  (the amount stays 0), so the bush, tree or ore node stops being drawn and — per the
+  Movement rules below — stops blocking movement. Farms are not tiles: a field empties
+  in place and nothing there turns to grass.
 - The emptied villager re-queues on the nearest tile of the **same** resource within
   **5** tiles (`nextSource`, `index.html:901`, and after a deposit `resumeGather`,
   `index.html:912`). The old radius-14 same-resource search and the any-resource radius-20
   fallback are gone: with nothing of that kind that close he stands idle instead of
   walking across the map to chop wood.
+
+## Movement
+
+- Everything solid blocks (`walkable`, `index.html:788`): water, resource tiles with
+  stock (`amount > 0`) and building tiles — foundations included, via `Game.occupied`
+  (`rebuildBlocks`, `index.html:551`). Units work from the neighbour tile instead of
+  standing on the thing: `workSpot` (`index.html:498`) offers only free walkable
+  neighbours, `workPos` (`index.html:570`) is the standing spot beside a building, and a
+  unit caught under a new footprint is moved there (`makeBuilding`, `index.html:526`).
+- Movement itself is still straight-line axis-sliding (`moveUnit`, `index.html:767`) —
+  no A\* yet (roadmap P0.2), so orders across a big blob can detour-stall. That is the
+  known limit this pass leaves in place: it bought solidity, not pathfinding.
+- Units push apart to `CFG.UNIT_SEP` (11 px) every tick (`separate`, `index.html:808`).
 
 ## Units (`KINDS`)
 
@@ -46,7 +57,7 @@ this file disagree, the code is right and this file is a bug.
 
 - Melee range = `attacker.r + target.r + 4` px (5 for villager, 6 for militia). Attacking
   a building stops at half its footprint + 2 px.
-- Auto-acquire (`autoAcquire`, `index.html:582`): non-villager fighters spot the nearest
+- Auto-acquire (`autoAcquire`, `index.html:658`): non-villager fighters spot the nearest
   enemy unit within `CFG.ACQUIRE` (6) tiles — else the nearest built enemy building within
   `CFG.BUILDING_ACQUIRE` (5) — and snap to the next target the moment their current one
   dies. Villagers never start fights; they only attack when ordered.
@@ -56,7 +67,7 @@ this file disagree, the code is right and this file is a bug.
   one 24×24 cell per animation × team — villagers: idle/walk + a/b frames for farm, chop
   and mine; militia: idle/walk + attack_a/b), drawn at 20×20 for villagers and 22×22 for
   militia, mirrored when the unit walks left; `tools/gen-atlas.js` regenerates the PNG
-  from `SPRITES`, and `unitAnim` (`index.html:1150`) picks the cell from the unit's order.
+  from `SPRITES`, and `unitAnim` (`index.html:1301`) picks the cell from the unit's order.
 
 ## Buildings (`BLD`)
 
@@ -73,8 +84,8 @@ this file disagree, the code is right and this file is a bug.
 - Drop-off routing (`findDropoff`, `index.html:860`): wood goes to the Lumber Camp,
   gold/stone to the Mining Camp and food to the Mill — each falling back to the Town
   Center (and food also to farms) when the dedicated building doesn't exist. A farm
-  never receives its own harvest.
-
+  never receives its own harvest. Farms feed 170 food (`BLD.farm.field`) before going
+  idle; the mill tracks `field` the same way.
 - Placement needs a free, walkable footprint (`siteFree`, `index.html:1039`) and enough
   resources. The builder (`pickBuilder` via `build`, `index.html:993`) is the nearest
   idle villager in the current selection, else the nearest idle team-0 villager: a
@@ -90,7 +101,7 @@ this file disagree, the code is right and this file is a bug.
 ## Ages (`AGES`)
 
 Dark Age → Feudal Age → Castle Age → Imperial Age.
-Cost (`index.html:915`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
+Cost (`index.html:110`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
 costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle, Castle → Imperial). Hotkey `T`.
 Each upgrade sets `Game.ageBonus = Game.age`, which scales unit damage.
 
@@ -106,5 +117,6 @@ Left click select · drag to box-select (mixed selections collapse to villagers)
 click move / attack / gather (context decided by what is under the cursor) · `WASD` or
 arrow keys pan at 620 px/s · 14 px edge-scroll band, active only while the pointer is
 over the canvas (not over header/footer chrome) · `Ctrl+1..9` store group, `1..9`
-recall · `H` house, `F` farm, `B` barracks, `T` upgrade age, `Esc` cancels placement then
-clears selection · minimap click/drag moves the camera · "New map" reseeds and resets.
+recall · `H` house, `F` farm, `B` barracks, `L` lumber camp, `G` mining camp, `M` mill,
+`T` upgrade age, `Esc` cancels placement then clears selection · minimap click/drag
+moves the camera · "New map" reseeds and resets.

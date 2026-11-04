@@ -5,6 +5,40 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-04
 
+### Board rules pass (T1–T5) — plan `docs/plans/2026-11-04-board-rules.md`
+
+One pass over the board rules (d9b16b4 → 9d0b55f); the per-task entries are merged here
+at T6, and the harness went 99 → 111 checks across the pass.
+
+- **T1 — halved starting economy (d9b16b4):** `CFG.START` 200/200/100/100 →
+  100/100/50/50, villager `CARRY_MAX` 10 → 15, `GATHER_RATE` 3.0 → 1.5/s, villager and
+  militia train times 5 s / 6 s → 2.5 s / 3 s, berry tiles 110 → 150 food. Numbers only;
+  a new `tuning: CFG and KINDS match the agreed numbers` check pins all six values so a
+  silent revert can't pass (100 → 101 checks).
+- **T2 — solid terrain (7a504f1):** `walkable` now rejects water, resource tiles with
+  stock and occupied building tiles alike, so units walk around forests, ore and
+  buildings and work from the neighbour tile; `workSpot` offers only walkable neighbours
+  and `makeBuilding` relocates a unit caught under a new footprint to `workPos(b)`. The
+  harness's per-frame water scan became a solid-tile scan plus the relocation check
+  (101 → 104 checks).
+- **T3 — one berry cluster per Town Center (ff38ca8):** `berryCluster` replaces the 7
+  scattered patches and the 2 ring berries with exactly one connected 6-tile cluster per
+  keep at 5–8 tiles' distance — each start reads as one grove beside the keep and the
+  starters reliably open on their own berries (three `map:` checks pin the layout;
+  104 → 107 checks).
+- **T4 — depleted tiles vanish, re-queue within 5 tiles (c8799a5):** `depleteTile`
+  reverts a tile the moment its `amount` reaches 0 to `T.GRASS` (farms still empty in
+  place), and `nextSource`/`resumeGather` now search the same resource within 5 tiles
+  only — the radius-14 band and the any-resource radius-20 fallback are gone, so a
+  villager whose grove is spent takes the next bush beside him or goes idle (three
+  `depletion:` checks; 107 → 110 checks).
+- **T5 — one builder per building (9d0b55f):** `build()` no longer re-picks the same
+  first villager from the selection on every placement — the multi-build bug that
+  yanked each builder off his unfinished site — `pickBuilder` assigns the nearest
+  **idle** villager, never takes one off a `built < 1` site, and refuses with `All
+  villagers are building` when none is free; two placements from one 4-villager
+  selection now raise two complete buildings (110 → 111 checks).
+
 ### Added
 - **Building sprites (task 5):** every built building now blits a team-coloured atlas
   cell instead of the flat footprint rectangle — `BLD_SPRITES`/`bldSpriteFor` join the
@@ -32,32 +66,6 @@ commits on `main`.
   "attacker took no damage" check becomes "may be countered" — enemies fight back now.
 
 ### Changed
-- **Spent resource tiles vanish and villagers stay on the same resource within 5 tiles
-  (T4):** `depleteTile` (exported) runs on the harvest tick the moment a tile's stock
-  reaches 0 — the berry, tree or ore tile reverts to `T.GRASS`, so it disappears from the
-  map and stops blocking movement (the T2 solidity rule) — while a farm's field still
-  empties in place and nothing on a farm becomes grass. `nextSource` and `resumeGather`
-  now search the same resource within 5 tiles only: the radius-14 same-resource band and
-  the any-resource radius-20 fallback are gone, so a villager whose grove is spent takes
-  the next bush beside him or goes idle instead of walking off to mine stone. Harness §5a
-  gained three `depletion:` checks (a 150-food berry watched empty over 10 trips → grass
-  and walkable again, retarget at 4 tiles, idle at 6) and the "tile died in flight" check
-  is re-authored around a villager 2 tiles off the dead tile with a live one 3 tiles the
-  other way, so it still proves the retarget under the new cap (107 → 110 checks).
-- **Berry clusters (T3):** every Town Center now owns exactly one connected 6-tile
-  berry cluster 5–8 tiles from its keep (`berryCluster`, exported from §2) — the 7
-  scattered berry patches and the 2 ring berries from `makeWorld` are gone, so each
-  start reads as one grove beside the keep instead of bushes all over the map, and the
-  4 starters reliably open on their own berries (harness §4 gained three `map:` berry
-  checks pinning 6-per-TC, the 5–8 band and the 150 food each; 104 → 107 checks).
-- **Tuning pass (T1):** the opening economy is halved — `CFG.START` 200/200/100/100 →
-  100/100/50/50, villager `CARRY_MAX` 10 → 15, `GATHER_RATE` 3.0 → 1.5/s, villager and
-  militia train times 5 s / 6 s → 2.5 s / 3 s, berry tiles 110 → 150 food. Numbers only,
-  no logic. The harness's `roster: starting stock` and `reset:` checks are amended in
-  place to the new stockpile, the section-8 spawn check now counts 2 units (the halved
-  villager time moved the red AI's 45 s queue-train inside its 7 s window), and a new
-  `tuning: CFG and KINDS match the agreed numbers` check pins all six values so a silent
-  revert cannot pass (100 → 101 checks).
 - **Sprite atlas v2** (villager redesign): villagers no longer wear the militia's helm —
   bare head with hair, plain tunic, and the tool of whatever they are working at in hand.
   `SPRITES` becomes `kind → animation → [Blue, Red]`: villagers get idle/walk plus
@@ -69,18 +77,6 @@ commits on `main`.
   the table shape, cell uniqueness and the order→animation mapping (75 → 81 checks).
 
 ### Fixed
-- **Placing a second building while several villagers were selected stalled the first
-  one** (T5, the multi-build bug). `build()` always handed the new site to
-  `sel.find(u => u.kind === 'villager')` — the *same* first villager on every placement —
-  so each new building yanked its predecessor's builder off the unfinished site and left
-  it stalled at partial forever. A new `pickBuilder` now assigns the nearest **idle**
-  villager in the selection (falling back to the nearest idle team-0 villager, as
-  before); a villager whose order points at a building with `built < 1` is never taken
-  off his site, a harvest/move order is simply abandoned, and with no idle villager the
-  placement is refused with `All villagers are building`. Harness §7 gained the
-  `build: two placements from a 4-villager selection get two distinct builders and both
-  complete` check; the existing single-placement construction checks stay green
-  (110 → 111 checks).
 - **Villagers stopped collecting food once the berry tile ran dry** (the "food stalls at
   420" report). Two causes: `assignStarter` gave every starting villager the *same*
   nearest tile, and `resumeGather` re-validated that exact tile after depositing — when

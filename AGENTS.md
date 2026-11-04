@@ -38,7 +38,7 @@ before committing (a blank sprite sheet once passed every assertion).
 The game exports its internals for exactly this reason:
 
 ```js
-if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;  // index.html:1765
+if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;  // index.html:1923
 ```
 
 If you add a new mechanic, add the check that proves it. Fix the test *and* the code with

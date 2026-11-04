@@ -126,7 +126,7 @@ completing. Plus a regenerated `preview.png` to eyeball the cluster.
     builders and both complete`; the existing §7 construction checks (single placement)
     keep passing.
 
-- [ ] T6: Docs sync and deploy check
+- [x] T6: Docs sync and deploy check
   - files: `docs/GAME_RULES.md`, `docs/CHANGELOG.md`, `docs/ROADMAP.md`, `preview.png`
   - change: GAME_RULES rewritten to the post-change ruleset (map, berries, depletion,
     tuning, movement) with fresh line refs; CHANGELOG entry for the pass; ROADMAP marks
