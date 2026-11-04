@@ -235,6 +235,12 @@ check(AoE2.CFG.START.food === 100 && AoE2.CFG.START.wood === 100 &&
   'tuning: CFG and KINDS match the agreed numbers',
   JSON.stringify({ start: AoE2.CFG.START, carry: AoE2.CFG.CARRY_MAX, gather: AoE2.CFG.GATHER_RATE,
     villagerTime: AoE2.KINDS.villager.time, militiaTime: AoE2.KINDS.militia.time, berry: AoE2.CFG.RES.berry }));
+// Phase-2 T1: refunds have their own writer — credit exactly the given cost.
+const rf = AoE2.createState();
+const rfWood = rf.res[0].wood;
+AoE2.refund(rf, 0, { wood: 20 });
+check(rf.res[0].wood === rfWood + 20 && rf.res[0].gold === 50,
+  'economy: refund credits exactly the given cost', rfWood + ' -> ' + rf.res[0].wood);
 
 /* ---- 5a. starter spread and dead-source retarget ---------------------- */
 // The food-stall regression: all 4 starters used to get the same berry tile,

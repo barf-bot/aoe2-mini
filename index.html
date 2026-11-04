@@ -107,6 +107,7 @@ const CFG = {
   CARRY_MAX: 15,                  // villager carry capacity (AoE2 uses 10)
   WORKERS_PER_TILE: 2,            // max villagers per tile (spreads the start squad)
   GATHER_RATE: 1.5,               // resource units per second while working
+  CANCEL_REFUND: 0.8,             // fraction of a building's cost refunded on construction cancel
   AGE_FOOD: 500,                  // food cost of Feudal Age
   WAVE_EVERY: 45,                 // seconds between enemy attack waves
   ACQUIRE: 6,                     // tiles: idle fighters spot enemy units this far
@@ -1104,6 +1105,7 @@ function missing(Game, team, cost) {
 }
 
 function spend(Game, team, cost) { for (const k in cost) Game.res[team][k] -= cost[k]; }
+function refund(Game, team, cost) { for (const k in cost) Game.res[team][k] += cost[k]; }
 
 /* ------------------------------ enemy AI ------------------------------- */
 
@@ -1916,7 +1918,7 @@ const AoE2 = {
   unitAnim,
   build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, autoAcquire,
-  popCap, popUsed, selectedUnits, canAfford, spend, resetGame,
+  popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };
 

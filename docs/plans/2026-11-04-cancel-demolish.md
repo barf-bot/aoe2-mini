@@ -56,7 +56,7 @@ existing build-button check. The full existing suite stays green (nothing weaken
 
 ## Tasks
 
-- [ ] T1: Refund constant + refund primitive (pure data/helpers)
+- [x] T1: Refund constant + refund primitive (pure data/helpers)
   - files: `index.html` §1 `CFG` (101-118), §4 `economy helpers` (1076-1104, after `spend`
     1106), export block (1910-1921); `tools/headless-check.js` §5 (217-237)
   - change: add `CANCEL_REFUND: 0.8` to `CFG` (commented like its neighbours); add
