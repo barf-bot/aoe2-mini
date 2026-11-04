@@ -423,6 +423,48 @@ check(house.hp === house.maxHp, 'build: hp scales with progress to full', house.
 check(AoE2.popCap(Game, 0) === 10, 'pop: house raises the cap to 10', String(AoE2.popCap(Game, 0)));
 check(AoE2.siteFree(Game, house.tx, house.ty, 2, 2) === false, 'site: occupied land rejected after building', 'rejected');
 
+/* ---- 7b. camps + drop-off routing (v2 task 3) ----------------------- */
+// Lumber/Mining camps and the Mill join BLD at their AoE2 costs and sizes, and
+// a carrying villager must walk to the DEDICATED building for what they carry
+// instead of always trudging to the Town Center.
+const cg = AoE2.createState();
+const cv = cg.units.find((u) => u.team === 0 && u.kind === 'villager');
+const vt = cg.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+const dropId = (res, src) => {
+  const d = AoE2.findDropoff(cg, cv, src || { kind: 'tile', res, amount: 10 });
+  return d ? d.id : null;
+};
+check(['food', 'wood', 'gold', 'stone'].every((res) => dropId(res) === vt.id),
+  'dropoff: with only a Town Center every resource walks there',
+  ['food', 'wood', 'gold', 'stone'].map((res) => res + '->' + dropId(res)).join(' '));
+cg.selection = [cv.id];
+cg.res[0].wood = 500;
+const vTx = Math.floor(cv.x / AoE2.CFG.TILE), vTy = Math.floor(cv.y / AoE2.CFG.TILE);
+const put = (kind, size) => {
+  const spot = freeSpotAround(cg.world, cg, vTx, vTy, size, size, 6);
+  return spot && AoE2.build(cg, kind, spot.tx * AoE2.CFG.TILE + 4, spot.ty * AoE2.CFG.TILE + 4);
+};
+const lc = put('lumber_camp', 1), mc = put('mining_camp', 1);
+const ml = put('mill', 2), f2 = put('farm', 2);
+const okShapes = lc && mc && f2 && lc.w === 1 && lc.h === 1 && mc.w === 1 && mc.h === 1 && ml && ml.w === 2 && ml.h === 2;
+check(!!okShapes, 'build: camps are 1x1 and the mill is 2x2, all placeable',
+  [lc && lc.w + 'x' + lc.h, mc && mc.w + 'x' + mc.h, ml && ml.w + 'x' + ml.h, f2 && f2.w + 'x' + f2.h].join(' '));
+check(Math.floor(cg.res[0].wood) === 500 - 100 - 100 - 175 - 60,
+  'build: lumber/mining camps cost 100 wood, the mill 175', String(Math.floor(cg.res[0].wood)));
+[lc, mc, ml, f2].forEach((b) => { if (b) b.built = 1; });
+check(dropId('wood') === lc.id, 'dropoff: wood walks to the Lumber Camp, not the Town Center',
+  String(dropId('wood')));
+check(dropId('gold') === mc.id && dropId('stone') === mc.id,
+  'dropoff: gold and stone walk to the Mining Camp',
+  dropId('gold') + '/' + dropId('stone'));
+check(dropId('food') === ml.id,
+  'dropoff: food prefers the Mill over the farms and the Town Center', String(dropId('food')));
+check(AoE2.findDropoff(cg, cv, AoE2.sourceFromFarm(f2)) === ml,
+  'dropoff: a farm never receives its own harvest — the mill takes it',
+  String((AoE2.findDropoff(cg, cv, AoE2.sourceFromFarm(f2)) || {}).kind));
+check(AoE2.train(cg, mc, 'villager') === undefined && /needs a Mining Camp/.test(cg.toastMsg),
+  'train: a Mining Camp trains nothing', String(cg.toastMsg));
+
 /* ---- 8. training ---------------------------------------------------- */
 const foodBt = Game.res[0].food;
 const unitsBt = Game.units.length;
@@ -499,6 +541,11 @@ doc.fire('keydown', { key: 'h', target: view });
 check(Game.placing === 'house', 'command: hotkey h arms house placement', String(Game.placing));
 doc.fire('keydown', { key: 'Escape', target: view });
 check(Game.placing === null, 'command: Esc cancels placement', String(Game.placing));
+[['l', 'lumber_camp'], ['g', 'mining_camp'], ['m', 'mill']].forEach(([k, want]) => {
+  doc.fire('keydown', { key: k, target: view });
+  check(Game.placing === want, 'command: hotkey ' + k + ' arms ' + want + ' placement', String(Game.placing));
+  doc.fire('keydown', { key: 'Escape', target: view });
+});
 const mmBefore = Game.cam.x;
 doc.getElementById('minimap').fire('mousedown', { clientX: 84, clientY: 84, target: doc.getElementById('minimap') });
 check(Game.cam.x !== mmBefore, 'input: minimap click moves the camera', mmBefore + ' -> ' + Math.round(Game.cam.x));

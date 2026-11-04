@@ -16,7 +16,8 @@ no framework, one small PNG of unit art. Open `index.html` and play.
 - Units: villager and militia drawn from a pixel-art sprite atlas (`assets/sprites.png`),
   a training queue at the Town Center, attack cooldowns, deaths
 - Controls: click / drag-select, control groups (`Ctrl+1…9`, `1…9` to recall), right-click
-  move / attack / gather, hotkeys (`H` for house, `Esc` to cancel), minimap camera drag
+  move / attack / gather, hotkeys (`H` house, `F` farm, `B` barracks, `L` lumber camp,
+  `G` mining camp, `M` mill, `T` age, `Esc` to cancel), minimap camera drag
 - An enemy village that reacts and fights back
 
 ## Known limits (it's a prototype)
@@ -46,13 +47,13 @@ Start with `AGENTS.md` if you're an agent picking the repo up cold.
 | `index.html` | the entire game (markup, styles, engine, renderer) |
 | `assets/sprites.png` | the unit atlas: 288×48, one 24×24 cell per unit animation × team (villagers idle/walk/farm/chop/mine, militia idle/walk/attack) |
 | `tools/gen-atlas.js` | regenerates `assets/sprites.png` from the `SPRITES` table in `index.html` |
-| `tools/headless-check.js` | extracts the `<script>` from the HTML, stubs the DOM, runs the simulation and asserts 81 invariants — currently **81/81 pass** |
+| `tools/headless-check.js` | extracts the `<script>` from the HTML, stubs the DOM, runs the simulation and asserts 92 invariants — currently **92/92 pass** |
 | `tools/render-preview.js` | boots the same code against a real canvas (`@napi-rs/canvas`) and writes `preview.png`, so the renderer is verified, not just assumed |
 | `tools/audit-line-refs.js` | checks that every `index.html:NNN` reference in the docs still points at the code it names, and that the documented section ranges match the real ones |
 | `preview.png` | a real frame of the game rendered headlessly |
 
 ```bash
-node tools/headless-check.js        # 81/81 checks passed
+node tools/headless-check.js        # 92/92 checks passed
 node tools/render-preview.js        # rewrites preview.png
 node tools/gen-atlas.js             # rewrites assets/sprites.png from the sprite table
 ```

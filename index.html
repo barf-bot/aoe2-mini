@@ -190,6 +190,12 @@ const BLD = {
                  time:6,  pop:0, trains:[], field:170 },
   barracks:    { label:'Barracks',    hp:1300, w:2, h:2, cost:{wood:175},
                  time:12, pop:0, trains:['militia'] },
+  lumber_camp: { label:'Lumber Camp', hp:950,  w:1, h:1, cost:{wood:100},
+                 time:8,  pop:0, trains:[] },
+  mining_camp: { label:'Mining Camp', hp:950,  w:1, h:1, cost:{wood:100},
+                 time:8,  pop:0, trains:[] },
+  mill:        { label:'Mill',        hp:1100, w:2, h:2, cost:{wood:175},
+                 time:10, pop:0, trains:[] },
 };
 
 const AGES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
@@ -651,17 +657,31 @@ function workersOnTile(Game, u, tx, ty) {
   return n;
 }
 
-/** Where a carry goes: Town Center beats farm for non-food, nearest otherwise. */
+/** Score a drop-off candidate for a carried resource: the resource's dedicated
+ *  building is best (0), a Town Center always works (+300), another farm takes
+ *  food when no mill exists (+150); everything else is not a drop-off. */
+function dropTargetScore(res, b) {
+  const want = { food: 'mill', wood: 'lumber_camp', gold: 'mining_camp', stone: 'mining_camp' }[res];
+  if (!want) return Infinity;
+  if (b.kind === want) return 0;
+  if (b.kind === 'town_center') return 300;
+  if (res === 'food' && b.kind === 'farm') return 150;
+  return Infinity;
+}
+
+/** Where a carrying villager walks: wood -> Lumber Camp -> TC,
+ *  gold/stone -> Mining Camp -> TC, food -> Mill -> farms -> TC. */
 function findDropoff(Game, unit, src) {
+  const res = src ? src.res : unit.carryRes;
+  if (!res) return null;
   let best = null, bestScore = Infinity;
   for (const b of Game.buildings) {
     if (b.team !== unit.team || !b.built) continue;
-    if (b.kind === 'house') continue;
     if (src && src.kind === 'farm' && b.id === src.b) continue;   // never its own farm
-    if (src && src.res !== 'food' && b.kind === 'farm') continue;
-    const d = Math.hypot(b.x - unit.x, b.y - unit.y);
-    const score = d + (b.kind === 'town_center' ? 0 : 300);
-    if (score < bestScore) { bestScore = score; best = b; }
+    const score = dropTargetScore(res, b);
+    if (score === Infinity) continue;
+    const d = Math.hypot(b.x - unit.x, b.y - unit.y) + score;
+    if (d < bestScore) { bestScore = d; best = b; }
   }
   return best;
 }
@@ -985,7 +1005,19 @@ function drawBuildings(Game, view) {
       c.fillStyle = dry ? '#6b5c3a' : '#7d7a3d'; c.fillRect(x + 2, y + 2, w - 4, h - 4);
       c.fillStyle = dry ? 'rgba(0,0,0,.25)' : '#93924a';
       for (let i = 0; i < 4; i++) c.fillRect(x + 4, y + 4 + i * (h / 4), w - 8, Math.max(1, h / 9));
-    } else {
+    } else if (b.kind === 'lumber_camp') {
+      c.fillStyle = '#6a4a2f'; c.fillRect(x + 2, y + 2, w - 4, h - 4);   // log-pile hut
+      c.fillStyle = team.main; c.fillRect(x + 4, y + 4, w - 8, 3);
+      c.fillStyle = team.light; c.fillRect(x + 4, y + h - 7, w - 8, 3);  // workbench
+    } else if (b.kind === 'mining_camp') {
+      c.fillStyle = team.main; c.fillRect(x + 2, y + 2, w - 4, h - 4);
+      c.fillStyle = '#cfd6e2'; c.fillRect(x + 4, y + h - 6, w - 6, 3);   // ore pile
+      c.fillStyle = team.light; c.fillRect(x + 4, y + 4, w - 8, 3);      // tent flap
+    } else if (b.kind === 'mill') {
+      c.fillStyle = team.main; c.fillRect(x + 2, y + 2, w - 4, h - 4);
+      c.fillStyle = '#93924a'; c.fillRect(x + 4, y + 4, w - 8, h - 10);  // grain floor
+      c.fillStyle = team.light; c.fillRect(x + 4, y + h - 6, w - 8, 4);  // millstone base
+    } else {  // barracks and future kinds
       c.fillRect(x + 2, y + 2, w - 4, h - 4);
       c.fillStyle = team.light;
       c.fillRect(x + 4, y + 4, w - 8, 4);
@@ -1366,6 +1398,9 @@ function attachInput(Game, d) {
     if (k === 'h') { Game.placing = Game.placing === 'house' ? null : 'house'; return; }
     if (k === 'f') { Game.placing = Game.placing === 'farm' ? null : 'farm'; return; }
     if (k === 'b') { Game.placing = Game.placing === 'barracks' ? null : 'barracks'; return; }
+    if (k === 'l') { Game.placing = Game.placing === 'lumber_camp' ? null : 'lumber_camp'; return; }
+    if (k === 'g') { Game.placing = Game.placing === 'mining_camp' ? null : 'mining_camp'; return; }
+    if (k === 'm') { Game.placing = Game.placing === 'mill' ? null : 'mill'; return; }
     if (k === 't') { upgradeAge(Game); return; }
     setKey(k, true);
   });
@@ -1615,7 +1650,7 @@ const AoE2 = {
   unitAnim,
   build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   popCap, popUsed, selectedUnits, canAfford, spend, resetGame,
-  findDropoff, nextSource, resumeGather, workersOnTile,
+  findDropoff, dropTargetScore, nextSource, resumeGather, workersOnTile,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;

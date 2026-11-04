@@ -1,6 +1,6 @@
 # Game rules (as implemented)
 
-Every number here is read out of `index.html` §1 config (lines 99-222). If the code and
+Every number here is read out of `index.html` §1 config (lines 99-228). If the code and
 this file disagree, the code is right and this file is a bug.
 
 ## Map
@@ -42,7 +42,7 @@ this file disagree, the code is right and this file is a bug.
   one 24×24 cell per animation × team — villagers: idle/walk + a/b frames for farm, chop
   and mine; militia: idle/walk + attack_a/b), drawn at 20×20 for villagers and 22×22 for
   militia, mirrored when the unit walks left; `tools/gen-atlas.js` regenerates the PNG
-  from `SPRITES`, and `unitAnim` (`index.html:1010`) picks the cell from the unit's order.
+  from `SPRITES`, and `unitAnim` (`index.html:1042`) picks the cell from the unit's order.
 
 ## Buildings (`BLD`)
 
@@ -52,6 +52,14 @@ this file disagree, the code is right and this file is a bug.
 | House | 560 | 2×2 | 25 wood | 4 s | +5 | — |
 | Farm | 320 | 2×2 | 60 wood | 6 s | — | (food field 170) |
 | Barracks | 1300 | 2×2 | 175 wood | 12 s | — | Militia |
+| Lumber Camp | 950 | 1×1 | 100 wood | 8 s | — | — |
+| Mining Camp | 950 | 1×1 | 100 wood | 8 s | — | — |
+| Mill | 1100 | 2×2 | 175 wood | 10 s | — | — |
+
+- Drop-off routing (`findDropoff`, `index.html:674`): wood goes to the Lumber Camp,
+  gold/stone to the Mining Camp and food to the Mill — each falling back to the Town
+  Center (and food also to farms) when the dedicated building doesn't exist. A farm
+  never receives its own harvest.
 
 - Placement needs a free, walkable footprint (`siteFree`) and enough resources; a villager
   is then assigned to build it and the building's HP scales with progress until complete.
@@ -62,7 +70,7 @@ this file disagree, the code is right and this file is a bug.
 ## Ages (`AGES`)
 
 Dark Age → Feudal Age → Castle Age → Imperial Age.
-Cost (`index.html:801`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
+Cost (`index.html:821`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
 costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle, Castle → Imperial). Hotkey `T`.
 Each upgrade sets `Game.ageBonus = Game.age`, which scales unit damage.
 

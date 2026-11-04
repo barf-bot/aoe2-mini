@@ -5,6 +5,14 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-04
 
+### Added
+- **Lumber Camp (100 wood, hotkey `L`), Mining Camp (100 wood, `G`) and Mill (175 wood,
+  `M`)** join `BLD` — camps 1×1, mill 2×2, drawn procedurally for now (atlas art arrives
+  with the building-sprites round). Carrying villagers now route by resource instead of
+  always walking to the Town Center: wood → Lumber Camp → TC, gold/stone → Mining Camp →
+  TC, food → Mill → farms → TC (`dropTargetScore`/`findDropoff`). Harness section 7b plus
+  hotkey checks pin the costs, sizes and every routing rule (81 → 92 checks).
+
 ### Changed
 - **Sprite atlas v2** (villager redesign): villagers no longer wear the militia's helm —
   bare head with hair, plain tunic, and the tool of whatever they are working at in hand.
