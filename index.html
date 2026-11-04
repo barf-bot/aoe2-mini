@@ -567,6 +567,18 @@ function rebuildBlocks(Game) {
   Game.occupied = occupied;
 }
 
+/** The one way a building leaves the world (combat raze, cancel, demolish):
+ *  drop it from Game.buildings, rebuild occupancy, and clear a footer
+ *  selection that points at it — hitBuilding used to splice by hand and left
+ *  Game.selectedBuilding dangling on raze. */
+function removeBuilding(Game, b) {
+  const i = Game.buildings.indexOf(b);
+  if (i >= 0) Game.buildings.splice(i, 1);
+  rebuildBlocks(Game);
+  if (Game.selectedBuilding === b) Game.selectedBuilding = null;
+  return i >= 0;
+}
+
 /** Free tile next to a building for a unit to spawn / stand on. */
 function workPos(Game, b) {
   const tiles = Game.blocks.get(b.id) || [];
@@ -645,12 +657,10 @@ function hitBuilding(Game, b, dmg) {
   b.hp -= dmg;
   if (b.hp > 0) return false;
   b.hp = 0;
-  const i = Game.buildings.indexOf(b);
-  if (i >= 0) Game.buildings.splice(i, 1);
-  rebuildBlocks(Game);
+  const removed = removeBuilding(Game, b);
   toast(Game, b.team === 0 ? BLD[b.kind].label + ' destroyed'
                            : 'Razed enemy ' + BLD[b.kind].label.toLowerCase());
-  return true;
+  return removed;
 }
 
 /** What an idle fighter sees: the nearest enemy unit within ACQUIRE tiles, else
@@ -1913,7 +1923,7 @@ const AoE2 = {
   CFG, KINDS, BLD, AGES, T, PAL, TEAM, RES_OF_TILE,
   SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor, BLD_SPRITES, bldSpriteFor,
   makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot,
-  makeUnit, makeBuilding, walkable, workPos, standingSpots, reachOf,
+  makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
   build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,

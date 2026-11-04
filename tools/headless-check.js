@@ -811,12 +811,15 @@ const gb = farB[0].b;
 gb.x = gm.x - AoE2.CFG.TILE; gb.y = gm.y;          // inside the stop radius → instant swing
 const gb0 = gb.hp;
 gm.order = { kind: 'attack', b: gb.id };
+ag.selectedBuilding = gb;                           // selected: razing must clear the reference
 AoE2.stepSim(ag, DT);
 check(gb.hp < gb0 && gb.hp > 0, 'combat: militia damages an enemy building (o.b order)',
   gb0 + ' -> ' + gb.hp);
-check(AoE2.hitBuilding(ag, gb, 99999) === true && !ag.buildings.includes(gb),
+check(AoE2.hitBuilding(ag, gb, 99999) === true && !ag.buildings.includes(gb) &&
+      ag.selectedBuilding === null,
   'combat: a building at 0 hp is razed and removed from the world',
-  ag.buildings.some((b) => b.team === 1) ? 'still there' : 'removed');
+  ag.buildings.some((b) => b.team === 1) ? 'still there'
+    : 'removed, selection=' + String(ag.selectedBuilding));
 
 const gv = g0.find((u) => u.kind === 'villager');
 gv.order = { kind: 'idle' };

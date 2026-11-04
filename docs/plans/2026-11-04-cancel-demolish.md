@@ -67,7 +67,7 @@ existing build-button check. The full existing suite stays green (nothing weaken
     throwaway state's `res`, `refund(Game, 0, { wood: 20 })`, wood up exactly 20) —
     written with the code, both land in one commit; existing §5 checks untouched.
 
-- [ ] T2: One shared removal path — `removeBuilding`
+- [x] T2: One shared removal path — `removeBuilding`
   - files: `index.html` §3 (after `rebuildBlocks` 551-567), §4 `hitBuilding` (643-653),
     export block; `tools/headless-check.js` §9b (811-813)
   - change: `removeBuilding(Game, b)` — `Game.buildings.splice` + `rebuildBlocks(Game)` +
