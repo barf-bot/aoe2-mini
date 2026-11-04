@@ -56,7 +56,7 @@ completing. Plus a regenerated `preview.png` to eyeball the cluster.
   - test: new `tuning: CFG and KINDS match the agreed numbers` check asserting all six
     values, so a future revert cannot pass silently. Section 6 checks otherwise untouched.
 
-- [ ] T2: Solid tiles — walkable consults resources and buildings
+- [x] T2: Solid tiles — walkable consults resources and buildings
   - files: `index.html` §4 `walkable` (706), `workSpot` (445), `makeBuilding` (478),
     export block (1752-1764); `tools/headless-check.js` §6 (371-406)
   - change: `walkable(Game, px, py)` = in bounds AND not WATER AND not a resource tile
