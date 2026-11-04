@@ -1,6 +1,6 @@
 # Cancel construction + demolish
 
-Status: planned
+Status: done
 
 Phase 2 of the 2026-11-04 rules pass (`docs/ROADMAP.md`), first of its two bullets —
 the uniform HUD frame ships separately after this.

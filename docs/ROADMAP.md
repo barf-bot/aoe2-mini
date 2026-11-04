@@ -50,10 +50,9 @@ prototypes stall.
 Split out of the board-rules request because one plan caps at 8 tasks; phase 1
 (`docs/plans/2026-11-04-board-rules.md`) ships the board rules, these ship next.
 
-- **Cancel construction + demolish.** Cancelling an in-progress building refunds 80% of
-  its cost and frees the builder; demolishing a finished building refunds nothing.
-  *Done when:* a check cancels a half-built house at exactly 80% back in the stockpile and
-  another deletes a finished one with zero change.
+- **Cancel construction + demolish.** Shipped 2026-11-04 via
+  `docs/plans/2026-11-04-cancel-demolish.md`: cancelling refunds 80% of the cost and frees
+  the builder; demolishing a finished building refunds nothing (Town Centers exempt).
 - **Uniform HUD frame.** Selecting a unit, a building or nothing must render one
   fixed-height overlay instead of today's footer that grows taller for a unit and shifts
   the layout; one place owns the HUD markup. *Done when:* `#info`, `#commands` and

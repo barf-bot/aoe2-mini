@@ -39,6 +39,19 @@ at T6, and the harness went 99 → 111 checks across the pass.
   villagers are building` when none is free; two placements from one 4-villager
   selection now raise two complete buildings (110 → 111 checks).
 
+### Cancel construction + demolish (T1–T5) — plan `docs/plans/2026-11-04-cancel-demolish.md`
+
+Phase 2 of the 2026-11-04 rules pass (ed29144 → bd73da6). `CFG.CANCEL_REFUND = 0.8` and
+`refund()` joined as the single crediting writer of `Game.res` (T1); one `removeBuilding`
+path is now shared by `hitBuilding`, cancel and demolish and also clears the
+`selectedBuilding` a raze used to leave dangling (T2); `cancelConstruction` refunds the
+floored 80% of a site's defined cost regardless of progress and frees its builders (T3);
+`demolish` removes a finished own-team building for nothing, protecting Town Centers and
+buildings with a training queue (T4); the footer renders and dispatches `Cancel`/
+`Demolish` buttons (T5). Harness 111 → 119 checks (the `tuning:` pass plus refund, three
+`cancel:`, three `demolish:` and the `ui:` dispatch checks; the §9b raze check now also
+asserts the selection clears).
+
 ### Added
 - **Building sprites (task 5):** every built building now blits a team-coloured atlas
   cell instead of the flat footprint rectangle — `BLD_SPRITES`/`bldSpriteFor` join the
