@@ -10,14 +10,14 @@ this file disagree, the code is right and this file is a bug.
 | Size | 96 × 96 tiles (`CFG.MAP_W/MAP_H`), 22 px per tile, single zoom level |
 | Seed | `1337` — fixed map, so runs and tests are reproducible (`New map` reseeds) |
 | Terrain | grass, water, forest, gold, stone, berry (`T` enum) |
-| Tile yields | tree 60 wood · gold 800 · stone 450 · berry 110 (`CFG.RES`) |
+| Tile yields | tree 60 wood · gold 800 · stone 450 · berry 150 (`CFG.RES`) |
 | Fog | explored/revealed per tile, drawn dimmed outside vision |
 | Teams | Blue (player, team 0) vs Red (AI, team 1) |
-| Starting stockpile | 200 food, 200 wood, 100 gold, 100 stone (`CFG.START`) |
+| Starting stockpile | 100 food, 100 wood, 50 gold, 50 stone (`CFG.START`) |
 
 ## Economy
 
-- Villagers gather at **3.0 units/second** (`CFG.GATHER_RATE`) and carry **10** at a time
+- Villagers gather at **1.5 units/second** (`CFG.GATHER_RATE`) and carry **15** at a time
   (`CFG.CARRY_MAX`), then walk to the nearest valid drop-off and deposit into the right
   stockpile (`u.carryRes`).
 - At most **2 villagers per resource tile** (`CFG.WORKERS_PER_TILE`). The 4 starters are
@@ -32,8 +32,8 @@ this file disagree, the code is right and this file is a bug.
 
 | Unit | HP | Speed | ATK | Attack time | Cost | Train time | Trained by |
 |---|---|---|---|---|---|---|---|
-| Villager | 60 | 46 | 3 | 1.0 s | 50 food | 5 s | Town Center |
-| Militia | 110 | 58 | 11 | 0.9 s | 60 food + 20 gold | 6 s | Town Center, Barracks |
+| Villager | 60 | 46 | 3 | 1.0 s | 50 food | 2.5 s | Town Center |
+| Militia | 110 | 58 | 11 | 0.9 s | 60 food + 20 gold | 3 s | Town Center, Barracks |
 
 - Melee range = `attacker.r + target.r + 4` px (5 for villager, 6 for militia). Attacking
   a building stops at half its footprint + 2 px.

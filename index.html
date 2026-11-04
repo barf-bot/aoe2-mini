@@ -103,10 +103,10 @@ const CFG = {
   MAP_H: 96,
   TILE: 22,                       // px per tile (single zoom level for now)
   SEED: 1337,                     // fixed map => reproducible, testable
-  START: { food: 200, wood: 200, gold: 100, stone: 100 },
-  CARRY_MAX: 10,                  // villager carry capacity (AoE2 uses 10)
+  START: { food: 100, wood: 100, gold: 50, stone: 50 },
+  CARRY_MAX: 15,                  // villager carry capacity (AoE2 uses 10)
   WORKERS_PER_TILE: 2,            // max villagers per tile (spreads the start squad)
-  GATHER_RATE: 3.0,               // resource units per second while working
+  GATHER_RATE: 1.5,               // resource units per second while working
   AGE_FOOD: 500,                  // food cost of Feudal Age
   WAVE_EVERY: 45,                 // seconds between enemy attack waves
   ACQUIRE: 6,                     // tiles: idle fighters spot enemy units this far
@@ -114,14 +114,14 @@ const CFG = {
   UNIT_SEP: 11,                   // min px between two units
   PAN_SPEED: 620,                 // px/s camera pan
   EDGE: 14,                       // px edge-scroll band
-  RES: { tree: 60, gold: 800, stone: 450, berry: 110 },
+  RES: { tree: 60, gold: 800, stone: 450, berry: 150 },
 };
 
 const KINDS = {
   villager: { label:'Villager', hp:60,  speed:46, atk:3,  atkTime:1.0, r:5,
-              cost:{food:50},          time:5, buildable:true },
+              cost:{food:50},          time:2.5, buildable:true },
   militia:  { label:'Militia',  hp:110, speed:58, atk:11, atkTime:0.9, r:6,
-              cost:{food:60, gold:20}, time:6, buildable:false },
+              cost:{food:60, gold:20}, time:3, buildable:false },
 };
 
 /* Sprite atlas v2 -- every unit frame lives in ONE image, assets/sprites.png.

@@ -32,6 +32,14 @@ commits on `main`.
   "attacker took no damage" check becomes "may be countered" — enemies fight back now.
 
 ### Changed
+- **Tuning pass (T1):** the opening economy is halved — `CFG.START` 200/200/100/100 →
+  100/100/50/50, villager `CARRY_MAX` 10 → 15, `GATHER_RATE` 3.0 → 1.5/s, villager and
+  militia train times 5 s / 6 s → 2.5 s / 3 s, berry tiles 110 → 150 food. Numbers only,
+  no logic. The harness's `roster: starting stock` and `reset:` checks are amended in
+  place to the new stockpile, the section-8 spawn check now counts 2 units (the halved
+  villager time moved the red AI's 45 s queue-train inside its 7 s window), and a new
+  `tuning: CFG and KINDS match the agreed numbers` check pins all six values so a silent
+  revert cannot pass (100 → 101 checks).
 - **Sprite atlas v2** (villager redesign): villagers no longer wear the militia's helm —
   bare head with hair, plain tunic, and the tool of whatever they are working at in hand.
   `SPRITES` becomes `kind → animation → [Blue, Red]`: villagers get idle/walk plus

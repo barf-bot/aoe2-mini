@@ -44,7 +44,7 @@ completing. Plus a regenerated `preview.png` to eyeball the cluster.
 
 ## Tasks
 
-- [ ] T1: Halve the economy numbers (pure tuning pass)
+- [x] T1: Halve the economy numbers (pure tuning pass)
   - files: `index.html` §1 `CFG` (101-118) + `KINDS` (120-125); `tools/headless-check.js`
     §5 (196); `docs/GAME_RULES.md` (Map + Units tables), `docs/CHANGELOG.md`
   - change: `START` 200/200/100/100 → 100/100/50/50; `CARRY_MAX` 10 → 15; `GATHER_RATE`

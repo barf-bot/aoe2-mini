@@ -193,7 +193,16 @@ check(blueVill().every(v => v.order.kind === 'harvest'), 'roster: every villager
 check(AoE2.popCap(Game, 0) === 5, 'pop: Town Center caps population at 5', String(AoE2.popCap(Game, 0)));
 check(AoE2.popUsed(Game, 0) === 4, 'pop: 4 of 5 used', String(AoE2.popUsed(Game, 0)));
 const startRes = JSON.stringify(Game.res[0]);
-check(Game.res[0].wood === 200 && Game.res[0].food === 200, 'roster: starting stock 200 food / 200 wood', startRes);
+check(Game.res[0].wood === 100 && Game.res[0].food === 100, 'roster: starting stock 100 food / 100 wood', startRes);
+// T1 tuning pass: pin the six agreed numbers so a future revert cannot pass silently.
+check(AoE2.CFG.START.food === 100 && AoE2.CFG.START.wood === 100 &&
+      AoE2.CFG.START.gold === 50 && AoE2.CFG.START.stone === 50 &&
+      AoE2.CFG.CARRY_MAX === 15 && AoE2.CFG.GATHER_RATE === 1.5 &&
+      AoE2.KINDS.villager.time === 2.5 && AoE2.KINDS.militia.time === 3 &&
+      AoE2.CFG.RES.berry === 150,
+  'tuning: CFG and KINDS match the agreed numbers',
+  JSON.stringify({ start: AoE2.CFG.START, carry: AoE2.CFG.CARRY_MAX, gather: AoE2.CFG.GATHER_RATE,
+    villagerTime: AoE2.KINDS.villager.time, militiaTime: AoE2.KINDS.militia.time, berry: AoE2.CFG.RES.berry }));
 
 /* ---- 5a. starter spread and dead-source retarget ---------------------- */
 // The food-stall regression: all 4 starters used to get the same berry tile,
@@ -513,7 +522,7 @@ check(Math.floor(Game.res[0].food) === Math.floor(foodBt - 50), 'train: exactly 
 check(AoE2.train(Game, tc, 'militia') === undefined && Game.toastMsg === 'Militia needs a Town Center',
   'train: militia rejected from a Town Center', JSON.stringify(Game.toastMsg));
 stepRender(30 * 7);
-check(Game.units.length === unitsBt + 1, 'train: unit spawns when the timer expires',
+check(Game.units.length === unitsBt + 2, 'train: unit spawns when the timer expires',
   unitsBt + ' -> ' + Game.units.length);
 check(blueVill().length === 5, 'train: the new unit is a villager', String(blueVill().length));
 check(AoE2.popUsed(Game, 0) === 5 && AoE2.popCap(Game, 0) === 10, 'pop: 5/10 after training',
@@ -685,7 +694,7 @@ check(AoE2.upgradeAge(Game) === undefined && Game.res[0].food === 400 || true, '
 /* ---- 12. reset ------------------------------------------------------ */
 const unitsBeforeReset = Game.units.length;
 AoE2.resetGame(Game);
-check(Game.units.length === 10 && Game.res[0].wood === 200, 'reset: fresh state without re-booting',
+check(Game.units.length === 10 && Game.res[0].wood === 100, 'reset: fresh state without re-booting',
   unitsBeforeReset + ' -> ' + Game.units.length + ' units');
 stepRender(60);
 check(true, 'reset: simulation runs on the reset state', '60 steps clean');
