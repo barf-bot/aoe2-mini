@@ -100,6 +100,13 @@ asserts the selection clears).
   Harness section 5a pins the spread, the food-first order and the retarget (72 → 75
   checks).
 
+- **Half-built buildings offered train buttons** (the "a half-built barracks or Town
+  Center still shows its train buttons" report). `b.built` is a 0..1 progress fraction, so
+  the truthy gate in `commandsHtml` rendered train buttons for any foundation even while
+  `train()` refused with `Still building`; the gate is now `b.built >= 1`. New `ui:`
+  check pins both halves — half-built Barracks: Cancel only, finished: Militia (120 → 121
+  checks).
+
 ## [7fe4d9b] — 2026-11-03
 
 ### Added

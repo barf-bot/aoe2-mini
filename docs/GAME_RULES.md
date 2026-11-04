@@ -99,8 +99,8 @@ this file disagree, the code is right and this file is a bug.
   defined cost whatever the progress — and frees its builders; `demolish`
   (`index.html:1068`) removes a finished own-team building with no refund, refuses Town
   Centers (`Cannot demolish a Town Center`) and buildings with a training queue
-  (`Still training`). The footer offers `Cancel` for a foundation and `Demolish` for a
-  finished non-Town Center building (T5).
+  (`Still training`). The footer offers `Cancel` for a foundation and, once the
+  building is finished, its train buttons plus `Demolish` for a non-Town Center building (T5).
 - Training: a building can only train what's in its `trains` list ("Militia needs a Town
   Center" when wrong), must be finished (`Still building`), max 5 in queue (`Queue full`),
   must be affordable, and must have population room (`Need more houses`).

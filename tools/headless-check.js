@@ -990,6 +990,20 @@ check(cmdHalf.includes('data-act="cancel"') && !cmdHalf.includes('data-act="demo
   'ui: a half-built site offers Cancel, a finished one Demolish',
   'half: ' + (cmdHalf.match(/data-act="\w+"/g) || []).join(' ') +
   ' | done: ' + (cmdDone.match(/data-act="\w+"/g) || []).join(' '));
+// Train buttons are a finished-building affordance too: built is a 0..1 progress
+// fraction, so a half-built Barracks used to offer Militia even though train()
+// answers 'Still building'. Same rule as the Demolish check above.
+Game.selection = [];
+Game.selectedBuilding = { kind: 'barracks', team: 0, built: 0.5, hp: 1, maxHp: 1, queue: [] };
+const cmdHalfBarracks = AoE2.commandsHtml(Game);
+Game.selectedBuilding.built = 1;
+const cmdDoneBarracks = AoE2.commandsHtml(Game);
+Game.selectedBuilding = null;
+check(!cmdHalfBarracks.includes('data-act="train"') && cmdHalfBarracks.includes('data-act="cancel"') &&
+      cmdDoneBarracks.includes('data-act="train"') && cmdDoneBarracks.includes('data-arg="militia"'),
+  'ui: a half-built Barracks offers no train buttons, a finished one trains Militia',
+  'half: ' + (cmdHalfBarracks.match(/data-act="\w+"/g) || []).join(' ') +
+  ' | done: ' + (cmdDoneBarracks.match(/data-act="\w+"/g) || []).join(' '));
 Game.res[0].food = 900;
 AoE2.upgradeAge(Game);
 check(Game.age === 1 && Game.res[0].food === 400, 'age: Feudal Age costs 500 food', 'age=' + Game.age + ' food=' + Game.res[0].food);

@@ -1538,7 +1538,7 @@ function commandsHtml(Game) {
   const sel = selectedUnits(Game);
   const b = Game.selectedBuilding;
   const out = [];
-  if (b && b.built) {
+  if (b && b.built >= 1) {
     for (const k of BLD[b.kind].trains || []) {
       const ok = canAfford(Game, b.team, KINDS[k].cost) && popUsed(Game, b.team) < popCap(Game, b.team);
       out.push('<button data-act="train" data-arg="' + k + '"' + (ok ? '' : ' disabled') + '>' +
