@@ -1545,6 +1545,12 @@ function commandsHtml(Game) {
         KINDS[k].label + '<span class="c">' + fmtCost(KINDS[k].cost) + '</span></button>');
     }
   }
+  if (b && !b.built) {
+    out.push('<button data-act="cancel">Cancel<span class="c">80% back</span></button>');
+  }
+  if (b && b.built && b.kind !== 'town_center') {
+    out.push('<button data-act="demolish">Demolish</button>');
+  }
   const villagers = sel.filter(u => u.kind === 'villager');
   if (villagers.length && !b) {
     for (const k in BLD) {
@@ -1720,6 +1726,8 @@ function attachInput(Game, d) {
       const act = t.getAttribute('data-act'), arg = t.getAttribute('data-arg');
       if (act === 'build') Game.placing = arg;
       else if (act === 'train' && Game.selectedBuilding) train(Game, Game.selectedBuilding, arg);
+      else if (act === 'cancel' && Game.selectedBuilding) cancelConstruction(Game, Game.selectedBuilding);
+      else if (act === 'demolish' && Game.selectedBuilding) demolish(Game, Game.selectedBuilding);
       else if (act === 'age') upgradeAge(Game);
       else if (act === 'restart') resetGame(Game);
     });

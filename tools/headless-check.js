@@ -964,6 +964,19 @@ button.setAttribute('data-act', 'build');
 button.setAttribute('data-arg', 'farm');
 Game.dom.commands.listeners.click.forEach(fn => fn({ target: button }));
 check(Game.placing === 'farm', 'ui: clicking the Farm button arms placement', String(Game.placing));
+// and the Demolish button (phase-2 T5): dispatched through the same delegated
+// listener, it demolishes the selected finished house from §7 for no refund.
+const uiHouse = Game.buildings.find(x => x.team === 0 && x.kind === 'house' && x.built >= 1);
+const uiWood0 = Game.res[0].wood;
+Game.selectedBuilding = uiHouse;
+const dBtn = stubEl('button', 'btn2', 60, 24);
+dBtn.setAttribute('data-act', 'demolish');
+Game.dom.commands.listeners.click.forEach(fn => fn({ target: dBtn }));
+check(!!uiHouse && !Game.buildings.includes(uiHouse) && Game.res[0].wood === uiWood0 &&
+      Game.selectedBuilding === null,
+  'ui: clicking the Demolish button demolishes the selected building',
+  !uiHouse ? 'no finished house to demolish'
+    : Game.buildings.includes(uiHouse) ? 'still there' : 'demolished, selection cleared');
 Game.res[0].food = 900;
 AoE2.upgradeAge(Game);
 check(Game.age === 1 && Game.res[0].food === 400, 'age: Feudal Age costs 500 food', 'age=' + Game.age + ' food=' + Game.res[0].food);

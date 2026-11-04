@@ -107,7 +107,7 @@ existing build-button check. The full existing suite stays green (nothing weaken
     demolished` and `demolish: an unfinished building refuses with 'Not built yet — cancel
     instead'`.
 
-- [ ] T5: Command-bar buttons + click dispatch
+- [x] T5: Command-bar buttons + click dispatch
   - files: `index.html` §5 `commandsHtml` (1491-1520), §6/§7 click delegate (1670-1679);
     `tools/headless-check.js` §11 (900-913)
   - change: `commandsHtml` renders `Cancel` (`data-act="cancel"`, hint `80% back`) for a
