@@ -1545,10 +1545,10 @@ function commandsHtml(Game) {
         KINDS[k].label + '<span class="c">' + fmtCost(KINDS[k].cost) + '</span></button>');
     }
   }
-  if (b && !b.built) {
+  if (b && b.built < 1) {
     out.push('<button data-act="cancel">Cancel<span class="c">80% back</span></button>');
   }
-  if (b && b.built && b.kind !== 'town_center') {
+  if (b && b.built >= 1 && b.kind !== 'town_center') {
     out.push('<button data-act="demolish">Demolish</button>');
   }
   const villagers = sel.filter(u => u.kind === 'villager');
@@ -1970,7 +1970,7 @@ const AoE2 = {
   unitAnim,
   build, cancelConstruction, demolish, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, autoAcquire,
-  popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
+  popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame, commandsHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };
 

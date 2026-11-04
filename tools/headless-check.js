@@ -977,6 +977,19 @@ check(!!uiHouse && !Game.buildings.includes(uiHouse) && Game.res[0].wood === uiW
   'ui: clicking the Demolish button demolishes the selected building',
   !uiHouse ? 'no finished house to demolish'
     : Game.buildings.includes(uiHouse) ? 'still there' : 'demolished, selection cleared');
+// The footer offers Cancel for the WHOLE build (built is a 0..1 fraction, not a flag)
+// and Demolish only once finished: a half-built site must not show Demolish.
+Game.selection = [];
+Game.selectedBuilding = { kind: 'house', team: 0, built: 0.5, hp: 1, maxHp: 1, queue: [] };
+const cmdHalf = AoE2.commandsHtml(Game);
+Game.selectedBuilding.built = 1;
+const cmdDone = AoE2.commandsHtml(Game);
+Game.selectedBuilding = null;
+check(cmdHalf.includes('data-act="cancel"') && !cmdHalf.includes('data-act="demolish"') &&
+      cmdDone.includes('data-act="demolish"') && !cmdDone.includes('data-act="cancel"'),
+  'ui: a half-built site offers Cancel, a finished one Demolish',
+  'half: ' + (cmdHalf.match(/data-act="\w+"/g) || []).join(' ') +
+  ' | done: ' + (cmdDone.match(/data-act="\w+"/g) || []).join(' '));
 Game.res[0].food = 900;
 AoE2.upgradeAge(Game);
 check(Game.age === 1 && Game.res[0].food === 400, 'age: Feudal Age costs 500 food', 'age=' + Game.age + ' food=' + Game.res[0].food);

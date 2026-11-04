@@ -122,7 +122,7 @@ existing build-button check. The full existing suite stays green (nothing weaken
     (stub `data-act="demolish"` button dispatched through the registered click listener,
     mirroring the existing build-button check).
 
-- [ ] T6: Docs sync + full verification
+- [x] T6: Docs sync + full verification
   - files: `docs/GAME_RULES.md` (Construction section: refund rule, Town Center exception,
     busy-queue refusal), `docs/CHANGELOG.md` (dated entry), `docs/ROADMAP.md` (mark the
     phase-2 cancel/demolish bullet as shipped via this plan), `docs/ARCHITECTURE.md`
