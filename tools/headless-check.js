@@ -195,6 +195,36 @@ check(AoE2.popUsed(Game, 0) === 4, 'pop: 4 of 5 used', String(AoE2.popUsed(Game,
 const startRes = JSON.stringify(Game.res[0]);
 check(Game.res[0].wood === 200 && Game.res[0].food === 200, 'roster: starting stock 200 food / 200 wood', startRes);
 
+/* ---- 5a. starter spread and dead-source retarget ---------------------- */
+// The food-stall regression: all 4 starters used to get the same berry tile,
+// and a villager whose tile emptied while carrying went idle forever.
+const villTiles = {};
+for (const v of blueVill()) {
+  if (v.order.src.kind === 'tile') {
+    const k = v.order.src.tx + ',' + v.order.src.ty;
+    villTiles[k] = (villTiles[k] || 0) + 1;
+  }
+}
+check(Object.keys(villTiles).length >= 2 &&
+      Object.values(villTiles).every(n => n <= AoE2.CFG.WORKERS_PER_TILE),
+  'gather: 4 starters spread over tiles with <= CFG.WORKERS_PER_TILE each',
+  Object.entries(villTiles).map(e => e.join(':')).join(' '));
+check(blueVill().every(v => v.order.src.res === 'food'),
+  'gather: food-first assignment — all 4 starters take berries (AoE2 opens on food)',
+  blueVill().map(v => v.order.src.res).join(','));
+const st2 = AoE2.createState();                        // fresh state, own villagers
+const rv0 = st2.units.find(u => u.team === 0 && u.kind === 'villager');
+const rtc = st2.buildings.find(b => b.team === 0 && b.kind === 'town_center');
+const rsrc = AoE2.sourceFromTile(st2.world, rv0, rv0.order.src.tx, rv0.order.src.ty);
+rv0.order = { kind: 'go_deposit', b: rtc.id, src: rsrc };
+rv0.x = rtc.x + 6; rv0.y = rtc.y; rv0.carry = 7; rv0.carryRes = rsrc.res;
+rsrc.amount = 0;                                       // tile empties while basket walks
+const rf0 = Math.floor(st2.res[0].food);
+AoE2.stepSim(st2, 1 / 30);
+check(Math.floor(st2.res[0].food) === rf0 + 7 && rv0.order.kind === 'harvest',
+  'gather: villager whose tile died in flight retargets instead of idling',
+  rv0.order.kind + ' food+' + (Math.floor(st2.res[0].food) - rf0));
+
 /* ---- 5b. sprite frame table ----------------------------------------- */
 // The atlas layout is data, not code: one sheet, one cell per kind x team.
 // Adding a unit kind without giving it a cell must fail here (the archer is

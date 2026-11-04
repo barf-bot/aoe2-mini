@@ -105,6 +105,7 @@ const CFG = {
   SEED: 1337,                     // fixed map => reproducible, testable
   START: { food: 200, wood: 200, gold: 100, stone: 100 },
   CARRY_MAX: 10,                  // villager carry capacity (AoE2 uses 10)
+  WORKERS_PER_TILE: 2,            // max villagers per tile (spreads the start squad)
   GATHER_RATE: 3.0,               // resource units per second while working
   AGE_FOOD: 500,                  // food cost of Feudal Age
   WAVE_EVERY: 45,                 // seconds between enemy attack waves
@@ -601,6 +602,19 @@ function separate(Game) {
   }
 }
 
+/** How many of u's villagers are already on a tile (harvesting it or carrying
+ *  from it). Used to spread the starting squad — four villagers on one berry
+ *  is how the economy used to stall at 420 food. */
+function workersOnTile(Game, u, tx, ty) {
+  let n = 0;
+  for (const v of Game.units) {
+    if (v.dead || v === u || v.team !== u.team || v.kind !== 'villager') continue;
+    const s = (v.order.kind === 'harvest' || v.order.kind === 'go_deposit') ? v.order.src : null;
+    if (s && s.kind === 'tile' && s.tx === tx && s.ty === ty) n++;
+  }
+  return n;
+}
+
 /** Where a carry goes: Town Center beats farm for non-food, nearest otherwise. */
 function findDropoff(Game, unit, src) {
   let best = null, bestScore = Infinity;
@@ -632,11 +646,15 @@ function nextSource(Game, u, src) {
   return alt ? sourceFromTile(Game.world, u, alt.tx, alt.ty) : null;
 }
 
-/** After depositing, re-point at the source (tiles revalidate, farms check field). */
+/** After depositing, re-point at the source. A tile can empty while the
+ *  basket walks (another villager drains it), so a dead tile falls back to
+ *  the same alternatives the harvest path uses instead of idling the
+ *  villager forever (the food-stall regression). */
 function resumeGather(Game, u, src) {
   if (src.kind === 'tile') {
-    const s = sourceFromTile(Game.world, u, src.tx, src.ty);
-    return s ? { kind: 'harvest', src: s } : { kind: 'idle' };
+    if (src.amount > 0) return { kind: 'harvest', src: sourceFromTile(Game.world, u, src.tx, src.ty) };
+    const alt = findAlternative(Game.world, u, src.res, 14) || findAlternative(Game.world, u, null, 20);
+    return alt ? { kind: 'harvest', src: sourceFromTile(Game.world, u, alt.tx, alt.ty) } : { kind: 'idle' };
   }
   const b = Game.buildings.find(x => x.id === src.b);
   if (!b || !b.built || b.field <= 0) return { kind: 'idle' };
@@ -1416,13 +1434,37 @@ function resetGame(Game) {
   Game.cam.y = clamp(a.ty * CFG.TILE - 200, 0, Math.max(0, Game.world.h * CFG.TILE - view_H(Game)));
 }
 
-/** Put a starting villager on the nearest harvestable tile. */
+/** Put a starting villager on the nearest harvestable tile that is not already
+ *  swarmed: food first (AoE2 opens on berries), then wood, then anything, and
+ *  never more than CFG.WORKERS_PER_TILE per tile — the old "nearest tile for
+ *  everyone" answer parked all four villagers on one berry bush. */
 function assignStarter(Game, v) {
   const ux = Math.floor(v.x / CFG.TILE), uy = Math.floor(v.y / CFG.TILE);
-  for (let r = 1; r <= 12; r++) {
-    const t = ringRes(Game.world, ux, uy, r, null);
-    if (t) { v.order = { kind: 'harvest', src: sourceFromTile(Game.world, v, t.tx, t.ty) }; return; }
+  const ring = (r) => {
+    const out = [];
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const t = tileRes(Game.world, ux + dx, uy + dy);
+        if (t) out.push(t);
+      }
+    }
+    return out;
+  };
+  let fallback = null;
+  for (const res of ['food', 'wood', null]) {
+    for (let r = 1; r <= 12; r++) {
+      for (const t of ring(r)) {
+        if (res && t.res !== res) continue;
+        if (workersOnTile(Game, v, t.tx, t.ty) < CFG.WORKERS_PER_TILE) {
+          v.order = { kind: 'harvest', src: sourceFromTile(Game.world, v, t.tx, t.ty) };
+          return;
+        }
+        if (!fallback) fallback = t;                       // every tile full: still better than idling
+      }
+    }
   }
+  if (fallback) v.order = { kind: 'harvest', src: sourceFromTile(Game.world, v, fallback.tx, fallback.ty) };
 }
 
 /** Fetch the unit atlas once, at boot (node has no Image, so this is a no-op
@@ -1515,6 +1557,7 @@ const AoE2 = {
   makeUnit, makeBuilding, setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   popCap, popUsed, selectedUnits, canAfford, spend, resetGame,
+  findDropoff, nextSource, resumeGather, workersOnTile,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;

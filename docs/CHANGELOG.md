@@ -3,7 +3,20 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions are the git
 commits on `main`.
 
-## [Unreleased] — 2026-11-03
+## [Unreleased] — 2026-11-04
+
+### Fixed
+- **Villagers stopped collecting food once the berry tile ran dry** (the "food stalls at
+  420" report). Two causes: `assignStarter` gave every starting villager the *same*
+  nearest tile, and `resumeGather` re-validated that exact tile after depositing — when
+  another villager drained it mid-carry the worker went idle forever. Starters now spread
+  (max `CFG.WORKERS_PER_TILE = 2` per tile, food first, then wood, then anything) and a
+  dead tile falls back through `findAlternative` exactly like `nextSource` does. Verified
+  in the sim: gold now accrues (100 → 970 over 120 s) where it previously sat at 775.
+  Harness section 5a pins the spread, the food-first order and the retarget (72 → 75
+  checks).
+
+## [7fe4d9b] — 2026-11-03
 
 ### Added
 - Unit art: `assets/sprites.png`, a 96×24 atlas with one 24×24 cell per unit kind × team,

@@ -1,6 +1,6 @@
 # Game rules (as implemented)
 
-Every number here is read out of `index.html` §1 config (lines 99-185). If the code and
+Every number here is read out of `index.html` §1 config (lines 99-186). If the code and
 this file disagree, the code is right and this file is a bug.
 
 ## Map
@@ -20,6 +20,9 @@ this file disagree, the code is right and this file is a bug.
 - Villagers gather at **3.0 units/second** (`CFG.GATHER_RATE`) and carry **10** at a time
   (`CFG.CARRY_MAX`), then walk to the nearest valid drop-off and deposit into the right
   stockpile (`u.carryRes`).
+- At most **2 villagers per resource tile** (`CFG.WORKERS_PER_TILE`). The 4 starters are
+  placed food-first (berries), then wood, then anything — putting all four on one berry
+  bush is what used to stall the economy at 420 food (the food-stall regression, fixed).
 - Drop-off rules: berries/gold/stone/forest go to the Town Center; a farm's own field is
   the drop-off for farm food. Farms feed 170 food (`BLD.farm.field`) before going idle.
 - When a tile runs dry the villager retargets the nearest tile of the same resource
@@ -35,7 +38,7 @@ this file disagree, the code is right and this file is a bug.
 - Melee range = `attacker.r + target.r + 4` px (5 for villager, 6 for militia).
 - Age bonus multiplies damage: `ageBonus` equals the current age index (0 at Dark Age).
 - Population used counts **villagers only**, per AoE2 convention.
-- Art: both kinds render from the unit atlas (`SPRITE_SHEET` 96×24 at `index.html:131`, one
+- Art: both kinds render from the unit atlas (`SPRITE_SHEET` 96×24 at `index.html:132`, one
   24×24 cell per kind × team, drawn at 20×20 for villagers and 22×22 for militia), mirrored
   when the unit walks left; `tools/gen-atlas.js` regenerates the PNG from `SPRITES`.
 
@@ -57,7 +60,7 @@ this file disagree, the code is right and this file is a bug.
 ## Ages (`AGES`)
 
 Dark Age → Feudal Age → Castle Age → Imperial Age.
-Cost (`index.html:747`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
+Cost (`index.html:765`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
 costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle, Castle → Imperial). Hotkey `T`.
 Each upgrade sets `Game.ageBonus = Game.age`, which scales unit damage.
 
