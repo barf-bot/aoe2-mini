@@ -1042,6 +1042,25 @@ function build(Game, kind, atX, atY) {
   return b;
 }
 
+/** Cancel an in-progress site: refund the floored CANCEL_REFUND share of the
+ *  *defined* cost — the AoE2 rule refunds the whole cost, not the worked
+ *  fraction — free every builder assigned to it, and remove the building
+ *  (removeBuilding also drops a footer selection pointing at it). */
+function cancelConstruction(Game, b) {
+  if (!b || b.team !== 0) return toast(Game, 'Not your building');
+  const def = BLD[b.kind];
+  if (b.built >= 1) return toast(Game, 'Already built — use demolish');
+  const back = {};
+  for (const k in def.cost) back[k] = Math.floor(def.cost[k] * CFG.CANCEL_REFUND);
+  refund(Game, b.team, back);
+  for (const u of Game.units) {
+    if (!u.dead && u.order.kind === 'build' && u.order.b === b.id) u.order = { kind: 'idle' };
+  }
+  removeBuilding(Game, b);
+  toast(Game, def.label + ' cancelled');
+  return true;
+}
+
 function near(Game, u, tx, ty, dist) {
   return Math.abs(tx - Math.floor(u.x / CFG.TILE)) <= dist && Math.abs(ty - Math.floor(u.y / CFG.TILE)) <= dist;
 }
@@ -1926,7 +1945,7 @@ const AoE2 = {
   makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
-  build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
+  build, cancelConstruction, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, autoAcquire,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,

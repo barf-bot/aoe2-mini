@@ -739,6 +739,35 @@ check(AoE2.findDropoff(cg, cv, AoE2.sourceFromFarm(f2)) === ml,
 check(AoE2.train(cg, mc, 'villager') === undefined && /needs a Mining Camp/.test(cg.toastMsg),
   'train: a Mining Camp trains nothing', String(cg.toastMsg));
 
+/* ---- 7c. cancel construction + demolish (phase 2) ------------------- */
+// The rule under test: cancelling an in-progress building refunds
+// floor(cost × CANCEL_REFUND) and frees its builder (T3); the demolish half
+// (T4) extends this section below. A throwaway state mirrors §9b's pattern so
+// the shared Game keeps its §7 buildings untouched by §8.
+const cs = AoE2.createState();
+const cv2 = cs.units.find((u) => u.team === 0 && u.kind === 'villager');
+cs.selection = [cv2.id];
+const cSpot = freeSpotAround(cs.world, cs, tOf(cv2.x), tOf(cv2.y), 2, 2, 8);
+const cHouse = cSpot && AoE2.build(cs, 'house', cSpot.tx * AoE2.CFG.TILE + 4, cSpot.ty * AoE2.CFG.TILE + 4);
+const cWoodBt = cs.res[0].wood;                       // 25 already spent by build()
+if (cHouse) cHouse.built = 0.5;                        // the half-built site of the done-criteria
+const cOk = cHouse && AoE2.cancelConstruction(cs, cHouse);
+check(cOk === true && !cs.buildings.includes(cHouse) && cs.res[0].wood === cWoodBt + 20 &&
+      cs.blocks.get(cHouse.id) === undefined,
+  'cancel: a half-built house refunds exactly 80% of its cost',
+  cHouse ? cWoodBt + ' -> ' + cs.res[0].wood : 'placement failed');
+check(cv2.order.kind === 'idle', 'cancel: the builder is freed to an idle order', cv2.order.kind);
+
+// the refusal branch: a finished site answers 'Already built — use demolish'
+const cSpot2 = cHouse && freeSpotAround(cs.world, cs, tOf(cv2.x), tOf(cv2.y), 2, 2, 8);
+const cHouse2 = cSpot2 && AoE2.build(cs, 'house', cSpot2.tx * AoE2.CFG.TILE + 4, cSpot2.ty * AoE2.CFG.TILE + 4);
+if (cHouse2) cHouse2.built = 1;
+const cWoodMid = cs.res[0].wood;
+const cRefuse = cHouse2 && AoE2.cancelConstruction(cs, cHouse2);
+check(cRefuse === undefined && cs.toastMsg === 'Already built — use demolish' &&
+      cs.buildings.includes(cHouse2) && cs.res[0].wood === cWoodMid,
+  'cancel: a finished building refuses with \'Already built — use demolish\'', String(cs.toastMsg));
+
 /* ---- 8. training ---------------------------------------------------- */
 const foodBt = Game.res[0].food;
 const unitsBt = Game.units.length;

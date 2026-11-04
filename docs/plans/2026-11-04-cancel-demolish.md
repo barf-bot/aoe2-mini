@@ -79,7 +79,7 @@ existing build-button check. The full existing suite stays green (nothing weaken
   - test: that §9b check is amended in place (not duplicated) to also assert
     `ag.selectedBuilding === null` after the raze.
 
-- [ ] T3: `cancelConstruction` — the 80% refund half of the feature's done-criteria
+- [x] T3: `cancelConstruction` — the 80% refund half of the feature's done-criteria
   - files: `index.html` §4 (after `build`, ~1032), export block; `tools/headless-check.js`
     new §7c (after §7b at 694-734)
   - change: `cancelConstruction(Game, b)` per the design: reject other teams and
