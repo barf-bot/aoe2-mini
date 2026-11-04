@@ -306,6 +306,44 @@ check(s0 === 'attack_a' && AoE2.unitAnim(am) === 'attack_b',
 am.anim = 0; am.order = { kind: 'move', x: 0, y: 0 };
 check(AoE2.unitAnim(am) === 'walk', 'anim: ordered militia walk', AoE2.unitAnim(am));
 
+/* ---- 5b3. building sprite table -------------------------------------- */
+// Task 5: every building kind x team has a cell, drawn at its exact footprint
+// (b.w*TILE x b.h*TILE), reachable through bldSpriteFor, and no building cell
+// collides with a unit cell or another building cell (shared rect set from 5b).
+let bldSpriteErr = '';
+const bldRects = new Set(rects);
+for (const kind of Object.keys(AoE2.BLD)) {
+  const cells = AoE2.BLD_SPRITES[kind];
+  if (!Array.isArray(cells) || cells.length !== AoE2.TEAM.length) {
+    bldSpriteErr = `BLD_SPRITES.${kind}: expected one cell per team`; break;
+  }
+  cells.forEach((f, team) => {
+    if (bldSpriteErr) return;
+    const ok = !!f && typeof f.sx === 'number' && typeof f.sy === 'number' &&
+      typeof f.sw === 'number' && typeof f.sh === 'number' &&
+      f.sw > 0 && f.sh > 0 && f.dw > 0 && f.dh > 0 &&
+      f.sx >= 0 && f.sy >= 0 && f.sx + f.sw <= sheet.w && f.sy + f.sh <= sheet.h;
+    if (!ok) { bldSpriteErr = `BLD_SPRITES.${kind}/${AoE2.TEAM[team].name}: bad rect`; return; }
+    if (AoE2.bldSpriteFor(kind, team) !== f) {
+      bldSpriteErr = `bldSpriteFor('${kind}', ${team}) returns a different cell`; return;
+    }
+    if (f.dw !== AoE2.BLD[kind].w * AoE2.CFG.TILE || f.dh !== AoE2.BLD[kind].h * AoE2.CFG.TILE) {
+      bldSpriteErr = `${kind}: cell draws ${f.dw}x${f.dh}, footprint is `
+        + AoE2.BLD[kind].w * AoE2.CFG.TILE + 'x' + AoE2.BLD[kind].h * AoE2.CFG.TILE + 'px'; return;
+    }
+    const key = f.sx + ',' + f.sy + ' ' + f.sw + 'x' + f.sh;
+    if (bldRects.has(key)) bldSpriteErr = `duplicate cell ${key}`;
+    bldRects.add(key);
+  });
+}
+for (const kind of Object.keys(AoE2.BLD_SPRITES)) {          // catch stray entries
+  if (!AoE2.BLD[kind]) { bldSpriteErr = 'BLD_SPRITES entry for unknown kind ' + kind; break; }
+}
+check(!bldSpriteErr, 'sprites: every building kind x team has a unique cell at its exact footprint',
+  bldSpriteErr ? 'bad: ' + bldSpriteErr
+    : Object.keys(AoE2.BLD).length * AoE2.TEAM.length + ' building cells + ' +
+      cellCount + ' unit cells in the ' + sheet.w + 'x' + sheet.h + ' sheet');
+
 /* ---- 5c. atlas wiring ----------------------------------------------- */
 // setAtlas is the single injection point for the sheet, so the renderer has one
 // field to consult and both harnesses can hand it an image (task 3). Probed on a

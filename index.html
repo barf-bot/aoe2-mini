@@ -137,7 +137,7 @@ const KINDS = {
  * `sprites: every registered anim x team has a unique in-sheet cell` check
  * fails.
  */
-const SPRITE_SHEET = { w: 288, h: 48 };
+const SPRITE_SHEET = { w: 308, h: 158 };  // unit rows y0-47, building rows from y48
 const SPRITES = {
   villager: {
     idle:   [{ sx: 0,   sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
@@ -183,6 +183,34 @@ function spriteFor(kind, team, anim) {
   return (c && typeof c.sx === 'number' && typeof c.sw === 'number') ? c : null;
 }
 
+/* Built-building art (C5): one cell per BLD kind x team, rows below the unit
+ * block. dw/dh always equal the footprint in px (b.w*TILE x b.h*TILE), so a
+ * BLD size change without redrawn cells fails the 5c check. */
+const BLD_SPRITES = {
+  town_center: [{ sx: 0,   sy: 48,  sw: 66, sh: 66, dw: 66, dh: 66 },
+                { sx: 66,  sy: 48,  sw: 66, sh: 66, dw: 66, dh: 66 }],
+  house:       [{ sx: 132, sy: 48,  sw: 44, sh: 44, dw: 44, dh: 44 },
+                { sx: 176, sy: 48,  sw: 44, sh: 44, dw: 44, dh: 44 }],
+  farm:        [{ sx: 220, sy: 48,  sw: 44, sh: 44, dw: 44, dh: 44 },
+                { sx: 264, sy: 48,  sw: 44, sh: 44, dw: 44, dh: 44 }],
+  barracks:    [{ sx: 0,   sy: 114, sw: 44, sh: 44, dw: 44, dh: 44 },
+                { sx: 44,  sy: 114, sw: 44, sh: 44, dw: 44, dh: 44 }],
+  mill:        [{ sx: 88,  sy: 114, sw: 44, sh: 44, dw: 44, dh: 44 },
+                { sx: 132, sy: 114, sw: 44, sh: 44, dw: 44, dh: 44 }],
+  lumber_camp: [{ sx: 176, sy: 114, sw: 22, sh: 22, dw: 22, dh: 22 },
+                { sx: 198, sy: 114, sw: 22, sh: 22, dw: 22, dh: 22 }],
+  mining_camp: [{ sx: 220, sy: 114, sw: 22, sh: 22, dw: 22, dh: 22 },
+                { sx: 242, sy: 114, sw: 22, sh: 22, dw: 22, dh: 22 }],
+};
+
+/** The atlas cell for one built building kind, per team; null when unknown. */
+function bldSpriteFor(kind, team) {
+  const cells = BLD_SPRITES[kind];
+  if (!Array.isArray(cells)) return null;
+  const c = cells[team];
+  return (c && typeof c.sx === 'number' && typeof c.sw === 'number') ? c : null;
+}
+
 const BLD = {
   town_center: { label:'Town Center', hp:1800, w:3, h:3, cost:{wood:275},
                  time:25, pop:5, trains:['villager'] },
@@ -197,7 +225,7 @@ const BLD = {
   mining_camp: { label:'Mining Camp', hp:950,  w:1, h:1, cost:{wood:100},
                  time:8,  pop:0, trains:[] },
   mill:        { label:'Mill',        hp:1100, w:2, h:2, cost:{wood:175},
-                 time:10, pop:0, trains:[] },
+                 time:10, pop:0, trains:[], field:170 },
 };
 
 const AGES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
@@ -1048,6 +1076,7 @@ function drawBuildings(Game, view) {
   const c = view.ctx;
   if (!c) return;
   const TS = CFG.TILE, cam = Game.cam;
+  const atlas = Game.sprites && Game.sprites.atlas;   // assets/sprites.png (see section 2)
   for (const b of Game.buildings) {
     const x = b.tx * TS - cam.x, y = b.ty * TS - cam.y, w = b.w * TS, h = b.h * TS;
     if (x > view.w || y > view.h || x + w < 0 || y + h < 0) continue;
@@ -1059,12 +1088,22 @@ function drawBuildings(Game, view) {
       c.fillStyle = '#c8a558'; c.fillRect(x, y + h - 4, w * b.built, 4);
       continue;
     }
-    c.fillStyle = team.dark; c.fillRect(x + 1, y + 1, w - 2, h - 2);
-    c.fillStyle = team.main;
-    if (b.kind === 'town_center') {
+    // Built: the atlas cell whenever we have one (bldSpriteFor, section 2);
+    // a harvested farm and unknown kinds keep the procedural look.
+    const frame = bldSpriteFor(b.kind, b.team);
+    const dryFarm = b.kind === 'farm' && b.field <= 0;
+    if (atlas && frame && !dryFarm) {
+      c.drawImage(atlas, frame.sx, frame.sy, frame.sw, frame.sh, x, y, w, h);
+    } else if (dryFarm) {
+      c.fillStyle = '#6b5c3a'; c.fillRect(x + 2, y + 2, w - 4, h - 4);
+      c.fillStyle = 'rgba(0,0,0,.25)';
+      for (let i = 0; i < 4; i++) c.fillRect(x + 4, y + 4 + i * (h / 4), w - 8, Math.max(1, h / 9));
+    } else if (b.kind === 'town_center') {
+      c.fillStyle = team.main;
       c.fillRect(x + 3, y + 3, w - 6, h - 6);
       c.fillStyle = team.light; c.fillRect(x + w / 2 - 4, y + 3, 8, h - 6);
     } else if (b.kind === 'house') {
+      c.fillStyle = team.main;
       c.fillRect(x + 3, y + 3, w - 6, h - 6);
       c.fillStyle = team.light;
       c.beginPath(); c.moveTo(x + 2, y + h / 2); c.lineTo(x + w / 2, y + 2); c.lineTo(x + w - 2, y + h / 2);
@@ -1713,7 +1752,7 @@ function stepGame(Game, dt) {
 
 const AoE2 = {
   CFG, KINDS, BLD, AGES, T, PAL, TEAM, RES_OF_TILE,
-  SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor,
+  SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor, BLD_SPRITES, bldSpriteFor,
   makeWorld, findSite, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,

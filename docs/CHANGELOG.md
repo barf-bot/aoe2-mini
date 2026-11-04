@@ -6,6 +6,16 @@ commits on `main`.
 ## [Unreleased] — 2026-11-04
 
 ### Added
+- **Building sprites (task 5):** every built building now blits a team-coloured atlas
+  cell instead of the flat footprint rectangle — `BLD_SPRITES`/`bldSpriteFor` join the
+  sprite tables (atlas grows 288×48 → 308×158: unit rows on top, building rows below;
+  town_center 66×66, house/farm/barracks/mill 44×44, camps 22×22, each cell drawn at the
+  exact footprint). `tools/gen-atlas.js` gains `BLD_ART` (one 11×11 art grid per kind —
+  keep/roofs/fields/tents, authored once and recoloured via the team palette) and paints
+  38 cells from the two tables; the mill now tracks `field` like a farm. Unbuilt
+  buildings keep the ghost + progress-bar render, dry farms keep procedural stubble.
+  New harness section 5b3 validates every BLD kind × team has a unique in-sheet cell at
+  its exact footprint (99 → 100 checks).
 - **Lumber Camp (100 wood, hotkey `L`), Mining Camp (100 wood, `G`) and Mill (175 wood,
   `M`)** join `BLD` — camps 1×1, mill 2×2, drawn procedurally for now (atlas art arrives
   with the building-sprites round). Carrying villagers now route by resource instead of
