@@ -1,6 +1,6 @@
 # Board rules: solid terrain, berry clusters, depletion, tuning, multi-build
 
-Status: awaiting go
+Status: in progress
 
 ## Design
 
