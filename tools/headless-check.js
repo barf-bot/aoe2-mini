@@ -768,6 +768,27 @@ check(cRefuse === undefined && cs.toastMsg === 'Already built — use demolish' 
       cs.buildings.includes(cHouse2) && cs.res[0].wood === cWoodMid,
   'cancel: a finished building refuses with \'Already built — use demolish\'', String(cs.toastMsg));
 
+// the demolish half (T4): zero refund, Town Center protected, unfinished refused
+const dFood0 = cs.res[0].food;
+const dWood0 = cs.res[0].wood;
+const dGold0 = cs.res[0].gold;
+const dStone0 = cs.res[0].stone;
+const dOk = cHouse2 && AoE2.demolish(cs, cHouse2);
+check(dOk === true && !cs.buildings.includes(cHouse2) && cs.res[0].food === dFood0 &&
+      cs.res[0].wood === dWood0 && cs.res[0].gold === dGold0 && cs.res[0].stone === dStone0,
+  'demolish: a finished house is removed with zero change to the stockpile',
+  JSON.stringify(cs.res[0]));
+const dTc = cs.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+check(AoE2.demolish(cs, dTc) === undefined && cs.toastMsg === 'Cannot demolish a Town Center' &&
+      cs.buildings.includes(dTc),
+  'demolish: a Town Center cannot be demolished', String(cs.toastMsg));
+const cSpot3 = cHouse && freeSpotAround(cs.world, cs, tOf(cv2.x), tOf(cv2.y), 2, 2, 8);
+const cHouse3 = cSpot3 && AoE2.build(cs, 'house', cSpot3.tx * AoE2.CFG.TILE + 4, cSpot3.ty * AoE2.CFG.TILE + 4);
+check(cHouse3 && AoE2.demolish(cs, cHouse3) === undefined &&
+      cs.toastMsg === 'Not built yet — cancel instead' && cs.buildings.includes(cHouse3),
+  'demolish: an unfinished building refuses with \'Not built yet — cancel instead\'',
+  String(cs.toastMsg));
+
 /* ---- 8. training ---------------------------------------------------- */
 const foodBt = Game.res[0].food;
 const unitsBt = Game.units.length;

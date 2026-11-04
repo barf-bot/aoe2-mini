@@ -1061,6 +1061,21 @@ function cancelConstruction(Game, b) {
   return true;
 }
 
+/** Demolish a finished own-team building for no refund (the AoE2 rule): a
+ *  Town Center cannot be demolished by its owner, unfinished sites are
+ *  cancelConstruction's job, and a building that is training is refused
+ *  rather than quietly eating its paid-for queue. */
+function demolish(Game, b) {
+  if (!b || b.team !== 0) return toast(Game, 'Not your building');
+  const def = BLD[b.kind];
+  if (b.built < 1) return toast(Game, 'Not built yet — cancel instead');
+  if (b.kind === 'town_center') return toast(Game, 'Cannot demolish a Town Center');
+  if (b.queue.length) return toast(Game, 'Still training');
+  removeBuilding(Game, b);
+  toast(Game, def.label + ' demolished');
+  return true;
+}
+
 function near(Game, u, tx, ty, dist) {
   return Math.abs(tx - Math.floor(u.x / CFG.TILE)) <= dist && Math.abs(ty - Math.floor(u.y / CFG.TILE)) <= dist;
 }
@@ -1945,7 +1960,7 @@ const AoE2 = {
   makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
-  build, cancelConstruction, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
+  build, cancelConstruction, demolish, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, autoAcquire,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,

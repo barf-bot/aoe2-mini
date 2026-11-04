@@ -93,7 +93,7 @@ existing build-button check. The full existing suite stays green (nothing weaken
     `cancel: the builder is freed to an idle order` and `cancel: a finished building
     refuses with 'Already built — use demolish'` (same throwaway state, sequential).
 
-- [ ] T4: `demolish` — the zero-refund half of the feature's done-criteria
+- [x] T4: `demolish` — the zero-refund half of the feature's done-criteria
   - files: `index.html` §4 (after `cancelConstruction`), export block;
     `tools/headless-check.js` §7c
   - change: `demolish(Game, b)` per the design: own team; `built < 1` → `Not built yet —
