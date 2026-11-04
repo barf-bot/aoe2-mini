@@ -253,18 +253,101 @@ check(Object.keys(villTiles).length >= 2 &&
 check(blueVill().every(v => v.order.src.res === 'food'),
   'gather: food-first assignment — all 4 starters take berries (AoE2 opens on food)',
   blueVill().map(v => v.order.src.res).join(','));
-const st2 = AoE2.createState();                        // fresh state, own villagers
-const rv0 = st2.units.find(u => u.team === 0 && u.kind === 'villager');
+/* Fixtures for the T4 checks: a fresh seeded state flattened to grass, so the
+   only resource tiles in the world are the ones a check places. The Town
+   Centers, the occupancy set and the 4 villagers keep their seeded positions,
+   which keeps the fixtures honest about movement while removing every other
+   source a retarget could secretly fall back to. */
+const tIdx = (st, x, y) => y * st.world.w + x;
+const setTile = (st, x, y, type, amount) => { st.world.type[tIdx(st, x, y)] = type; st.world.amount[tIdx(st, x, y)] = amount; };
+const tileCentre = (st, x, y) => ({ x: x * AoE2.CFG.TILE + AoE2.CFG.TILE / 2, y: y * AoE2.CFG.TILE + AoE2.CFG.TILE / 2 });
+function flatState() {
+  const st = AoE2.createState();
+  for (let i = 0; i < st.world.type.length; i++) { st.world.type[i] = AoE2.T.GRASS; st.world.amount[i] = 0; }
+  for (const u of st.units) u.order = { kind: 'idle' };
+  return st;
+}
+/** Two berry tiles on a line through the villager's own tile: one `deadDist`
+ *  tiles one way, one `liveDist` tiles the other, both on free ground. */
+function berryPair(st, v, deadDist, liveDist) {
+  const w = st.world, V = { x: Math.floor(v.x / AoE2.CFG.TILE), y: Math.floor(v.y / AoE2.CFG.TILE) };
+  const free = (x, y) => x >= 0 && y >= 0 && x < w.w && y < w.h && !st.occupied.has(tIdx(st, x, y));
+  const dir = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
+    .find(d => free(V.x + deadDist * d[0], V.y + deadDist * d[1]) &&
+               free(V.x - liveDist * d[0], V.y - liveDist * d[1]));
+  return dir && {
+    v: V,
+    dead: { x: V.x + deadDist * dir[0], y: V.y + deadDist * dir[1] },
+    live: { x: V.x - liveDist * dir[0], y: V.y - liveDist * dir[1] },
+  };
+}
+/** Put a 150-food berry on pair.dead and a second one on pair.live, send the
+ *  villager to work, and stop on the exact tick the pool empties. Returns what
+ *  the game left behind (tile type, walkability, the order he now holds). */
+function drainTo(st, v, pair) {
+  setTile(st, pair.dead.x, pair.dead.y, AoE2.T.BERRY, 150);
+  setTile(st, pair.live.x, pair.live.y, AoE2.T.BERRY, 150);
+  const src = AoE2.sourceFromTile(st, v, pair.dead.x, pair.dead.y);
+  if (!src) return null;
+  v.order = { kind: 'harvest', src: src };
+  const c = tileCentre(st, pair.dead.x, pair.dead.y);
+  for (let s = 1; s <= 6000; s++) {
+    AoE2.stepSim(st, 1 / 30);
+    if (st.world.amount[tIdx(st, pair.dead.x, pair.dead.y)] > 0) continue;
+    return { steps: s, type: st.world.type[tIdx(st, pair.dead.x, pair.dead.y)],
+             walkable: AoE2.walkable(st, c.x, c.y), order: { kind: v.order.kind, src: v.order.src } };
+  }
+  return null;
+}
+
+/* gather (T4 layout): the villager stands 2 tiles off the tile his basket came
+   from and a live berry sits 3 tiles the other way, so the retarget has to come
+   from the 5-tile same-resource band that replaced radius 14 + any resource 20. */
+const st2 = flatState();
 const rtc = st2.buildings.find(b => b.team === 0 && b.kind === 'town_center');
-const rsrc = AoE2.sourceFromTile(st2, rv0, rv0.order.src.tx, rv0.order.src.ty);
+const rv0 = st2.units.find(u => u.team === 0 && u.kind === 'villager');
+rv0.x = rtc.x + 6; rv0.y = rtc.y;                      // parked on the keep he serves
+const rp = berryPair(st2, rv0, 2, 3);
+setTile(st2, rp.dead.x, rp.dead.y, AoE2.T.BERRY, 150);
+setTile(st2, rp.live.x, rp.live.y, AoE2.T.BERRY, 150);
+const rsrc = AoE2.sourceFromTile(st2, rv0, rp.dead.x, rp.dead.y);
 rv0.order = { kind: 'go_deposit', b: rtc.id, src: rsrc };
-rv0.x = rtc.x + 6; rv0.y = rtc.y; rv0.carry = 7; rv0.carryRes = rsrc.res;
+rv0.carry = 7; rv0.carryRes = rsrc.res;
 rsrc.amount = 0;                                       // tile empties while basket walks
 const rf0 = Math.floor(st2.res[0].food);
 AoE2.stepSim(st2, 1 / 30);
-check(Math.floor(st2.res[0].food) === rf0 + 7 && rv0.order.kind === 'harvest',
+const rnew = rv0.order.src || {};
+check(Math.floor(st2.res[0].food) === rf0 + 7 && rv0.order.kind === 'harvest' &&
+      rnew.tx === rp.live.x && rnew.ty === rp.live.y,
   'gather: villager whose tile died in flight retargets instead of idling',
-  rv0.order.kind + ' food+' + (Math.floor(st2.res[0].food) - rf0));
+  rv0.order.kind + ' -> ' + (rnew.res || '-') + ' ' + rnew.tx + ',' + rnew.ty +
+  ' food+' + (Math.floor(st2.res[0].food) - rf0));
+
+/* ---- 5a2. depletion (T4): 0 food becomes grass, re-queue within 5 ------ */
+// The 10 trips at carry 15 that empty a 150-food berry bush, watched tick by tick.
+const stA = flatState();
+const dv = stA.units.find(u => u.team === 0 && u.kind === 'villager');
+const ap = berryPair(stA, dv, 1, 4);
+const aDrain = drainTo(stA, dv, ap);
+check(aDrain && aDrain.type === AoE2.T.GRASS && aDrain.walkable === true,
+  'depletion: a berry tile emptied by the harvest tick turns to grass and is walkable again',
+  !aDrain ? 'the tile never emptied in 6000 steps'
+    : 'empty at step ' + aDrain.steps + ', type ' + nameOf(aDrain.type) + ', walkable ' + aDrain.walkable);
+check(aDrain && aDrain.order.src && aDrain.order.src.res === 'food' &&
+      aDrain.order.src.tx === ap.live.x && aDrain.order.src.ty === ap.live.y,
+  'depletion: the empty villager re-queues on the same resource 4 tiles away',
+  aDrain ? aDrain.order.kind + ' -> ' + (aDrain.order.src ? aDrain.order.src.res + ' ' +
+    aDrain.order.src.tx + ',' + aDrain.order.src.ty : 'no source') : 'no drain');
+
+const stB = flatState();
+const bv = stB.units.find(u => u.team === 0 && u.kind === 'villager');
+const bp = berryPair(stB, bv, 1, 6);                   // nearest other food: 6 tiles
+const bDrain = drainTo(stB, bv, bp);
+for (let s = 0; s < 150; s++) AoE2.stepSim(stB, 1 / 30);   // hand in the last basket
+check(bDrain && bv.order.kind === 'idle',
+  'depletion: with the nearest other tile 6 tiles away the empty villager goes idle',
+  !bDrain ? 'the tile never emptied in 6000 steps'
+    : 'empty at step ' + bDrain.steps + ', order ' + bv.order.kind);
 
 /* ---- 5b. sprite frame table ----------------------------------------- */
 // The atlas layout is data, not code: one sheet, one cell per registered

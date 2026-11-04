@@ -32,6 +32,18 @@ commits on `main`.
   "attacker took no damage" check becomes "may be countered" — enemies fight back now.
 
 ### Changed
+- **Spent resource tiles vanish and villagers stay on the same resource within 5 tiles
+  (T4):** `depleteTile` (exported) runs on the harvest tick the moment a tile's stock
+  reaches 0 — the berry, tree or ore tile reverts to `T.GRASS`, so it disappears from the
+  map and stops blocking movement (the T2 solidity rule) — while a farm's field still
+  empties in place and nothing on a farm becomes grass. `nextSource` and `resumeGather`
+  now search the same resource within 5 tiles only: the radius-14 same-resource band and
+  the any-resource radius-20 fallback are gone, so a villager whose grove is spent takes
+  the next bush beside him or goes idle instead of walking off to mine stone. Harness §5a
+  gained three `depletion:` checks (a 150-food berry watched empty over 10 trips → grass
+  and walkable again, retarget at 4 tiles, idle at 6) and the "tile died in flight" check
+  is re-authored around a villager 2 tiles off the dead tile with a live one 3 tiles the
+  other way, so it still proves the retarget under the new cap (107 → 110 checks).
 - **Berry clusters (T3):** every Town Center now owns exactly one connected 6-tile
   berry cluster 5–8 tiles from its keep (`berryCluster`, exported from §2) — the 7
   scattered berry patches and the 2 ring berries from `makeWorld` are gone, so each

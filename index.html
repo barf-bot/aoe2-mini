@@ -753,6 +753,8 @@ function updateUnit(Game, u, dt) {
       u.carryRes = src.res;               // the dropoff needs to know what this is
     }
     if (u.carry >= CFG.CARRY_MAX || src.amount <= 0) {
+      // the pool is gone: retire the tile the same tick, before choosing the next one
+      if (src.kind === 'tile' && src.amount <= 0) depleteTile(Game, src.tx, src.ty);
       const drop = findDropoff(Game, u, src);
       if (!drop) { u.carry = 0; u.order = { kind: 'idle' }; return; }
       u.order = { kind: 'go_deposit', b: drop.id, src: nextSource(Game, u, src) };
@@ -877,12 +879,29 @@ function deposit(Game, unit, drop) {
   unit.carryRes = null;
 }
 
-/** Keep a villager employed: same tile while it has stock, otherwise the
- *  nearest tile of the same resource, then any resource at all. */
+/** A resource tile whose stock reaches 0 disappears: the type reverts to GRASS
+ *  (the amount stays 0), so the bush, tree or ore node stops being drawn and --
+ *  per the T2 rule in walkable -- stops blocking movement. Only tile sources
+ *  deplete: a farm's field empties in place (see sourceFromFarm). Returns true
+ *  when a spent resource tile was actually converted. */
+function depleteTile(Game, tx, ty) {
+  const world = Game.world;
+  if (tx < 0 || ty < 0 || tx >= world.w || ty >= world.h) return false;
+  const i = ty * world.w + tx;
+  if (!RES_OF_TILE[world.type[i]] || world.amount[i] > 0) return false;
+  world.type[i] = T.GRASS;
+  return true;
+}
+
+/** Keep a villager employed: the same tile while it holds stock, otherwise the
+ *  nearest tile of the SAME resource within 5 tiles (the T4 re-queue radius --
+ *  the old "or any other resource within 20" fallback is gone, so a spent grove
+ *  with nothing of the same kind nearby leaves him idle instead of sending him
+ *  across the map for wood). */
 function nextSource(Game, u, src) {
   if (src.amount > 0) return src;
   if (src.kind !== 'tile') return null;
-  const alt = findAlternative(Game.world, u, src.res, 14) || findAlternative(Game.world, u, null, 20);
+  const alt = findAlternative(Game.world, u, src.res, 5);
   return alt ? sourceFromTile(Game, u, alt.tx, alt.ty) : null;
 }
 
@@ -893,7 +912,7 @@ function nextSource(Game, u, src) {
 function resumeGather(Game, u, src) {
   if (src.kind === 'tile') {
     const live = src.amount > 0 ? sourceFromTile(Game, u, src.tx, src.ty) : null;
-    const alt = findAlternative(Game.world, u, src.res, 14) || findAlternative(Game.world, u, null, 20);
+    const alt = findAlternative(Game.world, u, src.res, 5);
     const next = live || (alt ? sourceFromTile(Game, u, alt.tx, alt.ty) : null);
     return next ? { kind: 'harvest', src: next } : { kind: 'idle' };
   }
@@ -1873,7 +1892,7 @@ const AoE2 = {
   build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, autoAcquire,
   popCap, popUsed, selectedUnits, canAfford, spend, resetGame,
-  findDropoff, dropTargetScore, nextSource, resumeGather, workersOnTile,
+  findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;

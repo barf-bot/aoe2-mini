@@ -26,8 +26,16 @@ this file disagree, the code is right and this file is a bug.
   bush is what used to stall the economy at 420 food (the food-stall regression, fixed).
 - Drop-off rules: berries/gold/stone/forest go to the Town Center; a farm's own field is
   the drop-off for farm food. Farms feed 170 food (`BLD.farm.field`) before going idle.
-- When a tile runs dry the villager retargets the nearest tile of the same resource
-  (radius 14), then any resource (radius 20), else goes idle (`nextSource`).
+- A tile that runs dry disappears (T4): `depleteTile` (`index.html:887`) runs on the
+  harvest tick the moment a tile's `amount` reaches 0 and reverts the tile to `T.GRASS`
+  (the amount stays 0), so the bush, tree or ore node stops being drawn and — per
+  `walkable` (`index.html:786`) — stops blocking movement. Farms are not tiles: a field
+  empties in place and nothing there turns to grass.
+- The emptied villager re-queues on the nearest tile of the **same** resource within
+  **5** tiles (`nextSource`, `index.html:901`, and after a deposit `resumeGather`,
+  `index.html:912`). The old radius-14 same-resource search and the any-resource radius-20
+  fallback are gone: with nothing of that kind that close he stands idle instead of
+  walking across the map to chop wood.
 
 ## Units (`KINDS`)
 

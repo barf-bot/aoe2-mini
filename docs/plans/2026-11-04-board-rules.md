@@ -94,7 +94,7 @@ completing. Plus a regenerated `preview.png` to eyeball the cluster.
     Town Center` checks stay green. Visual: `node tools/render-preview.js`, look for one
     cluster beside the keep instead of scattered bushes, commit the new `preview.png`.
 
-- [ ] T4: Depleted tiles disappear; workers re-queue within 5 tiles, then idle
+- [x] T4: Depleted tiles disappear; workers re-queue within 5 tiles, then idle
   - files: `index.html` §4 harvest branch (662-684), `nextSource` (784), `resumeGather`
     (795), new `depleteTile` + export; `tools/headless-check.js` §5a (198-227)
   - change: add `depleteTile(Game, tx, ty)` — a tile whose `amount` reaches 0 becomes
