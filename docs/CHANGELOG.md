@@ -12,6 +12,14 @@ commits on `main`.
   always walking to the Town Center: wood → Lumber Camp → TC, gold/stone → Mining Camp →
   TC, food → Mill → farms → TC (`dropTargetScore`/`findDropoff`). Harness section 7b plus
   hotkey checks pin the costs, sizes and every routing rule (81 → 92 checks).
+- **Militia auto-acquire + retarget-on-kill + razing (task 4):** non-villager fighters
+  pick the nearest enemy unit within `CFG.ACQUIRE` (6 tiles) on their own, else the
+  nearest built enemy building within `CFG.BUILDING_ACQUIRE` (5) — `autoAcquire` powers
+  both the idle state and the snap to the next target when the current one dies.
+  Attacks can now target buildings (`order.b`): `hitUnit`/`hitBuilding` centralize
+  damage, and a building at 0 hp is razed, removed and re-blocks its tiles. Right-click
+  an enemy building to raze it. Harness section 9b (92 → 99 checks); the old
+  "attacker took no damage" check becomes "may be countered" — enemies fight back now.
 
 ### Changed
 - **Sprite atlas v2** (villager redesign): villagers no longer wear the militia's helm —

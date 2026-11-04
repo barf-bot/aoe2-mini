@@ -498,7 +498,59 @@ check(!Game.units.includes(foe), 'combat: corpse pruned from the roster', 'remov
 const hurt = Game.units.find(u => u.team === 1 && u.hp < u.maxHp);
 check(!!hurt || true, 'combat: damage lands on the target', hurt ? 'another red unit at ' + hurt.hp + 'hp' : 'single target only');
 const regen = Game.units.find(u => u.team === 0 && u.kind === 'militia');
-check(regen.hp === regen.maxHp, 'combat: attacker took no damage at range', regen.hp + '/' + regen.maxHp);
+check(regen.hp <= regen.maxHp && regen.hp > 0,
+  'combat: v2 melee — the attacker may be countered, hp stays alive and capped',
+  regen.hp + '/' + regen.maxHp);
+
+/* ---- 9b. auto-acquire, retarget-on-kill, razing (v2 task 4) ---------- */
+// Fighters acquire nearby enemies on their own, snap to the next one when their
+// target dies, and buildings can be damaged and razed (a fresh state, seeded).
+const ag = AoE2.createState();
+const g0 = ag.units.filter((u) => u.team === 0);
+const gm = g0.find((u) => u.kind === 'militia');
+const reds = () => ag.units.filter((u) => u.team === 1);
+const farB = ag.buildings.filter((b) => b.team === 1).map((b) => ({ b, x: b.x, y: b.y }));
+
+gm.order = { kind: 'idle' };
+reds().forEach((v) => { v.x = gm.x + (AoE2.CFG.ACQUIRE + 4) * AoE2.CFG.TILE; v.y = gm.y; });
+farB.forEach((r) => { r.b.x = gm.x + (AoE2.CFG.BUILDING_ACQUIRE + 4) * AoE2.CFG.TILE; r.b.y = gm.y; });
+AoE2.stepSim(ag, DT);
+check(gm.order.kind === 'idle', 'ai: enemies outside acquisition range keep a militia idle', gm.order.kind);
+
+const gt = reds()[0];
+gt.x = gm.x + 3 * AoE2.CFG.TILE; gt.y = gm.y;
+AoE2.stepSim(ag, DT);
+check(gm.order.kind === 'attack' && gm.order.target === gt.id,
+  'ai: an idle militia auto-acquires the nearest enemy unit inside ACQUIRE',
+  gm.order.kind + '/' + (gm.order.target !== undefined ? gm.order.target : gm.order.b));
+
+const gt2 = reds()[1];
+gt2.x = gm.x + 5 * AoE2.CFG.TILE; gt2.y = gm.y + AoE2.CFG.TILE;
+check(AoE2.hitUnit(ag, gt, 9999) && gt.hp === 0 && gt.dead === true,
+  'combat: hitUnit kills a unit and clamps its hp at 0', String(gt.hp));
+AoE2.stepSim(ag, DT);
+check(gm.order.kind === 'attack' && gm.order.target === gt2.id,
+  'ai: militia snap to the next enemy when their current target dies',
+  gm.order.kind + '/' + (gm.order.target !== undefined ? gm.order.target : 'idle'));
+
+const gb = farB[0].b;
+gb.x = gm.x - AoE2.CFG.TILE; gb.y = gm.y;          // inside the stop radius → instant swing
+const gb0 = gb.hp;
+gm.order = { kind: 'attack', b: gb.id };
+AoE2.stepSim(ag, DT);
+check(gb.hp < gb0 && gb.hp > 0, 'combat: militia damages an enemy building (o.b order)',
+  gb0 + ' -> ' + gb.hp);
+check(AoE2.hitBuilding(ag, gb, 99999) === true && !ag.buildings.includes(gb),
+  'combat: a building at 0 hp is razed and removed from the world',
+  ag.buildings.some((b) => b.team === 1) ? 'still there' : 'removed');
+
+const gv = g0.find((u) => u.kind === 'villager');
+gv.order = { kind: 'idle' };
+const nearRed = reds()[0];
+nearRed.x = gv.x + AoE2.CFG.TILE; nearRed.y = gv.y;
+AoE2.stepSim(ag, DT);
+check(gv.order.kind === 'idle', 'ai: villagers never start fights — only ordered attacks',
+  gv.order.kind);
 
 /* ---- 10. input ------------------------------------------------------ */
 const view = doc.getElementById('view');

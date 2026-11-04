@@ -109,6 +109,8 @@ const CFG = {
   GATHER_RATE: 3.0,               // resource units per second while working
   AGE_FOOD: 500,                  // food cost of Feudal Age
   WAVE_EVERY: 45,                 // seconds between enemy attack waves
+  ACQUIRE: 6,                     // tiles: idle fighters spot enemy units this far
+  BUILDING_ACQUIRE: 5,            // tiles: ... and raze enemy buildings this close
   UNIT_SEP: 11,                   // min px between two units
   PAN_SPEED: 620,                 // px/s camera pan
   EDGE: 14,                       // px edge-scroll band
@@ -524,11 +526,60 @@ function stepSim(Game, dt) {
   aiStep(Game, dt);
 }
 
+/** Apply damage to a unit, clamped at 0; returns true if it died. */
+function hitUnit(Game, u, dmg) {
+  u.hp -= dmg;
+  if (u.hp > 0) return false;
+  u.hp = 0;
+  u.dead = true;
+  return true;
+}
+
+/** Apply damage to a building; at 0 hp it is razed and removed from the world. */
+function hitBuilding(Game, b, dmg) {
+  b.hp -= dmg;
+  if (b.hp > 0) return false;
+  b.hp = 0;
+  const i = Game.buildings.indexOf(b);
+  if (i >= 0) Game.buildings.splice(i, 1);
+  rebuildBlocks(Game);
+  toast(Game, b.team === 0 ? BLD[b.kind].label + ' destroyed'
+                           : 'Razed enemy ' + BLD[b.kind].label.toLowerCase());
+  return true;
+}
+
+/** What an idle fighter sees: the nearest enemy unit within ACQUIRE tiles, else
+ *  the nearest built enemy building within BUILDING_ACQUIRE. Villagers (atk 3)
+ *  never start fights; they only attack when ordered. */
+function autoAcquire(Game, u) {
+  if (u.kind === 'villager') return null;
+  const RU = CFG.ACQUIRE * CFG.TILE;
+  let bestUnit = null, du = Infinity;
+  for (const v of Game.units) {
+    if (v.team === u.team || v.dead) continue;
+    const d = Math.hypot(v.x - u.x, v.y - u.y);
+    if (d <= RU && d < du) { du = d; bestUnit = v; }
+  }
+  if (bestUnit) return { kind: 'attack', target: bestUnit.id };
+  const RB = CFG.BUILDING_ACQUIRE * CFG.TILE;
+  let bestB = null, db = Infinity;
+  for (const b of Game.buildings) {
+    if (b.team === u.team || !b.built) continue;
+    const d = Math.hypot(b.x - u.x, b.y - u.y);
+    if (d <= RB && d < db) { db = d; bestB = b; }
+  }
+  return bestB ? { kind: 'attack', b: bestB.id } : null;
+}
+
 function updateUnit(Game, u, dt) {
   if (u.dead) return;
   const o = u.order;
 
-  if (o.kind === 'idle') return;
+  if (o.kind === 'idle') {
+    const spot = autoAcquire(Game, u);          // standing still: take the nearest fight
+    if (spot) u.order = spot;
+    return;
+  }
 
   if (o.kind === 'move') {
     if (moveUnit(Game, u, o.x, o.y, dt)) u.order = { kind: 'idle' };
@@ -536,14 +587,21 @@ function updateUnit(Game, u, dt) {
   }
 
   if (o.kind === 'attack') {
-    const t = Game.units.find(x => x.id === o.target);
-    if (!t || t.dead) { u.order = { kind: 'idle' }; return; }
-    if (moveUnit(Game, u, t.x, t.y, dt, u.r + t.r + 4)) {
+    const isB = o.b !== undefined;              // o.b: attack a building, o.target: a unit
+    const t = isB ? Game.buildings.find(x => x.id === o.b)
+                  : Game.units.find(x => x.id === o.target);
+    if (!t || (!isB && t.dead)) {               // target gone: snap to the next one
+      u.order = autoAcquire(Game, u) || { kind: 'idle' };
+      return;
+    }
+    const stopR = isB ? CFG.TILE * Math.max(t.w, t.h) / 2 + 2 : u.r + t.r + 4;
+    if (moveUnit(Game, u, t.x, t.y, dt, stopR)) {
       u.cd -= dt;
       if (u.cd <= 0) {
         u.cd = u.atkTime;
-        t.hp -= u.atk * (1 + 0.25 * Game.ageBonus);
-        if (t.hp <= 0) t.dead = true;
+        const dmg = u.atk * (1 + 0.25 * Game.ageBonus);
+        if (isB) hitBuilding(Game, t, dmg);
+        else hitUnit(Game, t, dmg);
       }
     }
     return;
@@ -717,7 +775,7 @@ function resumeGather(Game, u, src) {
   return { kind: 'harvest', src: sourceFromFarm(b) };
 }
 
-/** Right-click resolution for one unit: enemy > farm > resource > move. */
+/** Right-click resolution for one unit: enemy > enemy building > farm > resource > move. */
 function orderForUnit(Game, u, wx, wy) {
   const world = Game.world;
   if (wx < 0 || wy < 0 || wx >= world.w * CFG.TILE || wy >= world.h * CFG.TILE) return null;
@@ -726,6 +784,9 @@ function orderForUnit(Game, u, wx, wy) {
   const enemy = Game.units.find(v => v.team !== u.team && !v.dead &&
     Math.hypot(v.x - wx, v.y - wy) < CFG.TILE * 0.8);
   if (enemy) return { kind: 'attack', target: enemy.id };
+  const eB = Game.buildings.find(b => b.team !== u.team && b.built &&
+    tx >= b.tx && tx < b.tx + b.w && ty >= b.ty && ty < b.ty + b.h);
+  if (eB) return { kind: 'attack', b: eB.id };
 
   if (u.kind === 'villager') {
     const farm = Game.buildings.find(b => b.team === u.team && b.built && b.kind === 'farm' &&
@@ -745,9 +806,14 @@ function issueOrder(Game, wx, wy) {
   if (!sel.length) return;
   const enemy = Game.units.find(v => v.team !== sel[0].team && !v.dead &&
     Math.hypot(v.x - wx, v.y - wy) < CFG.TILE * 0.8);
+  const tTx = Math.floor(wx / CFG.TILE), tTy = Math.floor(wy / CFG.TILE);
+  const eB = Game.buildings.find(b => b.team !== sel[0].team && b.built &&
+    tTx >= b.tx && tTx < b.tx + b.w && tTy >= b.ty && tTy < b.ty + b.h);
   let n = 0;
   for (const u of sel) {
-    let o = enemy ? { kind: 'attack', target: enemy.id } : orderForUnit(Game, u, wx, wy);
+    let o = enemy ? { kind: 'attack', target: enemy.id }
+        : eB ? { kind: 'attack', b: eB.id }
+        : orderForUnit(Game, u, wx, wy);
     if (!o) continue;
     if (u.kind !== 'villager' && o.kind === 'harvest') o = { kind: 'move', x: wx, y: wy };
     u.order = spread(o, n);
@@ -876,7 +942,10 @@ function aiStep(Game, dt) {
     let sent = 0;
     for (const u of Game.units) {
       if (u.team !== 1 || u.kind !== 'militia' || u.dead) continue;
-      const live = u.order.kind === 'attack' && Game.units.some(z => z.id === u.order.target && !z.dead);
+      const o = u.order;
+      const live = o.kind === 'attack' && (o.b !== undefined
+        ? Game.buildings.some(z => z.id === o.b)
+        : Game.units.some(z => z.id === o.target && !z.dead));
       if (live) continue;
       if (!prey) continue;
       u.order = { kind: 'attack', target: prey.id };
@@ -1649,6 +1718,7 @@ const AoE2 = {
   makeUnit, makeBuilding, setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
   build, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
+  hitUnit, hitBuilding, autoAcquire,
   popCap, popUsed, selectedUnits, canAfford, spend, resetGame,
   findDropoff, dropTargetScore, nextSource, resumeGather, workersOnTile,
 };

@@ -1,6 +1,6 @@
 # Game rules (as implemented)
 
-Every number here is read out of `index.html` §1 config (lines 99-228). If the code and
+Every number here is read out of `index.html` §1 config (lines 99-230). If the code and
 this file disagree, the code is right and this file is a bug.
 
 ## Map
@@ -35,14 +35,19 @@ this file disagree, the code is right and this file is a bug.
 | Villager | 60 | 46 | 3 | 1.0 s | 50 food | 5 s | Town Center |
 | Militia | 110 | 58 | 11 | 0.9 s | 60 food + 20 gold | 6 s | Town Center, Barracks |
 
-- Melee range = `attacker.r + target.r + 4` px (5 for villager, 6 for militia).
+- Melee range = `attacker.r + target.r + 4` px (5 for villager, 6 for militia). Attacking
+  a building stops at half its footprint + 2 px.
+- Auto-acquire (`autoAcquire`, `index.html:554`): non-villager fighters spot the nearest
+  enemy unit within `CFG.ACQUIRE` (6) tiles — else the nearest built enemy building within
+  `CFG.BUILDING_ACQUIRE` (5) — and snap to the next target the moment their current one
+  dies. Villagers never start fights; they only attack when ordered.
 - Age bonus multiplies damage: `ageBonus` equals the current age index (0 at Dark Age).
 - Population used counts **villagers only**, per AoE2 convention.
-- Art: both kinds render from the unit atlas (`SPRITE_SHEET` 288×48 at `index.html:138`,
+- Art: both kinds render from the unit atlas (`SPRITE_SHEET` 288×48 at `index.html:140`,
   one 24×24 cell per animation × team — villagers: idle/walk + a/b frames for farm, chop
   and mine; militia: idle/walk + attack_a/b), drawn at 20×20 for villagers and 22×22 for
   militia, mirrored when the unit walks left; `tools/gen-atlas.js` regenerates the PNG
-  from `SPRITES`, and `unitAnim` (`index.html:1042`) picks the cell from the unit's order.
+  from `SPRITES`, and `unitAnim` (`index.html:1111`) picks the cell from the unit's order.
 
 ## Buildings (`BLD`)
 
@@ -56,7 +61,7 @@ this file disagree, the code is right and this file is a bug.
 | Mining Camp | 950 | 1×1 | 100 wood | 8 s | — | — |
 | Mill | 1100 | 2×2 | 175 wood | 10 s | — | — |
 
-- Drop-off routing (`findDropoff`, `index.html:674`): wood goes to the Lumber Camp,
+- Drop-off routing (`findDropoff`, `index.html:732`): wood goes to the Lumber Camp,
   gold/stone to the Mining Camp and food to the Mill — each falling back to the Town
   Center (and food also to farms) when the dedicated building doesn't exist. A farm
   never receives its own harvest.
@@ -70,7 +75,7 @@ this file disagree, the code is right and this file is a bug.
 ## Ages (`AGES`)
 
 Dark Age → Feudal Age → Castle Age → Imperial Age.
-Cost (`index.html:821`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
+Cost (`index.html:887`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
 costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle, Castle → Imperial). Hotkey `T`.
 Each upgrade sets `Game.ageBonus = Game.age`, which scales unit damage.
 
