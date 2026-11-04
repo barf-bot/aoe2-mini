@@ -23,7 +23,9 @@ prototypes stall.
    `ageBonus` hook already exists as a multiplier.
 5. **More buildings**: lumber camp, mining camp, market, watch tower — the camp pattern
    (work-radius + drop-off) is already modelled by farms.
-6. **Wall building + gated choke points.** 1×1 segment placement, decay, pathing through gaps.
+6. **Wooden barricade (Feudal Age wall segment) + gated choke points.** 1×1 segment
+   placement, needs a `BLD.age` gate so buildings unlock by age; pathing through gaps.
+   Folded into phase 2 of the 2026-11-04 board-rules plan.
 7. **Win/lose conditions.** Currently there is no game-over; add "destroy the enemy Town
    Center" and a victory overlay.
 
@@ -38,6 +40,21 @@ prototypes stall.
 10. **Sound** — tiny embedded blips for attack/build/age-up.
 11. **Touch controls** for phones (tap-select, long-press command), plus a responsive layout.
 12. **Replay / seeded challenge** — the `mulberry32` seed is already a shareable handle on a map.
+
+## Phase 2 of the 2026-11-04 rules pass (designed, not yet planned)
+
+Split out of the board-rules request because one plan caps at 8 tasks; phase 1
+(`docs/plans/2026-11-04-board-rules.md`) ships the board rules, these ship next.
+
+- **Cancel construction + demolish.** Cancelling an in-progress building refunds 80% of
+  its cost and frees the builder; demolishing a finished building refunds nothing.
+  *Done when:* a check cancels a half-built house at exactly 80% back in the stockpile and
+  another deletes a finished one with zero change.
+- **Uniform HUD frame.** Selecting a unit, a building or nothing must render one
+  fixed-height overlay instead of today's footer that grows taller for a unit and shifts
+  the layout; one place owns the HUD markup. *Done when:* `#info`, `#commands` and
+  `#queue` render at identical heights for all three selection states and a check asserts
+  the markup shape per state.
 
 ## Process items (not features)
 
