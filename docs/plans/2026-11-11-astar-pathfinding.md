@@ -1,6 +1,6 @@
 # A\* pathfinding — walk around, not into (round: movement)
 
-Status: planned
+Status: in progress
 
 ## Design
 
@@ -29,7 +29,7 @@ proving check and the `Map of this file` banner stays truthful.
 
 ## Tasks
 
-- [ ] T1: `findPath` — the A\* core, with its checks written first
+- [x] T1: `findPath` — the A\* core, with its checks written first
   - files: `index.html` §4 (new `/* ---- pathfinding ---- */` sub-block directly above
     `moveUnit`, `index.html:959`: `tileOf(px, py)` + `findPath(Game, from, to)`;
     `walkable` (980) switches to `tileOf` instead of its own inline `Math.floor(p /

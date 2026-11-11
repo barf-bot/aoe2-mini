@@ -125,6 +125,7 @@ const CFG = {
   PAN_SPEED: 620,                 // px/s camera pan
   EDGE: 14,                       // px edge-scroll band
   PROJ_SPEED: 176,                // px/s an arrow flies (8 tiles/s - the table carries no projectile speed)
+  ASTAR_MAX_NODES: 4000,          // expansion cap for one A* query (the table carries no pathfinding budget)
   RES: { tree: 60, gold: 800, stone: 450, berry: 150 },
 };
 
@@ -955,6 +956,101 @@ function updateUnit(Game, u, dt) {
   }
 }
 
+/* ----------------------------- pathfinding ------------------------------ */
+
+/** The tile containing a world-space point. The one px→tile conversion in the
+ *  code: walkable() and findPath() both go through it, so a tile is only ever
+ *  addressed one way. */
+function tileOf(px, py) { return { tx: Math.floor(px / CFG.TILE), ty: Math.floor(py / CFG.TILE) }; }
+
+/** The eight neighbour offsets, and the rule they carry: a diagonal step needs
+ *  BOTH its orthogonal neighbours open, so nobody squeezes through the pinched
+ *  corner between two walls — the AoE2 movement rule. */
+const DIRS8 = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+
+/** The binary min-heap findPath's open set needs (entries are [fScore, tile]);
+ *  ~20 lines of percolate, because scanning an array open set per pop is O(n)
+ *  on a board with 9216 tiles and the frame loop cannot afford it. */
+function heapPush(hp, e) {
+  hp.push(e);
+  let i = hp.length - 1;
+  while (i > 0) {
+    const p = (i - 1) >> 1;
+    if (hp[p][0] <= e[0]) break;
+    hp[i] = hp[p]; i = p;
+  }
+  hp[i] = e;
+}
+function heapPop(hp) {
+  const top = hp[0], last = hp.pop();
+  if (hp.length) {
+    hp[0] = last;
+    for (let i = 0;;) {
+      const l = 2 * i + 1, r = l + 1;
+      let s = i;
+      if (l < hp.length && hp[l][0] < hp[i][0]) s = l;
+      if (r < hp.length && hp[r][0] < hp[s][0]) s = r;
+      if (s === i) break;
+      const t = hp[i]; hp[i] = hp[s]; hp[s] = t;
+      i = s;
+    }
+  }
+  return top;
+}
+
+/** A* over the tile grid — the roadmap P0.2 route finder. `from`/`to` are tiles
+ *  as tileOf() returns them. 8-connected with uniform cost (any open tile costs
+ *  1, whatever the direction) and the admissible Chebyshev heuristic, so a route
+ *  comes out within a hair of optimal. The start tile is accepted even when it
+ *  is solid (a unit may stand on a farm tile or a fresh foundation) while every
+ *  later tile must satisfy walkable(). Returns the route start→goal inclusive,
+ *  or null when the goal is unreachable or the search burns
+ *  CFG.ASTAR_MAX_NODES expansions — a hopeless query must not stall the frame
+ *  loop. Every call counts itself in Game.pathQueries, so a caller that routes
+ *  every frame shows up as a number the harness can pin. */
+function findPath(Game, from, to) {
+  Game.pathQueries = (Game.pathQueries || 0) + 1;
+  const w = Game.world.w, h = Game.world.h;
+  if (!from || !to) return null;
+  const fx = from.tx, fy = from.ty, gx = to.tx, gy = to.ty;
+  if (fx < 0 || fy < 0 || fx >= w || fy >= h || gx < 0 || gy < 0 || gx >= w || gy >= h) return null;
+  const centre = (t) => t * CFG.TILE + CFG.TILE / 2;
+  const openAt = (tx, ty) => (tx === fx && ty === fy) || walkable(Game, centre(tx), centre(ty));
+  const hCost = (tx, ty) => Math.max(Math.abs(tx - gx), Math.abs(ty - gy));
+  const idx = (tx, ty) => ty * w + tx;
+  const goal = idx(gx, gy), start = idx(fx, fy);
+  const gScore = new Map([[start, 0]]);
+  const cameFrom = new Map();
+  const closed = new Set();
+  const open = [];
+  heapPush(open, [hCost(fx, fy), start]);
+  for (let expansions = 0; open.length;) {
+    const cur = heapPop(open)[1];
+    if (closed.has(cur)) continue;                          // stale heap entry
+    if (cur === goal) {                                     // cheapest route: walk it back
+      const rev = [];
+      for (let c = cur; c !== undefined; c = cameFrom.get(c)) rev.push({ tx: c % w, ty: (c / w) | 0 });
+      return rev.reverse();
+    }
+    closed.add(cur);
+    if (expansions++ >= CFG.ASTAR_MAX_NODES) return null;   // budget spent, goal unreachable in time
+    const cx = cur % w, cy = (cur / w) | 0, cg = gScore.get(cur);
+    for (let k = 0; k < 8; k++) {
+      const dx = DIRS8[k][0], dy = DIRS8[k][1], nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      if (dx && dy && !(openAt(cx, ny) && openAt(nx, cy))) continue;   // no corner-cutting
+      const ni = idx(nx, ny);
+      if (closed.has(ni) || !openAt(nx, ny)) continue;
+      if (cg + 1 < (gScore.has(ni) ? gScore.get(ni) : Infinity)) {
+        gScore.set(ni, cg + 1);
+        cameFrom.set(ni, cur);
+        heapPush(open, [cg + 1 + hCost(nx, ny), ni]);
+      }
+    }
+  }
+  return null;
+}
+
 /** Move `u` toward (x,y); returns true on arrival. Slides along water edges. */
 function moveUnit(Game, u, x, y, dt, stop) {
   const s = stop || 1;
@@ -978,7 +1074,7 @@ function moveUnit(Game, u, x, y, dt, stop) {
  *  foundation counts, exactly like the AoE2 rule. Everything that walks, works
  *  or spawns asks this: moveUnit's X/Y slide, workSpot, workPos, makeBuilding. */
 function walkable(Game, px, py) {
-  const tx = Math.floor(px / CFG.TILE), ty = Math.floor(py / CFG.TILE);
+  const { tx, ty } = tileOf(px, py);
   if (tx < 0 || ty < 0 || tx >= Game.world.w || ty >= Game.world.h) return false;
   const i = ty * Game.world.w + tx;
   if (Game.world.type[i] === T.WATER) return false;
@@ -2201,6 +2297,7 @@ const AoE2 = {
   SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor, BLD_SPRITES, bldSpriteFor,
   makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,
+  tileOf, findPath,
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
   build, cancelConstruction, demolish, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,

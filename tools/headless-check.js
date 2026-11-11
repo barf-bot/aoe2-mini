@@ -658,6 +658,140 @@ check(typeof restedAt === 'number' && marcher.anim === restedAt,
   'units: walk phase frozen while idle',
   secs(restedAt) + ' -> ' + secs(marcher.anim) + ' over 1s of standing');
 
+/* ---- 6c. pathfinding (T1: findPath, the A* core) -------------------- */
+// Written before findPath existed, and still graded the §6a way: the harness
+// carries its own search over its own tile rule, so a wrong A* cannot grade
+// itself. Each fixture proves its own optimum before A* is compared to it.
+// Fixture maps are ASCII: '.' grass, 'W' water, '#' a building tile, 'B' a berry.
+const pathState = (rows) => {
+  const h = rows.length, w = rows[0].length;
+  const type = new Array(w * h).fill(AoE2.T.GRASS), amount = new Array(w * h).fill(0);
+  const occupied = new Set();
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const c = rows[y][x];
+    if (c === 'W') type[y * w + x] = AoE2.T.WATER;
+    else if (c === '#') occupied.add(y * w + x);
+    else if (c === 'B') { type[y * w + x] = AoE2.T.BERRY; amount[y * w + x] = 150; }
+  }
+  return { world: { w, h, type, amount }, occupied, units: [], buildings: [], pathQueries: 0 };
+};
+const N8 = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+/** The reference route: uniform-cost Dijkstra over the harness's own solidTile
+ *  rule with the two rules findPath documents (the start tile may be solid, a
+ *  diagonal needs both its orthogonal neighbours walkable). Step count, or null. */
+const refSteps = (st, from, to) => {
+  const W = st.world.w, N = W * st.world.h;
+  const openAt = (x, y) => (x === from.tx && y === from.ty) || solidTile(st, x, y) === null;
+  const dist = new Array(N).fill(Infinity), done = new Array(N).fill(false);
+  dist[from.ty * W + from.tx] = 0;
+  for (;;) {
+    let cur = -1, best = Infinity;
+    for (let i = 0; i < N; i++) if (!done[i] && dist[i] < best) { best = dist[i]; cur = i; }
+    if (cur < 0) return null;
+    if (cur === to.ty * W + to.tx) return best;
+    done[cur] = true;
+    const cx = cur % W, cy = (cur / W) | 0;
+    for (const d of N8) {
+      const x = cx + d[0], y = cy + d[1];
+      if (x < 0 || y < 0 || x >= W || y >= st.world.h) continue;
+      if (d[0] && d[1] && !(openAt(cx, y) && openAt(x, cy))) continue;   // no corner-cutting
+      if (!openAt(x, y)) continue;
+      if (best + 1 < dist[y * W + x]) dist[y * W + x] = best + 1;
+    }
+  }
+};
+/** What is wrong with a route, as a list: gaps, tiles that are not walkable
+ *  (the route's own start tile excepted), diagonals cutting a corner, and
+ *  anything off the board. Empty list means the route obeys the board rule. */
+const routeProblems = (st, p) => {
+  const out = [];
+  for (let i = 1; i < p.length; i++) {
+    const dx = p[i].tx - p[i - 1].tx, dy = p[i].ty - p[i - 1].ty;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
+      out.push(p[i - 1].tx + ',' + p[i - 1].ty + '->' + p[i].tx + ',' + p[i].ty + ' is not a step');
+    } else if (dx && dy &&
+        (solidTile(st, p[i - 1].tx, p[i].ty) !== null || solidTile(st, p[i].tx, p[i - 1].ty) !== null)) {
+      out.push('the diagonal into ' + p[i].tx + ',' + p[i].ty + ' squeezes between two solid tiles');
+    }
+  }
+  for (let i = 1; i < p.length; i++) {
+    if (solidTile(st, p[i].tx, p[i].ty) !== null) out.push(p[i].tx + ',' + p[i].ty + ' is not walkable');
+  }
+  return out;
+};
+// Every check below reads the export the same guarded way §6a reads walkable(),
+// so a missing findPath fails the check instead of killing the run.
+const fp = (st, a, b) => (typeof AoE2.findPath === 'function' ? AoE2.findPath(st, a, b) : null);
+const fpNote = (p) => (p === null ? (typeof AoE2.findPath === 'function' ? 'no route returned' : 'findPath is not exported') : undefined);
+
+// 1. open grass: the route must be the straight-line optimum, tile for tile.
+const OPEN = pathState(['.........', '.........', '.........', '.........', '.........']);
+const openRoute = fp(OPEN, { tx: 0, ty: 0 }, { tx: 8, ty: 3 });
+const idealSteps = Math.max(8, 3);
+check(!!openRoute && openRoute.length === idealSteps + 1 &&
+      openRoute[0].tx === 0 && openRoute[0].ty === 0 &&
+      openRoute[openRoute.length - 1].tx === 8 && openRoute[openRoute.length - 1].ty === 3 &&
+      routeProblems(OPEN, openRoute).length === 0,
+  'path: a route on open grass is the straight-line optimum',
+  fpNote(openRoute) || (openRoute.length + ' tiles where the straight line needs ' +
+    (idealSteps + 1) + '; ' + (routeProblems(OPEN, openRoute).join(' ') || 'every step is 8-adjacent on open grass')));
+
+// 2. the roadmap P0.2 exit condition, on a 5-tile inlet hanging off the north
+// shore: Dijkstra says the optimum, A* may not be more than 15% longer, and the
+// fixture itself is only trusted when its own optimum is close to the
+// straight line (otherwise "within 15% of optimal" would be vacuous).
+const INLET = pathState(['.....W.....', '.....W.....', '.....W.....', '.....W.....', '.....W.....',
+  '...........', '...........', '...........', '...........', '...........', '...........']);
+const inFrom = { tx: 0, ty: 4 }, inTo = { tx: 10, ty: 4 };
+const inIdeal = Math.max(10, 0);
+const inBest = refSteps(INLET, inFrom, inTo);
+const inRoute = fp(INLET, inFrom, inTo);
+check(inBest !== null && inBest <= 1.15 * inIdeal && !!inRoute &&
+      (inRoute.length - 1) <= 1.15 * inBest && routeProblems(INLET, inRoute).length === 0,
+  'path: a route around a water inlet stays within 15% of optimal',
+  'straight line ' + inIdeal + ' steps, Dijkstra around the inlet ' + inBest +
+    ' steps, A* ' + (fpNote(inRoute) || (inRoute.length - 1) + ' steps'));
+
+// 3. the only shortcut here is the illegal one: (1,2)->(2,1) has water at
+// (1,1) and a building at (2,2) as its two orthogonal neighbours, so a
+// corner-cutting search returns the 3-tile route and this check names it.
+const SQUEEZE = pathState(['WW....', 'WW....', '..#...', '......', '......', '......']);
+const sqRoute = fp(SQUEEZE, { tx: 0, ty: 3 }, { tx: 3, ty: 0 });
+check(!!sqRoute && routeProblems(SQUEEZE, sqRoute).length === 0,
+  'path: a diagonal never squeezes between two solid tiles',
+  fpNote(sqRoute) || (sqRoute.length + ' tiles (' + sqRoute.map((t) => t.tx + ',' + t.ty).join(' ') +
+    ') — ' + (routeProblems(SQUEEZE, sqRoute).join(' ') || 'both orthogonal tiles open at every diagonal')));
+
+// 4. a hopeless query must answer, not stall: an island with no route to a
+// walkable goal, and a route that exists but blows the authored node budget.
+const ISLES = pathState(['WWWWWWW', 'WWWWWWW', 'WW.W.WW', 'WWWWWWW', 'WWWWWWW']);
+const lostRoute = fp(ISLES, { tx: 3, ty: 2 }, { tx: 5, ty: 2 });
+const savedCap = AoE2.CFG.ASTAR_MAX_NODES;
+AoE2.CFG.ASTAR_MAX_NODES = 3;                       // the open 9x5 route needs 8
+const cappedRoute = fp(OPEN, { tx: 0, ty: 0 }, { tx: 8, ty: 3 });
+AoE2.CFG.ASTAR_MAX_NODES = savedCap;
+check(!!openRoute && lostRoute === null && cappedRoute === null,
+  'path: an unreachable goal returns null within the node cap',
+  fpNote(openRoute) || ('unreachable island -> ' + (lostRoute === null ? 'null' : lostRoute.length + ' tiles') +
+    '; the same 8-step route with CFG.ASTAR_MAX_NODES=3 -> ' +
+    (cappedRoute === null ? 'null' : cappedRoute.length + ' tiles') + ' (authored cap ' + savedCap + ')'));
+
+// 5. a unit standing on a farm tile or a fresh foundation still has a route:
+// the start tile is accepted even when solid, every later tile must be open.
+const FOUNDATION = pathState(['#.....', '......', '......', '......']);
+const foundFrom = { tx: 0, ty: 0 }, foundTo = { tx: 4, ty: 3 };
+const foundRoute = fp(FOUNDATION, foundFrom, foundTo);
+check(!!foundRoute && foundRoute[0].tx === 0 && foundRoute[0].ty === 0 &&
+      foundRoute[foundRoute.length - 1].tx === foundTo.tx &&
+      foundRoute[foundRoute.length - 1].ty === foundTo.ty &&
+      refSteps(FOUNDATION, foundFrom, foundTo) === foundRoute.length - 1 &&
+      routeProblems(FOUNDATION, foundRoute).length === 0,
+  "path: a route starts on the unit's own tile even when that tile is solid",
+  fpNote(foundRoute) || ('route ' + foundRoute.map((t) => t.tx + ',' + t.ty).join(' ') +
+    ' starts on the occupied tile and matches the Dijkstra length ' +
+    refSteps(FOUNDATION, foundFrom, foundTo) + '; ' +
+    (routeProblems(FOUNDATION, foundRoute).join(' ') || 'all later tiles walkable')));
+
 /* ---- 7. construction ------------------------------------------------ */
 function freeSpotAround(world, Game, tx, ty, w, h, maxR) {
   for (let r = 1; r <= maxR; r++) {
