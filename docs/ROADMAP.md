@@ -16,9 +16,11 @@ prototypes stall.
    **Known limit the 2026-11-04 board-rules pass leaves in place:** terrain and buildings
    went solid (T2), so straight-line movement against a now-solid tile can still
    detour-stall around big blobs — the pass bought solidity, not pathfinding.
-3. **Ranged combat + a second unit line (archer).** Melee-only combat makes fights static
-   and there is no ranged counter-play. *Done when:* arrows register at range with a
-   projectile, and militia-vs-archer matchups resolve per the stat table.
+3. **Ranged combat + a second unit line (archer).** Shipped 2026-11-11 by the
+   OG-content port (`docs/plans/2026-11-11-og-content-port.md`, T4 + T5): `KINDS.archer`
+   (hp 30, atk 4, range 4, reload 2, accuracy 80) trains from the Archery Range and
+   fights through `Game.projectiles`; the Town Center shoots through the same path, so
+   matchups resolve on the vendored stat table instead of the old `CFG.ACQUIRE` guess.
 
 ## P1 — content depth
 
@@ -83,7 +85,7 @@ frames, the archer line, ranged combat, win/lose, docs). Left over on purpose:
 
 ## Process items (not features)
 
-- **Split the harness checks by domain.** Today it's 121 checks in one file; group them into
+- **Split the harness checks by domain.** Today it's 133 checks in one file; group them into
   `economy / build / combat / input / ui` sections so a failure names its area instantly.
 - **Pin the toolchain**: a `package.json` with `devDependencies` (`@napi-rs/canvas`) and an
   `npm test` script would make CI possible without touching the game's dependency-free rule.

@@ -116,27 +116,28 @@ const CFG = {
   UNIT_SEP: 11,                   // min px between two units
   PAN_SPEED: 620,                 // px/s camera pan
   EDGE: 14,                       // px edge-scroll band
+  PROJ_SPEED: 176,                // px/s an arrow flies (8 tiles/s - the table carries no projectile speed)
   RES: { tree: 60, gold: 800, stone: 450, berry: 150 },
 };
 
 // GENERATED FROM data/units.json -- edit the data or run `node tools/check-stats.mjs --write`.
 const KINDS = {
   villager: {
-    label: 'Villager', hp: 25, speed: 18, atk: 3,
+    label: 'Villager', hp: 25, speed: 18, atk: 3, atkType: 'melee',
     atkTime: 0.64, r: 5, time: 25, buildable: true,
     cost: { food: 50 }, meleeArmor: 0,
     pierceArmor: 0, lineOfSight: 4,
     range: 0, minRange: 0, reload: 2, accuracy: 100,
   },
   militia: {
-    label: 'Militia', hp: 40, speed: 20, atk: 4,
+    label: 'Militia', hp: 40, speed: 20, atk: 4, atkType: 'melee',
     atkTime: 0.5, r: 6, time: 21, buildable: true,
     cost: { food: 50, gold: 20 }, meleeArmor: 0,
     pierceArmor: 1, lineOfSight: 4,
     range: 0, minRange: 0, reload: 2, accuracy: 100,
   },
   archer: {
-    label: 'Archer', hp: 30, speed: 21, atk: 4,
+    label: 'Archer', hp: 30, speed: 21, atk: 4, atkType: 'ranged',
     atkTime: 0.35, r: 5, time: 35, buildable: true,
     cost: { wood: 25, gold: 45 }, meleeArmor: 0,
     pierceArmor: 0, lineOfSight: 6,
@@ -598,6 +599,8 @@ function makeUnit(Game, kind, team, x, y) {
   const u = {
     id: Game.nextId++, kind, team, x, y,
     hp: k.hp, maxHp: k.hp, speed: k.speed, atk: k.atk, atkTime: k.atkTime, r: k.r,
+    atkType: k.atkType, range: k.range, minRange: k.minRange, reload: k.reload,
+    accuracy: k.accuracy,
     face: 1, anim: 0, // sprite mirror + walking clock, both set by moveUnit
     order: { kind: 'idle' }, carry: 0, carryRes: null, work: 0, cd: 0, dead: false,
   };
@@ -611,7 +614,7 @@ function makeBuilding(Game, kind, team, tx, ty) {
     id: Game.nextId++, kind, team, tx, ty, w: def.w, h: def.h,
     x: (tx + def.w / 2) * CFG.TILE, y: (ty + def.h / 2) * CFG.TILE,
     hp: def.hp, maxHp: def.hp, built: 0, field: def.field ? def.field : 0,
-    time: def.time, queue: [], born: Game.time,
+    time: def.time, queue: [], born: Game.time, cd: 0,
   };
   Game.buildings.push(b);
   rebuildBlocks(Game);                       // occupancy first: workPos reads it
@@ -715,6 +718,8 @@ function stepSim(Game, dt) {
 
   for (const u of Game.units.slice()) updateUnit(Game, u, dt);
   separate(Game);
+  stepBuildingAttacks(Game, dt);              // built shooters (Town Center) fire
+  updateProjectiles(Game, dt);               // arrows in flight resolve and vanish
 
   if (Game.units.some(u => u.dead)) {
     Game.units = Game.units.filter(u => !u.dead);
@@ -733,6 +738,70 @@ function hitUnit(Game, u, dmg) {
   return true;
 }
 
+/* --------------------------- projectiles (ranged) --------------------------- */
+
+/** One arrow in flight. `from` is the shooter - a unit, or a built building whose
+ *  numbers then come from BLD the way hitBuilding reads them - and `target` is the
+ *  exact unit or building the arrow is bound to: it never switches marks and can
+ *  only ever hit once, so a kill mid-flight cannot splash onto the next body.
+ *  Pure logic, no DOM. */
+function spawnArrow(Game, from, target) {
+  const stats = from.atk === undefined ? { atk: BLD[from.kind].attack,
+                                            accuracy: BLD[from.kind].accuracy }
+                                       : { atk: from.atk, accuracy: from.accuracy };
+  const dx = target.x - from.x, dy = target.y - from.y, d = Math.hypot(dx, dy) || 1;
+  const p = { x: from.x, y: from.y, team: from.team, t: target, dx: dx / d, dy: dy / d,
+              dmg: stats.atk * (1 + 0.25 * Game.ageBonus), accuracy: stats.accuracy };
+  Game.projectiles.push(p);
+  return p;
+}
+
+/** Fly every arrow one step toward its mark (CFG.PROJ_SPEED px/s) and resolve the
+ *  ones that arrive: the table accuracy rolled on Game.rnd decides whether the hit
+ *  lands, hitUnit/hitBuilding applies it, and the arrow is gone either way - a dead
+ *  mark swallows the shot. Runs before stepSim's dead-unit cleanup. */
+function updateProjectiles(Game, dt) {
+  const step = CFG.PROJ_SPEED * dt;
+  for (let i = Game.projectiles.length - 1; i >= 0; i--) {
+    const p = Game.projectiles[i];
+    const t = p.t;
+    if (!t || t.hp <= 0 || (t.dead !== undefined && t.dead)) {  // the mark is gone
+      Game.projectiles.splice(i, 1);
+      continue;
+    }
+    const dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy) || 1;
+    const isB = t.r === undefined;                              // unit (has r) vs building
+    if (d <= (isB ? reachOf(t) : t.r) + step) {                  // arrived: resolve, vanish
+      Game.projectiles.splice(i, 1);
+      if (Game.rnd() * 100 < p.accuracy) {
+        if (isB) hitBuilding(Game, t, p.dmg); else hitUnit(Game, t, p.dmg);
+      }
+      continue;
+    }
+    p.dx = dx / d; p.dy = dy / d;                                // the lerp and the heading
+    p.x += p.dx * step; p.y += p.dy * step;
+  }
+}
+
+/** Built buildings whose row carries an attack shoot the nearest enemy unit inside
+ *  their table line of sight, on their table reload - the same arrow path (T5). */
+function stepBuildingAttacks(Game, dt) {
+  for (const b of Game.buildings) {
+    if (b.built < 1 || !BLD[b.kind].attack) continue;
+    b.cd = Math.max(0, (b.cd || 0) - dt);
+    if (b.cd > 0) continue;
+    let best = null, bd = Infinity;
+    for (const u of Game.units) {
+      if (u.dead || u.team === b.team) continue;
+      const d = Math.hypot(u.x - b.x, u.y - b.y);
+      if (d <= BLD[b.kind].lineOfSight * CFG.TILE && d < bd) { bd = d; best = u; }
+    }
+    if (!best) continue;
+    b.cd = BLD[b.kind].reload || 1;
+    spawnArrow(Game, b, best);
+  }
+}
+
 /** Apply damage to a building; at 0 hp it is razed and removed from the world. */
 function hitBuilding(Game, b, dmg) {
   b.hp -= dmg;
@@ -749,7 +818,8 @@ function hitBuilding(Game, b, dmg) {
  *  never start fights; they only attack when ordered. */
 function autoAcquire(Game, u) {
   if (u.kind === 'villager') return null;
-  const RU = CFG.ACQUIRE * CFG.TILE;
+  const RU = (KINDS[u.kind].range || 0) > 0 ? KINDS[u.kind].range * CFG.TILE   /* the table's own reach */
+                                             : CFG.ACQUIRE * CFG.TILE;          /* melee: the authored radius */
   let bestUnit = null, du = Infinity;
   for (const v of Game.units) {
     if (v.team === u.team || v.dead) continue;
@@ -790,14 +860,21 @@ function updateUnit(Game, u, dt) {
       u.order = autoAcquire(Game, u) || { kind: 'idle' };
       return;
     }
-    const stopR = isB ? reachOf(t) : u.r + t.r + 4;
+    /* The table decides how far a fighter fights from and how often it hits: a
+     * ranged unit halts at `range` tiles and every `reload` seconds looses an
+     * arrow; a melee one walks to contact and swings every `atkTime`. */
+    const ranged = u.atkType === 'ranged';
+    const contact = isB ? reachOf(t) : u.r + t.r + 4;
+    const stopR = ranged ? Math.max(u.range * CFG.TILE, contact) : contact;
     if (moveUnit(Game, u, t.x, t.y, dt, stopR)) {
       u.cd -= dt;
       if (u.cd <= 0) {
-        u.cd = u.atkTime;
-        const dmg = u.atk * (1 + 0.25 * Game.ageBonus);
-        if (isB) hitBuilding(Game, t, dmg);
-        else hitUnit(Game, t, dmg);
+        u.cd = ranged ? (u.reload || u.atkTime) : u.atkTime;     // the table's cadence
+        if (ranged) spawnArrow(Game, u, t);                       // the hit lands on arrival
+        else {
+          const dmg = u.atk * (1 + 0.25 * Game.ageBonus);
+          if (isB) hitBuilding(Game, t, dmg); else hitUnit(Game, t, dmg);
+        }
       }
     }
     return;
@@ -1513,6 +1590,24 @@ function orderTarget(Game, u) {
   return null;
 }
 
+/** The arrows in flight: a 6px dash in the shooter's team colour, pointing where
+ *  the arrow is going (updateProjectiles keeps dx/dy current). */
+function drawProjectiles(Game, view) {
+  const c = view.ctx;
+  if (!c) return;
+  const cam = Game.cam;
+  c.lineWidth = 1;
+  for (const p of Game.projectiles) {
+    const x = p.x - cam.x, y = p.y - cam.y;
+    if (x < -8 || y < -8 || x > view.w + 8 || y > view.h + 8) continue;
+    c.strokeStyle = TEAM[p.team].main;
+    c.beginPath();
+    c.moveTo(x - p.dx * 3, y - p.dy * 3);
+    c.lineTo(x + p.dx * 3, y + p.dy * 3);
+    c.stroke();
+  }
+}
+
 function drawGhost(Game, view) {
   const c = view.ctx;
   if (!c || !Game.placing || !Game.cursor) return;
@@ -1679,6 +1774,7 @@ function renderFrame(Game) {
   drawWorld(Game, Game.view);
   drawBuildings(Game, Game.view);
   drawUnits(Game, Game.view);
+  drawProjectiles(Game, Game.view);
   drawGhost(Game, Game.view);
   drawDragBox(Game, Game.view);
   drawMinimap(Game, Game.mm);
@@ -1875,12 +1971,12 @@ function sizeH(dom) {
 
 function createState() {
   const Game = {
-    world: null, units: [], buildings: [], blocks: new Map(), occupied: new Set(),
+    world: null, units: [], buildings: [], projectiles: [], blocks: new Map(), occupied: new Set(),
     sprites: { atlas: null },
     res: [{ food: 0, wood: 0, gold: 0, stone: 0 }, { food: 0, wood: 0, gold: 0, stone: 0 }],
     selection: [], selectedBuilding: null, groups: {}, keys: {},
     cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, placing: null,
-    time: 0, wave: 0, age: 0, ageBonus: 0, nextId: 1, started: false,
+    time: 0, wave: 0, age: 0, ageBonus: 0, nextId: 1, started: false, rnd: mulberry32(CFG.SEED),
     dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0,
   };
   Game.toast = (m) => toast(Game, m);
@@ -1891,9 +1987,10 @@ function createState() {
 function resetGame(Game) {
   Game.world = makeWorld(CFG.SEED);
   Game.units = [];
+  Game.projectiles = [];
   Game.buildings = [];
   Game.nextId = 1;
-  Game.time = 0; Game.wave = 0; Game.age = 0; Game.ageBonus = 0;
+  Game.time = 0; Game.wave = 0; Game.age = 0; Game.ageBonus = 0; Game.rnd = mulberry32(CFG.SEED);
   Game.selection = []; Game.selectedBuilding = null; Game.placing = null;
   Game.mmBase = null;
   Game.res[0] = Object.assign({}, CFG.START);
@@ -2051,7 +2148,7 @@ const AoE2 = {
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
   build, cancelConstruction, demolish, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
-  hitUnit, hitBuilding, autoAcquire,
+  hitUnit, hitBuilding, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame, commandsHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };

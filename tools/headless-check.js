@@ -935,6 +935,76 @@ AoE2.stepSim(ag, DT);
 check(gv.order.kind === 'idle', 'ai: villagers never start fights — only ordered attacks',
   gv.order.kind);
 
+/* ---- 9c. ranged combat (2026-11-11 content port, T5) ----------------- */
+/* The table's ranged half: KINDS.archer (range 4, reload 2, accuracy 80) fights
+ * from its range through Game.projectiles, and a built Town Center (attack 5)
+ * shoots the same path. Own state, squads cleared, so no other unit's arrows or
+ * separation jitter can move the numbers being asserted. */
+const rs = AoE2.createState();
+rs.units = [];
+const rsTc = rs.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+const arc = AoE2.makeUnit(rs, 'archer', 0, rsTc.x + 200, rsTc.y);   // out of the TC's LOS 8
+const vic = AoE2.makeUnit(rs, 'villager', 1,
+  arc.x + AoE2.KINDS.archer.range * AoE2.CFG.TILE, arc.y);           // exactly the table range
+arc.order = { kind: 'attack', target: vic.id };
+AoE2.stepSim(rs, DT);
+const p0 = rs.projectiles[0];
+check(!!p0 && p0.team === 0 && p0.t === vic &&
+      p0.dmg === AoE2.KINDS.archer.atk && p0.accuracy === AoE2.KINDS.archer.accuracy,
+  'ranged: ranged order creates an arrow projectile',
+  p0 ? 'team=' + p0.team + ' dmg=' + p0.dmg + ' accuracy=' + p0.accuracy : 'no projectile');
+const d0 = Math.hypot(vic.x - p0.x, vic.y - p0.y);
+AoE2.stepSim(rs, DT);
+const p1 = rs.projectiles[0];
+check(!!p1 && p1 === p0 && Math.hypot(vic.x - p1.x, vic.y - p1.y) < d0,
+  'ranged: the arrow position lerps toward the target',
+  p1 ? Math.round(d0) + ' -> ' + Math.round(Math.hypot(vic.x - p1.x, vic.y - p1.y)) + 'px'
+     : 'the arrow disappeared before reaching its target');
+const hpB = vic.hp;
+for (let i = 0; i < 40 && rs.projectiles.indexOf(p0) >= 0; i++) AoE2.stepSim(rs, DT);
+check(rs.projectiles.indexOf(p0) < 0, 'ranged: arrow is removed when it lands',
+  rs.projectiles.length + ' projectile(s) left');
+const hpAfter = vic.hp;
+check(hpAfter === hpB || hpAfter === hpB - p0.dmg,
+  'ranged: a target never takes two hits from one arrow',
+  hpB + ' -> ' + hpAfter + ' (one arrow deals ' + p0.dmg + ')');
+const ax = arc.x, ay = arc.y;
+for (let i = 0; i < 1600 && !vic.dead; i++) AoE2.stepSim(rs, DT);
+check(vic.dead && arc.x === ax && arc.y === ay && rs.projectiles.length === 0,
+  'ranged: archer kills a villager at the table\'s range',
+  'hp=' + vic.hp + ' moved=' + (arc.x === ax && arc.y === ay ? 'no' : 'yes') +
+  ' airborne=' + rs.projectiles.length);
+
+/* the arrow is bound to one body: a kill mid-flight must not splash onto the
+ * neighbour standing next to the corpse */
+const r5 = AoE2.createState();
+r5.units = [];
+const r5Tc = r5.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+const a5 = AoE2.makeUnit(r5, 'archer', 0, r5Tc.x + 200, r5Tc.y);
+const vA = AoE2.makeUnit(r5, 'villager', 1, a5.x + 60, a5.y);
+const vB = AoE2.makeUnit(r5, 'villager', 1, a5.x + 64, a5.y + 2);
+a5.cd = 99;                                       // no second shot while the first flies
+const p5 = AoE2.spawnArrow(r5, a5, vA);
+const hpB5 = vB.hp;
+AoE2.hitUnit(r5, vA, 999);                       // the mark dies while the arrow flies
+for (let i = 0; i < 20; i++) AoE2.stepSim(r5, DT);
+check(r5.projectiles.length === 0 && vB.hp === hpB5 && vA.dead,
+  'ranged: a shot at a dead target does not phantom-hit the next one',
+  'airborne=' + r5.projectiles.length + ' vB.hp=' + vB.hp + '/' + hpB5);
+
+/* the building half of the same path: the Town Center's own attack 5 / accuracy
+ * 100 leave through spawnArrow, not through an instant hit */
+const r7 = AoE2.createState();
+r7.units = [];
+const r7Tc = r7.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+const foe7 = AoE2.makeUnit(r7, 'militia', 1, r7Tc.x + 60, r7Tc.y);
+AoE2.stepSim(r7, DT);
+const tp = r7.projectiles[0];
+check(!!tp && tp.t === foe7 && tp.team === 0 &&
+      tp.dmg === AoE2.BLD.town_center.attack && tp.accuracy === AoE2.BLD.town_center.accuracy,
+  'ranged: the Town Center shoots through the same path',
+  tp ? 'team=' + tp.team + ' dmg=' + tp.dmg + ' accuracy=' + tp.accuracy : 'no arrow from the TC');
+
 /* ---- 10. input ------------------------------------------------------ */
 const view = doc.getElementById('view');
 const mine = blueVill();

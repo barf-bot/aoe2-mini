@@ -165,30 +165,39 @@ HD/DE files later is a directory replacement and nothing else.
     `ui: clicking the Archery Range button arms placement` — plus check-stats exit 0 and
     the unmodified sprite checks.
 
-- [ ] T5: Ranged combat driven by `KINDS.range`/`accuracy`/`reload`
-  - files: `index.html` §4 (`Game` shape + `createState`, `stepSim` 621-646, `hitUnit`
-    647-655, `updateUnit` 689-798, `autoAcquire` 669-688, `orderForUnit` 936-968; new
-    `spawnArrow`/`updateProjectiles` beside `hitUnit`), §5 `drawProjectiles` + `renderFrame`
-    wiring, export block 1964-1975, `tools/headless-check.js` new §9c (the harness's §12 is
-    `reset`; the check list itself is the one `docs/plans/2026-11-03-unit-sprites.md` drew
-    for this feature)
-  - change: §4 gains `Game.projectiles` and `spawnArrow(Game, u, target)` /
+- [x] T5: Ranged combat driven by `KINDS.range`/`accuracy`/`reload`
+  - files: `index.html` §4 (`Game` shape + `createState` 1972, `stepSim` 705, `hitUnit`
+    733, `updateUnit` 840, `autoAcquire` 819, `orderForUnit` 1094; new `spawnArrow` 748,
+    `updateProjectiles` 763, `stepBuildingAttacks` 788 beside `hitUnit`), §5
+    `drawProjectiles` 1595 + `renderFrame` 1768 wiring, export block 2151;
+    `data/units.json` (+ `units.*.atkType`, + `cfg.PROJ_SPEED` 176 — the table carries
+    neither, so both go in `authored[]`), `tools/check-stats.mjs` (`kindValue` + the
+    KINDS template), `tools/headless-check.js` new §9c (the harness's §12 is `reset`; the
+    check list itself is the one `docs/plans/2026-11-03-unit-sprites.md` drew for this
+    feature)
+  - change: §4 gains `Game.projectiles` and `spawnArrow(Game, from, target)` /
     `updateProjectiles(Game, dt)`; `KINDS.atkType` ('melee' | 'ranged'), `range`,
     `minRange` and `reload` are read only from the table — melee keeps today's instant
-    `hitUnit`, ranged units face the target, stop at `range * CFG.TILE`, fire on the reload
-    cadence and resolve the hit when the arrow arrives, gated by
-    `Game.rnd` (`mulberry32`) against `accuracy`; buildings with `attack > 0` (Town Center
-    5, LOS 8 — already in `data/buildings.json`) shoot through the same path; arrows are
-    deleted on arrival and never double-hit; `autoAcquire`/`orderForUnit` compare against
-    the per-kind range instead of the single `CFG.ACQUIRE` radius.
+    `hitUnit`, ranged units face the target, stop at `range * CFG.TILE`, fire on the
+    reload cadence and resolve the hit when the arrow arrives, gated by `Game.rnd`
+    against `accuracy`; buildings with `attack > 0` (Town Center 5, LOS 8 — already in
+    `data/buildings.json`) shoot through the same path from `stepBuildingAttacks`;
+    arrows are deleted on arrival and never double-hit; `autoAcquire` compares against
+    the per-kind range (shooters their `range * CFG.TILE`, melee `CFG.ACQUIRE`) instead of
+    the single global radius. Three things the plan didn't name, all forced by the code:
+    `Game.rnd = mulberry32(CFG.SEED)` (nothing else on `Game` carried the seeded generator
+    the accuracy roll needs), `cfg.PROJ_SPEED: 176` px/s (the table has no projectile
+    speed), and `cd: 0` on the building instance so a building's reload has somewhere
+    to live.
   - done when: on a throwaway state an archer kills a villager **4 tiles away** (the
     table's range) without moving, `Game.projectiles.length` returns to 0 after the burst,
-    and the 121 existing checks still pass.
+    and the checks from T1–T4 still pass — the suite is now 133/133, exit 0.
   - test: new §9c checks — `ranged: ranged order creates an arrow projectile`,
     `ranged: the arrow position lerps toward the target`, `ranged: arrow is removed when it
     lands`, `ranged: a target never takes two hits from one arrow`, `ranged: a shot at a
     dead target does not phantom-hit the next one`, `ranged: archer kills a villager at the
-    table's range` (replaces the old §12 list; written first, then the code).
+    table's range`, plus `ranged: the Town Center shoots through the same path` (the
+    building half of the change needs its own proving check) — written first, then the code.
 
 - [ ] T6: Win/lose on top of the same buildings
   - files: `index.html` §4 (`hitBuilding` 656-668 / `removeBuilding` 574-582 set the

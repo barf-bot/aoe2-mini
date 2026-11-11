@@ -60,6 +60,8 @@ function kindValue(u) {
     hp: mustNum(u.hp, `${where}.hp`),
     speed: Math.round(TILE * mustNum(u.speedTps, `${where}.speedTps`)),
     atk: mustNum(u.atk, `${where}.atk`),
+    atkType: u.atkType === 'melee' || u.atkType === 'ranged'
+      ? u.atkType : fail(`${where}.atkType must be 'melee' or 'ranged'`),
     atkTime: mustNum(u.atkTime, `${where}.atkTime`),
     r: mustNum(u.r, `${where}.r`),
     time: mustNum(u.time, `${where}.time`),
@@ -119,7 +121,7 @@ function renderKINDS() {
     const v = kindValue(unitsDoc.units[name]);
     return [
       `  ${name}: {`,
-      `    label: '${v.label}', hp: ${v.hp}, speed: ${v.speed}, atk: ${v.atk},`,
+      `    label: '${v.label}', hp: ${v.hp}, speed: ${v.speed}, atk: ${v.atk}, atkType: '${v.atkType}',`,
       `    atkTime: ${v.atkTime}, r: ${v.r}, time: ${v.time}, buildable: ${v.buildable},`,
       `    cost: ${inline(v.cost, `units.${name}.cost`)}, meleeArmor: ${v.meleeArmor},`,
       `    pierceArmor: ${v.pierceArmor}, lineOfSight: ${v.lineOfSight},`,

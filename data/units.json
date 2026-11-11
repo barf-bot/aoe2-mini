@@ -11,8 +11,8 @@
   "authored": [
     "cfg.MAP_W", "cfg.MAP_H", "cfg.TILE", "cfg.SEED", "cfg.START", "cfg.WORKERS_PER_TILE",
     "cfg.GATHER_RATE", "cfg.CANCEL_REFUND", "cfg.AGE_FOOD", "cfg.WAVE_EVERY", "cfg.ACQUIRE",
-    "cfg.BUILDING_ACQUIRE", "cfg.UNIT_SEP", "cfg.PAN_SPEED", "cfg.EDGE", "cfg.RES",
-    "units.*.label", "units.*.r", "units.*.buildable"
+    "cfg.BUILDING_ACQUIRE", "cfg.UNIT_SEP", "cfg.PAN_SPEED", "cfg.EDGE", "cfg.RES", "cfg.PROJ_SPEED",
+    "units.*.label", "units.*.r", "units.*.buildable", "units.*.atkType"
   ],
   "design": {
     "cfg.CARRY_MAX": "10 - the agreed port number (the pre-port block said 15 and its own comment named 10 as the AoE2 value; the table carries no carry capacity for this row)",
@@ -36,6 +36,7 @@
     "UNIT_SEP": 11,
     "PAN_SPEED": 620,
     "EDGE": 14,
+    "PROJ_SPEED": 176,
     "RES": { "tree": 60, "gold": 800, "stone": 450, "berry": 150 }
   },
   "cfgNotes": {
@@ -51,7 +52,8 @@
     "BUILDING_ACQUIRE": "tiles: ... and raze enemy buildings this close",
     "UNIT_SEP": "min px between two units",
     "PAN_SPEED": "px/s camera pan",
-    "EDGE": "px edge-scroll band"
+    "EDGE": "px edge-scroll band",
+    "PROJ_SPEED": "px/s an arrow flies (8 tiles/s - the table carries no projectile speed)"
   },
   "units": {
     "villager": {
@@ -60,6 +62,7 @@
       "label": "Villager",
       "hp": 25,
       "atk": 3,
+      "atkType": "melee",
       "meleeArmor": 0,
       "pierceArmor": 0,
       "atkTime": 0.64,
@@ -80,6 +83,7 @@
       "label": "Militia",
       "hp": 40,
       "atk": 4,
+      "atkType": "melee",
       "meleeArmor": 0,
       "pierceArmor": 1,
       "atkTime": 0.5,
@@ -100,6 +104,7 @@
       "label": "Archer",
       "hp": 30,
       "atk": 4,
+      "atkType": "ranged",
       "meleeArmor": 0,
       "pierceArmor": 0,
       "atkTime": 0.35,
