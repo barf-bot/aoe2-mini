@@ -154,6 +154,26 @@
       "reload": 0,
       "accuracy": 0,
       "garrisonCapacity": 0
+    },
+    "archery_range": {
+      "id": 87,
+      "internalName": "ARRG",
+      "label": "Archery Range",
+      "hp": 1500,
+      "cost": { "wood": 175 },
+      "time": 50,
+      "w": 2,
+      "h": 2,
+      "pop": 0,
+      "trains": ["archer"],
+      "attack": 0,
+      "meleeArmor": 1,
+      "pierceArmor": 8,
+      "lineOfSight": 6,
+      "range": 0,
+      "reload": 0,
+      "accuracy": 0,
+      "garrisonCapacity": 10
     }
   }
 }

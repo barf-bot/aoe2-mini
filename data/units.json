@@ -93,6 +93,26 @@
       "time": 21,
       "r": 6,
       "buildable": true
+    },
+    "archer": {
+      "id": 4,
+      "internalName": "ARCHR",
+      "label": "Archer",
+      "hp": 30,
+      "atk": 4,
+      "meleeArmor": 0,
+      "pierceArmor": 0,
+      "atkTime": 0.35,
+      "speedTps": 0.96,
+      "lineOfSight": 6,
+      "range": 4,
+      "minRange": 0,
+      "reload": 2,
+      "accuracy": 80,
+      "cost": { "wood": 25, "gold": 45 },
+      "time": 35,
+      "r": 5,
+      "buildable": true
     }
   }
 }

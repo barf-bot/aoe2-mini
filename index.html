@@ -135,6 +135,13 @@ const KINDS = {
     pierceArmor: 1, lineOfSight: 4,
     range: 0, minRange: 0, reload: 2, accuracy: 100,
   },
+  archer: {
+    label: 'Archer', hp: 30, speed: 21, atk: 4,
+    atkTime: 0.35, r: 5, time: 35, buildable: true,
+    cost: { wood: 25, gold: 45 }, meleeArmor: 0,
+    pierceArmor: 0, lineOfSight: 6,
+    range: 4, minRange: 0, reload: 2, accuracy: 80,
+  },
 };
 
 /* Sprite atlas -- every frame lives in ONE image, assets/sprites.png, and every
@@ -154,37 +161,47 @@ const KINDS = {
  */
 // GENERATED FROM data/sprites.json
 const SPRITE_SHEET = {
-  w: 1215, h: 684,
+  w: 1522, h: 684,
 };
 // GENERATED FROM data/sprites.json
 const SPRITES = {
+  archer: {
+    attack_a: [{ sx: 0, sy: 0, sw: 58, sh: 70, dw: 20, dh: 20 },
+              { sx: 0, sy: 86, sw: 58, sh: 70, dw: 20, dh: 20 }],
+    attack_b: [{ sx: 58, sy: 0, sw: 58, sh: 70, dw: 20, dh: 20 },
+              { sx: 58, sy: 86, sw: 58, sh: 70, dw: 20, dh: 20 }],
+    idle: [{ sx: 116, sy: 0, sw: 49, sh: 51, dw: 20, dh: 20 },
+          { sx: 116, sy: 86, sw: 49, sh: 51, dw: 20, dh: 20 }],
+    walk: [{ sx: 165, sy: 0, sw: 53, sh: 54, dw: 20, dh: 20 },
+          { sx: 165, sy: 86, sw: 53, sh: 54, dw: 20, dh: 20 }],
+  },
   militia: {
-    attack_a: [{ sx: 0, sy: 0, sw: 64, sh: 67, dw: 22, dh: 22 },
-              { sx: 0, sy: 86, sw: 64, sh: 67, dw: 22, dh: 22 }],
-    attack_b: [{ sx: 64, sy: 0, sw: 64, sh: 67, dw: 22, dh: 22 },
-              { sx: 64, sy: 86, sw: 64, sh: 67, dw: 22, dh: 22 }],
-    idle: [{ sx: 128, sy: 0, sw: 37, sh: 50, dw: 22, dh: 22 },
-          { sx: 128, sy: 86, sw: 37, sh: 50, dw: 22, dh: 22 }],
-    walk: [{ sx: 165, sy: 0, sw: 36, sh: 50, dw: 22, dh: 22 },
-          { sx: 165, sy: 86, sw: 36, sh: 50, dw: 22, dh: 22 }],
+    attack_a: [{ sx: 218, sy: 0, sw: 64, sh: 67, dw: 22, dh: 22 },
+              { sx: 218, sy: 86, sw: 64, sh: 67, dw: 22, dh: 22 }],
+    attack_b: [{ sx: 282, sy: 0, sw: 64, sh: 67, dw: 22, dh: 22 },
+              { sx: 282, sy: 86, sw: 64, sh: 67, dw: 22, dh: 22 }],
+    idle: [{ sx: 346, sy: 0, sw: 37, sh: 50, dw: 22, dh: 22 },
+          { sx: 346, sy: 86, sw: 37, sh: 50, dw: 22, dh: 22 }],
+    walk: [{ sx: 383, sy: 0, sw: 36, sh: 50, dw: 22, dh: 22 },
+          { sx: 383, sy: 86, sw: 36, sh: 50, dw: 22, dh: 22 }],
   },
   villager: {
-    chop_a: [{ sx: 201, sy: 0, sw: 82, sh: 71, dw: 20, dh: 20 },
-            { sx: 201, sy: 86, sw: 82, sh: 71, dw: 20, dh: 20 }],
-    chop_b: [{ sx: 283, sy: 0, sw: 82, sh: 71, dw: 20, dh: 20 },
-            { sx: 283, sy: 86, sw: 82, sh: 71, dw: 20, dh: 20 }],
-    farm_a: [{ sx: 365, sy: 0, sw: 146, sh: 86, dw: 20, dh: 20 },
-            { sx: 365, sy: 86, sw: 146, sh: 86, dw: 20, dh: 20 }],
-    farm_b: [{ sx: 511, sy: 0, sw: 146, sh: 86, dw: 20, dh: 20 },
-            { sx: 511, sy: 86, sw: 146, sh: 86, dw: 20, dh: 20 }],
-    idle: [{ sx: 657, sy: 0, sw: 28, sh: 46, dw: 20, dh: 20 },
-          { sx: 657, sy: 86, sw: 28, sh: 46, dw: 20, dh: 20 }],
-    mine_a: [{ sx: 685, sy: 0, sw: 73, sh: 76, dw: 20, dh: 20 },
-            { sx: 685, sy: 86, sw: 73, sh: 76, dw: 20, dh: 20 }],
-    mine_b: [{ sx: 758, sy: 0, sw: 73, sh: 76, dw: 20, dh: 20 },
-            { sx: 758, sy: 86, sw: 73, sh: 76, dw: 20, dh: 20 }],
-    walk: [{ sx: 831, sy: 0, sw: 31, sh: 48, dw: 20, dh: 20 },
-          { sx: 831, sy: 86, sw: 31, sh: 48, dw: 20, dh: 20 }],
+    chop_a: [{ sx: 419, sy: 0, sw: 82, sh: 71, dw: 20, dh: 20 },
+            { sx: 419, sy: 86, sw: 82, sh: 71, dw: 20, dh: 20 }],
+    chop_b: [{ sx: 501, sy: 0, sw: 82, sh: 71, dw: 20, dh: 20 },
+            { sx: 501, sy: 86, sw: 82, sh: 71, dw: 20, dh: 20 }],
+    farm_a: [{ sx: 583, sy: 0, sw: 146, sh: 86, dw: 20, dh: 20 },
+            { sx: 583, sy: 86, sw: 146, sh: 86, dw: 20, dh: 20 }],
+    farm_b: [{ sx: 729, sy: 0, sw: 146, sh: 86, dw: 20, dh: 20 },
+            { sx: 729, sy: 86, sw: 146, sh: 86, dw: 20, dh: 20 }],
+    idle: [{ sx: 875, sy: 0, sw: 28, sh: 46, dw: 20, dh: 20 },
+          { sx: 875, sy: 86, sw: 28, sh: 46, dw: 20, dh: 20 }],
+    mine_a: [{ sx: 903, sy: 0, sw: 73, sh: 76, dw: 20, dh: 20 },
+            { sx: 903, sy: 86, sw: 73, sh: 76, dw: 20, dh: 20 }],
+    mine_b: [{ sx: 976, sy: 0, sw: 73, sh: 76, dw: 20, dh: 20 },
+            { sx: 976, sy: 86, sw: 73, sh: 76, dw: 20, dh: 20 }],
+    walk: [{ sx: 1049, sy: 0, sw: 31, sh: 48, dw: 20, dh: 20 },
+          { sx: 1049, sy: 86, sw: 31, sh: 48, dw: 20, dh: 20 }],
   },
 };
 
@@ -215,20 +232,22 @@ function spriteFor(kind, team, anim) {
  * set ships no farm bitmap (see data/README.md). */
 // GENERATED FROM data/sprites.json
 const BLD_SPRITES = {
-  barracks: [{ sx: 0, sy: 172, sw: 316, sh: 256, dw: 44, dh: 44 },
-            { sx: 0, sy: 428, sw: 316, sh: 256, dw: 44, dh: 44 }],
-  farm: [{ sx: 316, sy: 172, sw: 44, sh: 44, dw: 44, dh: 44 },
-        { sx: 316, sy: 428, sw: 44, sh: 44, dw: 44, dh: 44 }],
-  house: [{ sx: 360, sy: 172, sw: 177, sh: 126, dw: 44, dh: 44 },
-         { sx: 360, sy: 428, sw: 177, sh: 126, dw: 44, dh: 44 }],
-  lumber_camp: [{ sx: 537, sy: 172, sw: 163, sh: 137, dw: 22, dh: 22 },
-               { sx: 537, sy: 428, sw: 163, sh: 137, dw: 22, dh: 22 }],
-  mill: [{ sx: 700, sy: 172, sw: 218, sh: 216, dw: 44, dh: 44 },
-        { sx: 700, sy: 428, sw: 218, sh: 216, dw: 44, dh: 44 }],
-  mining_camp: [{ sx: 918, sy: 172, sw: 176, sh: 110, dw: 22, dh: 22 },
-               { sx: 918, sy: 428, sw: 176, sh: 110, dw: 22, dh: 22 }],
-  town_center: [{ sx: 1094, sy: 172, sw: 121, sh: 163, dw: 66, dh: 66 },
-               { sx: 1094, sy: 428, sw: 121, sh: 163, dw: 66, dh: 66 }],
+  archery_range: [{ sx: 0, sy: 172, sw: 307, sh: 253, dw: 44, dh: 44 },
+                 { sx: 0, sy: 428, sw: 307, sh: 253, dw: 44, dh: 44 }],
+  barracks: [{ sx: 307, sy: 172, sw: 316, sh: 256, dw: 44, dh: 44 },
+            { sx: 307, sy: 428, sw: 316, sh: 256, dw: 44, dh: 44 }],
+  farm: [{ sx: 623, sy: 172, sw: 44, sh: 44, dw: 44, dh: 44 },
+        { sx: 623, sy: 428, sw: 44, sh: 44, dw: 44, dh: 44 }],
+  house: [{ sx: 667, sy: 172, sw: 177, sh: 126, dw: 44, dh: 44 },
+         { sx: 667, sy: 428, sw: 177, sh: 126, dw: 44, dh: 44 }],
+  lumber_camp: [{ sx: 844, sy: 172, sw: 163, sh: 137, dw: 22, dh: 22 },
+               { sx: 844, sy: 428, sw: 163, sh: 137, dw: 22, dh: 22 }],
+  mill: [{ sx: 1007, sy: 172, sw: 218, sh: 216, dw: 44, dh: 44 },
+        { sx: 1007, sy: 428, sw: 218, sh: 216, dw: 44, dh: 44 }],
+  mining_camp: [{ sx: 1225, sy: 172, sw: 176, sh: 110, dw: 22, dh: 22 },
+               { sx: 1225, sy: 428, sw: 176, sh: 110, dw: 22, dh: 22 }],
+  town_center: [{ sx: 1401, sy: 172, sw: 121, sh: 163, dw: 66, dh: 66 },
+               { sx: 1401, sy: 428, sw: 121, sh: 163, dw: 66, dh: 66 }],
 };
 
 /** The atlas cell for one built building kind, per team; null when unknown. */
@@ -282,6 +301,12 @@ const BLD = {
     cost: { wood: 100 }, time: 35, pop: 0,
     trains: [],
     attack: 0, meleeArmor: 0, pierceArmor: 7, lineOfSight: 6, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 0, field: 170,
+  },
+  archery_range: {
+    label: 'Archery Range', hp: 1500, w: 2, h: 2,
+    cost: { wood: 175 }, time: 50, pop: 0,
+    trains: ['archer'],
+    attack: 0, meleeArmor: 1, pierceArmor: 8, lineOfSight: 6, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 10,
   },
 };
 
@@ -1768,6 +1793,7 @@ function attachInput(Game, d) {
     if (k === 'l') { Game.placing = Game.placing === 'lumber_camp' ? null : 'lumber_camp'; return; }
     if (k === 'g') { Game.placing = Game.placing === 'mining_camp' ? null : 'mining_camp'; return; }
     if (k === 'm') { Game.placing = Game.placing === 'mill' ? null : 'mill'; return; }
+    if (k === 'r') { Game.placing = Game.placing === 'archery_range' ? null : 'archery_range'; return; }
     if (k === 't') { upgradeAge(Game); return; }
     setKey(k, true);
   });

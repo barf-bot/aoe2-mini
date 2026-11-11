@@ -108,6 +108,9 @@ function simulateAndRender(G, Game, realView) {
   const steps = Math.round(SECONDS * 30);
   for (let i = 0; i < steps; i++) G.stepGame(Game, 1 / 30);
   if (villagers[0]) Game.selection = [villagers[0].id];
+  // T4 of the content port: an archer joins the frame through the same factory
+  // train() uses, so the committed preview shows the new atlas cell.
+  if (villagers[0]) G.makeUnit(Game, 'archer', 0, villagers[0].x + 26, villagers[0].y + 14);
   G.renderFrame(Game);
 
   const png = realView.toBuffer('image/png');

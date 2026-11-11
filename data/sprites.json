@@ -1,5 +1,11 @@
 {
   "buildings": {
+    "archery_range": {
+      "file": {
+        "blue": "buildings/archery_range_blue.png",
+        "red": "buildings/archery_range_red.png"
+      }
+    },
     "barracks": {
       "file": {
         "blue": "buildings/barracks_blue.png",
@@ -49,6 +55,30 @@
     "units": "Internet Archive: \"All Bitmaps of All Units.zip\" (AoE2 DE graphics rip)"
   },
   "units": {
+    "archer": {
+      "anims": {
+        "attack_a": {
+          "blue": "units/archer/attack_a_blue.png",
+          "red": "units/archer/attack_a_red.png"
+        },
+        "attack_b": {
+          "blue": "units/archer/attack_b_blue.png",
+          "red": "units/archer/attack_b_red.png"
+        },
+        "idle": {
+          "blue": "units/archer/idle_blue.png",
+          "red": "units/archer/idle_red.png"
+        },
+        "walk": {
+          "blue": "units/archer/walk_blue.png",
+          "red": "units/archer/walk_red.png"
+        }
+      },
+      "draw": {
+        "h": 20,
+        "w": 20
+      }
+    },
     "militia": {
       "anims": {
         "attack_a": {

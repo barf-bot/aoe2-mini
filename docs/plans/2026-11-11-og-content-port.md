@@ -141,15 +141,17 @@ HD/DE files later is a directory replacement and nothing else.
     wiring checks (§5c) pass unmodified; visual check = `node tools/render-preview.js` +
     look at `preview.png`.
 
-- [ ] T4: The archer line, straight from the same table
+- [x] T4: The archer line, straight from the same table
   - files: `data/units.json` (+ `archer` ← id 4 `ARCHR`: hp 30, atk 4, armour 0/0,
     `AttackDelaySeconds` 0.35, reload 2 s, range 4, min 0, accuracy 80 %, speed 0.96
     tiles/s, cost 25 wood + 45 gold, train 35 s), `data/buildings.json` (+ `archery_range`
     ← id 87 `ARRG`: hp 1500, 175 wood, 2x2, `trains:['archer']`), `index.html` §1 (`KINDS`
-    121-126, `BLD` 215-230), §5 hotkey table + `commandsHtml` (1537-1573), §6 build
-    delegate, `data/sprites.json` + `SPRITES.archer` + `BLD_SPRITES.archery_range`
-    (regen via `tools/gen-atlas.js`), `assets/sprites.png`, `preview.png`,
-    `tools/headless-check.js` §8 (792-810), §11 (959-1013)
+    123-145, `BLD` 262-311), §5 hotkey table (1790-1797) + `commandsHtml` (1618-1653),
+    §6 build delegate (1809), `data/sprites.json` + `SPRITES.archer` +
+    `BLD_SPRITES.archery_range` (regen via `tools/gen-atlas.js`), `assets/sprites.png`,
+    `preview.png` (+ `tools/render-preview.js`: it also places one archer in the frame so
+    the committed preview shows the new cell), `tools/headless-check.js` §8 (817-864),
+    §11 (1015-1081)
   - change: add the two rows, regenerate §1 with `check-stats --write` and the atlas, wire
     the new building the same way the camps are wired (hotkey `R`, `data-act="build"`
     button, delegate → `build(Game,'archery_range',…)`); `BLD.barracks.trains` stays

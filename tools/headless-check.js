@@ -833,6 +833,36 @@ const houseTrain = AoE2.train(Game, house, 'villager');
 check(houseTrain === undefined && Game.toastMsg === 'Villager needs a House',
   'train: houses cannot train', JSON.stringify(Game.toastMsg));
 
+/* T4 of the 2026-11-11 content port: the archer line. A throwaway state (the
+ * §7c pattern) funded with exactly the two table prices - 175 wood to raise the
+ * range, 25 wood + 45 gold to train the archer - so no cost can pass by
+ * accident, and the trained unit is checked against KINDS.archer, not literals. */
+const ar = AoE2.createState();
+const arVill = ar.units.find((u) => u.team === 0 && u.kind === 'villager');
+ar.selection = [arVill.id];
+ar.res[0].wood = dataBuildings.buildings.archery_range.cost.wood + AoE2.KINDS.archer.cost.wood;
+const arSpot = freeSpotAround(ar.world, ar, tOf(arVill.x), tOf(arVill.y), 2, 2, 8);
+const arRng = arSpot && AoE2.build(ar, 'archery_range', arSpot.tx * AoE2.CFG.TILE + 4,
+                                   arSpot.ty * AoE2.CFG.TILE + 4);
+check(!!arRng && arRng.w === 2 && arRng.h === 2 &&
+      ar.res[0].wood === AoE2.KINDS.archer.cost.wood,
+  'build: an Archery Range raises its table 2x2 footprint for exactly 175 wood',
+  arRng ? arRng.w + 'x' + arRng.h + ' wood=' + ar.res[0].wood : 'placement failed');
+if (arRng) arRng.built = 1;
+const arGoldBt = ar.res[0].gold;
+const arQueued = arRng && AoE2.train(ar, arRng, 'archer');
+check(arQueued === arRng && arRng.queue.length === 1 && arRng.queue[0].kind === 'archer' &&
+      arRng.queue[0].t === AoE2.KINDS.archer.time && ar.res[0].wood === 0 &&
+      ar.res[0].gold === arGoldBt - AoE2.KINDS.archer.cost.gold,
+  'train: the Archery Range queues the Archer its trains column names',
+  arRng ? JSON.stringify(arRng.queue) + ' wood=' + ar.res[0].wood : 'no range');
+for (let i = 0; i < Math.ceil(AoE2.KINDS.archer.time / DT) + 2; i++) AoE2.stepSim(ar, DT);
+const arUnit = ar.units.find((u) => u.team === 0 && u.kind === 'archer');
+check(!!arUnit && arUnit.hp === 30 && arUnit.maxHp === 30 && arUnit.atk === 4 &&
+      arUnit.atkTime === 0.35 && arUnit.speed === 21,
+  'train: a finished Archery Range trains an Archer with the table\'s stats',
+  arUnit ? 'hp=' + arUnit.hp + ' atk=' + arUnit.atk + ' atkTime=' + arUnit.atkTime : 'no archer');
+
 /* ---- 9. combat ------------------------------------------------------ */
 const foe = Game.units.find(u => u.team === 1 && u.kind === 'villager');
 const scout = Game.units.find(u => u.team === 0 && u.kind === 'militia');
@@ -990,6 +1020,18 @@ button.setAttribute('data-act', 'build');
 button.setAttribute('data-arg', 'farm');
 Game.dom.commands.listeners.click.forEach(fn => fn({ target: button }));
 check(Game.placing === 'farm', 'ui: clicking the Farm button arms placement', String(Game.placing));
+// The archer line's building (T4): offered to a villager selection, and its
+// button arms placement through the same delegated listener as every other.
+Game.selection = blueVill().map(u => u.id);
+const cmdRng = AoE2.commandsHtml(Game);
+const rngBtn = stubEl('button', 'btnRng', 60, 24);
+rngBtn.setAttribute('data-act', 'build');
+rngBtn.setAttribute('data-arg', 'archery_range');
+Game.dom.commands.listeners.click.forEach(fn => fn({ target: rngBtn }));
+check(cmdRng.includes('data-act="build" data-arg="archery_range"') &&
+      Game.placing === 'archery_range',
+  'ui: clicking the Archery Range button arms placement',
+  'offered=' + cmdRng.includes('data-arg="archery_range"') + ' placing=' + Game.placing);
 // and the Demolish button (phase-2 T5): dispatched through the same delegated
 // listener, it demolishes the selected finished house from §7 for no refund.
 const uiHouse = Game.buildings.find(x => x.team === 0 && x.kind === 'house' && x.built >= 1);
