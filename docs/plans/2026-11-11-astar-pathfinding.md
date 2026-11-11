@@ -1,6 +1,6 @@
 # A\* pathfinding — walk around, not into (round: movement)
 
-Status: in progress
+Status: done
 
 ## Design
 
