@@ -1395,7 +1395,9 @@ function orderForUnit(Game, u, wx, wy) {
 
 /** Right-click: hand an order to everything selected — the fighters take the fight
  *  and the movers march on formation tiles, resolved once for the whole group
- *  instead of one scattered destination per unit (T4). */
+ *  instead of one scattered destination per unit (T4). A member the click cannot
+ *  order at all (a point off the map, or a solid tile with no standing spot) is
+ *  skipped: the order and the formation slot he already has stay as they were. */
 function issueOrder(Game, wx, wy) {
   const sel = selectedUnits(Game);
   if (!sel.length) return;
@@ -1418,6 +1420,7 @@ function issueOrder(Game, wx, wy) {
   let n = 0;
   sel.forEach((u, i) => {
     const o = want[i];
+    if (!o) return;                                      // nothing to order him to: keep his order
     const slot = o.kind === 'move' ? slotOf[u.id] || null : null;  // a fight or a site owns no tile
     u.order = slot ? { ...o, x: slot.x, y: slot.y } : o;           // walk onto the tile he was given
     u.slot = slot;

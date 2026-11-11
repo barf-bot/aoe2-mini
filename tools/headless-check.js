@@ -1570,6 +1570,35 @@ check(pick.order.kind === 'attack' && pick.order.target === enemyNear.id,
 AoE2.issueOrder(Game, pick.x + 44, pick.y);
 check(['move', 'harvest'].indexOf(pick.order.kind) >= 0, 'command: right-click on ground orders move/gather',
   pick.order.kind);
+/* T4 regression: the rewritten issueOrder read `want[i]` for every member of the
+   selection, so a click that resolves to NO order at all — off the map, or a solid
+   tile with no standing spot — threw inside the contextmenu handler and would have
+   replaced that member's live order (and his formation slot) with `null`. The rule
+   before T4 was `if (!o) continue;`: refuse him, keep what he had, and do not ping
+   for an order nobody received. Two villagers are ordered properly first so the
+   order and the slots being kept are real ones. */
+const refusalF = (() => {
+  const st = flatState();
+  const vs = st.units.filter((u) => u.team === 0 && u.kind === 'villager').slice(0, 2);
+  const V = { x: tOf(vs[0].x), y: tOf(vs[0].y) };
+  const pad = [[2, 0], [-2, 0], [0, 2], [0, -2]].map(([dx, dy]) => ({ tx: V.x + dx, ty: V.y + dy }))
+    .find((t) => AoE2.siteFree(st, t.tx, t.ty, 1, 1));
+  if (!pad) return null;
+  const at = tileCentre(st, pad.tx, pad.ty);
+  st.selection = vs.map((u) => u.id);
+  AoE2.issueOrder(st, at.x, at.y);                     // a legal group order: slots assigned
+  const snap = (u) => `${JSON.stringify(u.order)}|${u.slot ? u.slot.tx + ',' + u.slot.ty : 'none'}`;
+  const had = vs.map(snap), ping = st.pingAt;
+  let threw = null;
+  try { AoE2.issueOrder(st, -1, at.y); } catch (e) { threw = e; }   // then a click off the map
+  return { had, ping, threw, now: vs.map(snap), nowPing: st.pingAt };
+})();
+check(!!refusalF && !refusalF.threw && refusalF.now.join(' ') === refusalF.had.join(' ') &&
+      refusalF.nowPing === refusalF.ping,
+  'command: a click that orders nobody is refused, not written',
+  !refusalF ? 'no two villagers with a free tile two steps away'
+    : refusalF.threw ? `issueOrder off the map threw ${refusalF.threw.message}`
+      : `${refusalF.now.join(' ')} (was ${refusalF.had.join(' ')}), pingAt ${refusalF.nowPing} (was ${refusalF.ping})`);
 doc.fire('keydown', { key: 'h', target: view });
 check(Game.placing === 'house', 'command: hotkey h arms house placement', String(Game.placing));
 doc.fire('keydown', { key: 'Escape', target: view });

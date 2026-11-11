@@ -103,7 +103,7 @@ and every sprite frame from the ripped graphics (f3ff6e6 → 08ca6a8), and the h
 ### A\* pathfinding — walk around, not into (T1–T5) — plan `docs/plans/2026-11-11-astar-pathfinding.md`
 
 Movement stops being straight-line: orders route over the tile grid and squads arrive in
-ranks (a1bcebd → 452a269); the harness went 137 → 155 checks across the plan.
+ranks (a1bcebd → 452a269); the harness went 137 → 156 checks across the plan.
 
 - **T1 — `findPath`, the A\* core (b24d020):** an 8-connected, uniform-cost A\* over the
   tiles `walkable` allows — no diagonal squeezed between two solid tiles, `CFG.ASTAR_MAX_NODES`
@@ -134,6 +134,11 @@ ranks (a1bcebd → 452a269); the harness went 137 → 155 checks across the plan
   `pathfinding` sub-block and a `### Pathfinding` section), `docs/ROADMAP.md` (P0.2 shipped)
   and `AGENTS.md` re-pointed at the final file — every `index.html:NNN` reference and section
   range re-measured through `tools/audit-line-refs.js`.
+- **review:** `issueOrder` clobbered a selected unit with `u.order = null` — and threw on the
+  way — whenever the click resolved to no order for him (a point off the map, or a solid tile
+  with no standing spot); the pre-T4 `if (!o) continue;` is back, so such a unit keeps the
+  order and the formation slot he had and the group does not ping for an order nobody
+  received. §10 gains the check (155 → 156 checks), and the docs it shifted are re-pointed.
 
 ### Added
 - **Building sprites (task 5):** every built building now blits a team-coloured atlas

@@ -100,7 +100,7 @@ a bug.
   `index.html:173`), the frames ripped from the AoE2 art and recoloured per team, drawn at
   the size the manifest authors (villager 20×20, militia 22×22, archer 20×20) and mirrored
   when the unit walks left; `tools/gen-atlas.js` regenerates the PNG from
-  `data/sprites.json`, and `unitAnim` (`index.html:1779`) picks the cell from the unit's order.
+  `data/sprites.json`, and `unitAnim` (`index.html:1782`) picks the cell from the unit's order.
 
 ## Buildings (`BLD`)
 
@@ -120,18 +120,18 @@ a bug.
   Center (and food also to farms) when the dedicated building doesn't exist. A farm
   never receives its own harvest. Farms feed 170 food (`BLD.farm.field`) before going
   idle; the mill tracks `field` the same way.
-- Placement needs a free, walkable footprint (`siteFree`, `index.html:1516`) and enough
-  resources. The builder (`pickBuilder` via `build`, `index.html:1456`) is the nearest
+- Placement needs a free, walkable footprint (`siteFree`, `index.html:1519`) and enough
+  resources. The builder (`pickBuilder` via `build`, `index.html:1459`) is the nearest
   idle villager in the current selection, else the nearest idle team-0 villager: a
   villager already building a finished-or-missing building or on a harvest/move order is
   free (the order is abandoned), while one assigned to a building with `built < 1` is
   never yanked off — so each placement gets its own builder and parallel construction
   works. With no idle villager the placement is refused (`All villagers are building`).
   The building's HP scales with progress until complete.
-- Cancelling and demolishing (phase 2, T3/T4): `cancelConstruction` (`index.html:1481`)
+- Cancelling and demolishing (phase 2, T3/T4): `cancelConstruction` (`index.html:1484`)
   ends an in-progress site, refunding `floor(cost × CFG.CANCEL_REFUND)` — **80%** of the
   defined cost whatever the progress — and frees its builders; `demolish`
-  (`index.html:1500`) removes a finished own-team building with no refund, refuses Town
+  (`index.html:1503`) removes a finished own-team building with no refund, refuses Town
   Centers (`Cannot demolish a Town Center`) and buildings with a training queue
   (`Still training`). The footer offers `Cancel` for a foundation and, once the
   building is finished, its train buttons plus `Demolish` for a non-Town Center building (T5).
@@ -161,8 +161,8 @@ leave the world through `removeBuilding` (`index.html:672`), so all three count.
 `Game.result` set to `'victory'` (enemy keep gone) or `'defeat'` (yours gone), `stepSim`
 (`index.html:734`) stops after the clock tick: units, build sites, training queues, arrows
 in flight and the enemy AI freeze while the camera and rendering keep working. The `#result`
-overlay — markup from `resultHtml` (`index.html:1972`), styled in the head — names the result
-and offers a `New game` button wired to `resetGame` (`index.html:2285`), which rebuilds the
+overlay — markup from `resultHtml` (`index.html:1975`), styled in the head — names the result
+and offers a `New game` button wired to `resetGame` (`index.html:2288`), which rebuilds the
 same seeded start and clears `result` back to `null`. No auto-restart, no countdown.
 
 ## Camera & controls
