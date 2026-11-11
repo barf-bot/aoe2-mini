@@ -109,22 +109,26 @@ HD/DE files later is a directory replacement and nothing else.
     table (25 hp ÷ 4 dmg per 0.5 s → dead in ~3.5 s) rather than retuned by eye; §7b's camp
     fixtures are funded from `BLD` so the lumber/mining builds still afford.
 
-- [ ] T3: Build `assets/sprites.png` from the ripped frames instead of drawing it
+- [x] T3: Build `assets/sprites.png` from the ripped frames instead of drawing it
   - files: `data/sprites/` (new: the vendored PNG frames), `data/sprites.json` (the cell
     manifest), `tools/gen-atlas.js` (replace the `ART`/`BLD_ART` grids, 66-323, with
-    `ASSET_DIR = data/sprites` + manifest compositing), `index.html` §1 (`SPRITE_SHEET`
-    141, `SPRITES` 142-171 + its comment 128-140, `BLD_SPRITES` 190-205, `WORK_ANIM` 175),
-    `AGENTS.md` (the one line: the atlas is generated from `data/sprites/`, the game still
-    ships exactly one image), `README.md` (gen-atlas row), `preview.png`
+    `ASSET_DIR = data/sprites` + manifest compositing), `index.html` §1 (its comment
+    140-154, `SPRITE_SHEET` 155-158, `SPRITES` 159-189, `WORK_ANIM` 193-199,
+    `BLD_SPRITES` 216-232), `AGENTS.md` (the one line: the atlas is generated from
+    `data/sprites/`, the game still ships exactly one image), `README.md` (gen-atlas row),
+    `preview.png`
   - change: convert the ripped BMPs to PNG frames and vendor them — villager
     `Standard` (idle + walk) and the three work animations `WORK_ANIM` already names
     (`Farm`, `Woodcutter`, `Mine`, a/b pair each) from `Villager/Male/…`, militia
-    `Stand Ground`/`Walk`/`Attack` a/b — recoloured per team by mapping the source's
+    `Stand Ground`/`Walk`/`Attack` a/b, plus the building frames from the buildings rip
+    (`farm` excepted: that set ships no farm bitmap, so the v2 procedural cell is vendored
+    as a PNG) — recoloured per team by mapping the source's
     player-colour ramp onto `TEAM[t].dark/main/light` (keeps gen-atlas's "team colours come
     from `TEAM`, a recolour is one edit" property); `data/sprites.json` maps
     kind → anim → `[blue, red]` files and is the only place the atlas layout is authored;
     gen-atlas composes the sheet, keeps `--out`/the sha256 print/the decode+empty-cell
-    guard, and rewrites `SPRITE_SHEET`/`SPRITES`/`WORK_ANIM` between their banners with
+    guard, and rewrites `SPRITE_SHEET`/`SPRITES`/`WORK_ANIM`/`BLD_SPRITES` between their
+    banners with
     `sw/sh` = frame size and `dw/dh` = the current on-screen size; `preview.png` is
     regenerated through the real renderer.
   - done when: `node tools/gen-atlas.js` exits 0 with no empty cell and the written PNG

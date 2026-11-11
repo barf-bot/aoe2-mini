@@ -1,23 +1,27 @@
 #!/usr/bin/env node
 /* =========================================================================
-   gen-atlas.js -- render assets/sprites.png from the sprite table in the game.
+   gen-atlas.js -- compose assets/sprites.png from the art in data/sprites.
 
    WHERE THINGS LIVE, so art and code cannot drift:
-     - the atlas layout (SPRITE_SHEET, SPRITES, spriteFor, BLD_SPRITES,
-       bldSpriteFor) is in index.html: that is the single source of truth for
-       which cell holds which frame -- unit rows y0-47, built-building rows
-       below -- and tools/headless-check.js asserts it covers every unit kind
-       x team and every BLD kind x team, so new content forces new art.
-     - the pixels (ART / BLD_ART below) live here and nowhere else: one 12x12
-       grid per unit kind x animation (villager idle/walk/farm/chop/mine frames,
-       militia idle/walk/attack frames) blown up into the 24x24 cell, and one
-       11x11 grid per building kind (cells 66/44/22 px, all multiples of 11)
-       blown up 6x/4x/2x -- one colour per art pixel.
-     - team colours come from TEAM in index.html, so a recolour is one edit.
-
+     - ASSET_DIR (data/sprites) is the game's entire art library: one PNG per
+       frame x team, vendored from the ripped AoE2 graphics documented in
+       data/README.md. It is the single asset source -- replace the files there
+       (or point ASSET_DIR at a different folder) and re-run; index.html holds
+       no pixels, and the procedural pixel grids this file used to draw units
+       with are gone.
+     - data/sprites.json is the manifest: kind -> animation -> the blue/red
+       files, the size each unit kind is drawn at, and WORK_ANIM. It is the only
+       place the atlas layout is authored.
+     - index.html's SPRITE_SHEET, SPRITES, WORK_ANIM and BLD_SPRITES are
+       generated from the manifest between their `// GENERATED FROM
+       data/sprites.json` banners -- the same scheme tools/check-stats.mjs uses
+       for CFG/KINDS/BLD -- so the table the game renders from can never
+       disagree with the sheet on disk. tools/headless-check.js re-checks that
+       the tables cover every KINDS/BLD kind x team.
    usage: node tools/gen-atlas.js [--out assets/sprites.png]
-   exits non-zero if the written PNG does not decode at the table's size or any
-   cell is empty; the sha256 it prints is stable for identical input.
+   exits non-zero when a manifest file is missing, a kind in index.html has no
+   art, a blue/red pair is mis-sized, the written PNG does not decode at the
+   table's size or any cell is empty; the sha256 it prints is stable.
    ========================================================================= */
 'use strict';
 
@@ -27,6 +31,11 @@ const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..');
 const HTML = path.join(ROOT, 'index.html');
+const ASSET_DIR = path.join(ROOT, 'data', 'sprites');      // the asset source
+const MANIFEST = path.join(ROOT, 'data', 'sprites.json');  // the authored layout
+const BANNER = '// GENERATED FROM data/sprites.json';
+
+const fail = (msg) => { console.error('FAIL  ' + msg); process.exit(1); };
 
 /* --------------------------- canvas backend ---------------------------- */
 function loadCanvas() {
@@ -47,277 +56,184 @@ if (!napi) {
 }
 
 /* ------------------- the frame table, read from index.html ------------- */
+let tmpSeq = 0;
 function gameSurface() {
   const html = fs.readFileSync(HTML, 'utf8');
   const m = html.match(/<script>([\s\S]*?)<\/script>/);
-  if (!m) { console.error('FAIL  no <script> block found in ' + HTML); process.exit(1); }
-  const tmp = path.join(__dirname, '.extracted-atlas.js');
+  if (!m) fail('no <script> block found in ' + HTML);
+  const tmp = path.join(__dirname, `.extracted-atlas-${process.pid}-${tmpSeq++}.js`);
   fs.writeFileSync(tmp, m[1]);
   try { return require(tmp); } finally { fs.unlinkSync(tmp); }
 }
+
+/** Replace one generated block (`// GENERATED FROM ...` + `const NAME = {...};`)
+ *  with its new text; the same contract tools/check-stats.mjs uses for §1. */
+function replaceBlock(html, name, rendered) {
+  const re = new RegExp(`(^|\\n)(?:// GENERATED FROM [^\\n]*\\n)?const ${name} = \\{[\\s\\S]*?\\};`);
+  const m = re.exec(html);
+  if (!m) fail(`no \`const ${name} = { ... };\` block found in index.html`);
+  // m[1] is the newline the match consumed; re-emitting it keeps the block on its own line.
+  return html.slice(0, m.index) + m[1] + rendered + html.slice(m.index + m[0].length);
+}
+
+/* ------------------------------ the plan ------------------------------- */
 const G = gameSurface();
-if (!G || !G.SPRITE_SHEET || !G.SPRITES || typeof G.spriteFor !== 'function' ||
-    !G.BLD_SPRITES || typeof G.bldSpriteFor !== 'function') {
-  console.error('FAIL  index.html does not export SPRITE_SHEET / SPRITES / spriteFor'
-    + ' / BLD_SPRITES / bldSpriteFor');
-  process.exit(1);
+if (!G || !G.KINDS || !G.BLD || !G.CFG || typeof G.spriteFor !== 'function' ||
+    typeof G.bldSpriteFor !== 'function') {
+  fail('index.html does not export KINDS / BLD / CFG / spriteFor / bldSpriteFor');
+}
+const M = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+
+/** One frame: resolve the manifest path against ASSET_DIR and load it. */
+async function frameFor(file) {
+  const abs = path.join(ASSET_DIR, file);
+  if (!fs.existsSync(abs)) fail(`data/sprites.json names ${file}, but ${abs} does not exist`);
+  const img = await napi.loadImage(abs);
+  return { file, img, w: img.width, h: img.height };
 }
 
-/* ------------------------------ the art ------------------------------- */
-/* Art is authored on a GRID x GRID grid (12) and blown up into the cell: one
- * art pixel = 2 px in a 24x24 cell. Shapes are rects drawn back to front --
- * outline ring first, colours laid inside it -- so a frame's silhouette is
- * always rectangular-clean (hand-typed per-row strings kept going ragged).
- * Colours are slots: K outline, M/L/D team colours, S skin, G steel, W wood.
- * Both figures face right; drawUnits mirrors them when a unit walks left.
- */
-const GRID = 12;
-/* Villager bodies are civilian from v2 on: bare head with hair (no helmet),
- * plain tunic, tool in the right hand per work frame. The walking frames
- * stride; work frames alternate a (tool raised) / b (tool landed) so the
- * animation lives in the art, not in code-side offsets. */
-const ART = {
-  villager: {
-    idle: [
-      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
-      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
-    ],
-    walk: [
-      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
-      [2, 10, 2, 2, 'D'], [8, 10, 2, 2, 'D'],                     // striding legs
-    ],
-    farm_a: [                                                       // sickle raised
-      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
-      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
-      [8, 5, 1, 2, 'S'], [9, 3, 2, 1, 'G'], [10, 4, 1, 1, 'G'],   // arm + sickle curve
-    ],
-    farm_b: [                                                       // sickle swung down
-      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
-      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
-      [8, 8, 1, 1, 'S'], [9, 8, 2, 1, 'G'],                        // arm down, blade at hip
-    ],
-    chop_a: [                                                       // axe raised
-      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
-      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
-      [8, 6, 1, 1, 'S'], [9, 2, 1, 6, 'W'], [8, 1, 2, 1, 'G'],    // shaft + axe head
-    ],
-    chop_b: [                                                       // axe at the stump
-      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
-      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
-      [8, 6, 1, 3, 'S'], [8, 9, 3, 1, 'G'], [9, 9, 1, 2, 'W'],    // blade low, shaft down
-    ],
-    mine_a: [                                                       // pickaxe raised
-      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
-      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
-      [8, 6, 1, 1, 'S'], [9, 3, 1, 5, 'W'], [7, 2, 4, 1, 'G'],    // wide pick head
-    ],
-    mine_b: [                                                       // pickaxe at the ore
-      [3, 0, 6, 6, 'K'], [4, 1, 4, 1, 'H'], [4, 2, 4, 3, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 6, 8, 4, 'K'], [3, 7, 6, 2, 'M'], [7, 7, 1, 2, 'D'],
-      [3, 10, 2, 2, 'D'], [7, 10, 2, 2, 'D'],
-      [8, 7, 1, 2, 'S'], [9, 8, 1, 3, 'W'], [8, 8, 3, 1, 'G'],    // head striking low
-    ],
-  },
-  militia: {
-    idle: [
-      // helm: outline, steel dome, sheen, face slit with an eye
-      [3, 0, 6, 5, 'K'], [4, 1, 4, 2, 'G'], [4, 1, 4, 1, 'L'], [4, 3, 4, 1, 'S'], [6, 3, 1, 1, 'K'],
-      // body: outline, tunic, shaded right column, belt
-      [2, 5, 8, 5, 'K'], [3, 6, 6, 3, 'M'], [7, 6, 1, 3, 'D'], [3, 8, 6, 1, 'D'],
-      // legs
-      [3, 10, 2, 2, 'K'], [7, 10, 2, 2, 'K'],
-      // sword: blade in the right hand, crossguard
-      [10, 2, 1, 7, 'G'], [9, 8, 2, 1, 'K'],
-    ],
-    walk: [
-      [3, 0, 6, 5, 'K'], [4, 1, 4, 2, 'G'], [4, 1, 4, 1, 'L'], [4, 3, 4, 1, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 5, 8, 5, 'K'], [3, 6, 6, 3, 'M'], [7, 6, 1, 3, 'D'], [3, 8, 6, 1, 'D'],
-      [2, 10, 2, 2, 'K'], [7, 10, 3, 2, 'K'],                      // striding legs
-      [10, 2, 1, 7, 'G'], [9, 8, 2, 1, 'K'],
-    ],
-    attack_a: [                                                     // sword raised
-      [3, 0, 6, 5, 'K'], [4, 1, 4, 2, 'G'], [4, 1, 4, 1, 'L'], [4, 3, 4, 1, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 5, 8, 5, 'K'], [3, 6, 6, 3, 'M'], [7, 6, 1, 3, 'D'], [3, 8, 6, 1, 'D'],
-      [3, 10, 2, 2, 'K'], [7, 10, 2, 2, 'K'],
-      [9, 0, 1, 6, 'G'], [8, 5, 2, 1, 'K'],                        // blade up behind the guard
-    ],
-    attack_b: [                                                     // sword thrust forward
-      [3, 0, 6, 5, 'K'], [4, 1, 4, 2, 'G'], [4, 1, 4, 1, 'L'], [4, 3, 4, 1, 'S'], [6, 3, 1, 1, 'K'],
-      [2, 5, 8, 5, 'K'], [3, 6, 6, 3, 'M'], [7, 6, 1, 3, 'D'], [3, 8, 6, 1, 'D'],
-      [3, 10, 2, 2, 'K'], [7, 10, 2, 2, 'K'],
-      [9, 6, 3, 1, 'G'], [8, 5, 1, 3, 'K'],                        // blade flat out, guard
-    ],
-  },
-};
-const SKIN = '#e8c39a';
-const STEEL = '#cfd6e2';
-const WOOD = '#8a6a3f';
-const HAIR = '#6a4a2f';
-const FIELD = '#7d7a3d';   // farmland green, shared with the procedural farm in index.html
-
-/** Colour slot -> hex for one frame: team colours come from index.html. */
-function paletteFor(kind, team) {
-  const t = G.TEAM[team];
-  return {
-    K: kind === 'militia' ? '#262626' : '#1f1f1f',
-    M: t.main, D: t.dark, L: t.light,
-    S: SKIN, G: STEEL, W: WOOD, H: HAIR, F: FIELD,
-  };
-}
-
-/* Building art sits on an 11x11 grid (every footprint cell is a multiple of
- * 11 px: 66/44/22) and is authored once per kind, recoloured via paletteFor
- * like the unit art. */
-const BLD_GRID = 11;
-const BLD_ART = {
-  town_center: [
-    [0, 0, 11, 11, 'K'],
-    [1, 1, 9, 9, 'M'],                                  // keep walls
-    [1, 1, 9, 3, 'L'],                                  // upper storey
-    [2, 1, 1, 1, 'K'], [4, 1, 1, 1, 'K'],               // crenellation notches
-    [6, 1, 1, 1, 'K'], [8, 1, 1, 1, 'K'],
-    [5, 4, 1, 4, 'W'],                                  // great door
-    [2, 6, 1, 1, 'G'], [8, 6, 1, 1, 'G'],               // window slits
-    [1, 9, 9, 1, 'D'],                                  // shaded base
-  ],
-  house: [
-    [0, 0, 11, 11, 'K'],
-    [1, 1, 9, 3, 'L'], [5, 1, 1, 3, 'D'],               // pitched roof + ridge
-    [1, 4, 9, 1, 'D'],                                  // eave shadow
-    [2, 5, 7, 3, 'M'], [3, 6, 2, 2, 'W'], [8, 5, 1, 1, 'G'],  // walls, door, window
-    [1, 8, 9, 1, 'D'],                                  // ground shade
-  ],
-  farm: [
-    [0, 0, 11, 11, 'K'],
-    [1, 1, 9, 9, 'F'],                                  // field
-    [1, 2, 9, 1, 'W'], [1, 4, 9, 1, 'W'],               // furrows
-    [1, 6, 9, 1, 'W'], [1, 8, 9, 1, 'W'],
-  ],
-  barracks: [
-    [0, 0, 11, 11, 'K'],
-    [1, 1, 9, 2, 'L'],                                  // roof band
-    [2, 3, 7, 6, 'M'],                                  // facade
-    [4, 6, 3, 3, 'D'],                                  // dark entry hall
-    [5, 4, 1, 2, 'G'],                                  // hung blade
-    [1, 9, 9, 1, 'D'],                                  // base
-  ],
-  mill: [
-    [0, 0, 11, 11, 'K'],
-    [1, 1, 9, 2, 'D'], [5, 1, 1, 2, 'L'],               // dark roof + axle
-    [2, 3, 7, 5, 'M'],                                  // tower body
-    [3, 5, 5, 2, 'F'],                                  // grain floor
-    [1, 8, 9, 1, 'L'],                                  // bright base ring
-  ],
-  lumber_camp: [
-    [0, 0, 11, 11, 'K'],
-    [1, 1, 9, 2, 'M'],                                  // team lean-to roof
-    [2, 3, 7, 5, 'W'],                                  // stacked log walls
-    [1, 8, 9, 2, 'D'],                                  // shaded base
-  ],
-  mining_camp: [
-    [0, 0, 11, 11, 'K'],
-    [1, 1, 9, 3, 'L'], [3, 1, 1, 3, 'D'],               // striped tent canvas
-    [5, 1, 1, 3, 'D'], [7, 1, 1, 3, 'D'],
-    [2, 4, 6, 4, 'M'],                                  // tent body
-    [8, 6, 2, 3, 'G'],                                  // ore pile beside it
-  ],
-};
-
-const fail = (msg) => { console.error('FAIL  ' + msg); process.exit(1); };
-
-/** Paint one frame's rects into its cell; throws on geometry that cannot tile.
- *  grid defaults to the unit GRID (12); buildings pass their BLD_GRID (11). */
-function paintCell(g, frame, rects, pal, label, grid) {
-  const U = grid || GRID;
-  if (frame.sw !== frame.sh || frame.sw % U !== 0) {
-    fail(`${label}: cell ${frame.sw}x${frame.sh} is not a whole multiple of the `
-      + `${U}x${U} art grid`);
+/** Measure both teams of one frame; a recolour must not change the size. */
+async function pairFor(kind, what, files) {
+  const [blue, red] = await Promise.all([frameFor(files.blue), frameFor(files.red)]);
+  if (blue.w !== red.w || blue.h !== red.h) {
+    fail(`${kind}.${what}: blue frame is ${blue.w}x${blue.h}, red is ${red.w}x${red.h}`);
   }
-  const u = frame.sw / U;
-  for (const [x, y, w, h, slot] of rects) {
-    const colour = pal[slot];
-    if (colour === undefined) fail(`${label}: rect ${x},${y} ${w}x${h} uses unknown slot '${slot}'`);
-    if (x < 0 || y < 0 || x + w > U || y + h > U) {
-      fail(`${label}: rect ${x},${y} ${w}x${h} falls outside the ${U}x${U} grid`);
+  return { blue, red, w: blue.w, h: blue.h };
+}
+
+async function main() {
+  const argv = process.argv.slice(2);
+  const arg = (name, dflt) => { const i = argv.indexOf('--' + name); return i === -1 ? dflt : argv[i + 1]; };
+  const OUT = path.resolve(arg('out', path.join(ROOT, 'assets', 'sprites.png')));
+
+  /* --- every unit kind in KINDS needs its anims, every BLD kind a frame --- */
+  for (const kind of Object.keys(G.KINDS)) {
+    if (!M.units[kind]) fail(`KINDS.${kind} has no entry in data/sprites.json`);
+  }
+  for (const kind of Object.keys(M.units)) {
+    if (!G.KINDS[kind]) fail(`data/sprites.json has a unit kind '${kind}' that KINDS lacks`);
+  }
+  for (const kind of Object.keys(G.BLD)) {
+    if (!M.buildings[kind]) fail(`BLD.${kind} has no entry in data/sprites.json`);
+  }
+  for (const kind of Object.keys(M.buildings)) {
+    if (!G.BLD[kind]) fail(`data/sprites.json has a building '${kind}' that BLD lacks`);
+  }
+
+  const SPRITES = {};
+  const unitAnims = [];                                  // ordered anim pairs, one row
+  for (const kind of Object.keys(M.units)) {
+    SPRITES[kind] = {};
+    for (const anim of Object.keys(M.units[kind].anims)) {
+      const pair = await pairFor(kind, anim, M.units[kind].anims[anim]);
+      SPRITES[kind][anim] = [pair, pair];                 // cells filled once laid out
+      unitAnims.push({ kind, anim, pair, dw: M.units[kind].draw.w, dh: M.units[kind].draw.h });
     }
-    g.fillStyle = colour;
-    g.fillRect(frame.sx + x * u, frame.sy + y * u, w * u, h * u);
   }
-}
+  const bldEntries = Object.keys(M.buildings).map((kind) => ({
+    kind,
+    pair: null,                                          // filled below (await in loop)
+    dw: G.BLD[kind].w * G.CFG.TILE,
+    dh: G.BLD[kind].h * G.CFG.TILE,
+  }));
+  for (const e of bldEntries) e.pair = await pairFor(`BLD.${e.kind}`, 'built', M.buildings[e.kind].file);
 
-/* ------------------------------- main --------------------------------- */
-const argv = process.argv.slice(2);
-const arg = (name, dflt) => { const i = argv.indexOf('--' + name); return i === -1 ? dflt : argv[i + 1]; };
-const OUT = path.resolve(arg('out', path.join(ROOT, 'assets', 'sprites.png')));
+  /* --- layout: two unit rows (blue, red) above two building rows (blue, red) --- */
+  const rowH = (items) => items.reduce((m, i) => Math.max(m, i.pair.h), 0);
+  const rowW = (items) => items.reduce((s, i) => s + i.pair.w, 0);
+  const unitRowH = rowH(unitAnims), bldRowH = rowH(bldEntries);
+  const sheetW = Math.max(rowW(unitAnims), rowW(bldEntries));
+  const sheetH = 2 * unitRowH + 2 * bldRowH;
+  const sheet = { w: sheetW, h: sheetH };
 
-const sheet = G.SPRITE_SHEET;
-const canvas = napi.createCanvas(sheet.w, sheet.h);
-const g = canvas.getContext('2d');
-g.clearRect(0, 0, sheet.w, sheet.h);
-if ('imageSmoothingEnabled' in g) g.imageSmoothingEnabled = false;
-
-const drawn = [];
-for (const kind of Object.keys(G.KINDS)) {
-  const table = G.SPRITES[kind];
-  if (!table) fail(`KINDS.${kind} has no SPRITES entry in index.html`);
-  if (!ART[kind]) fail(`KINDS.${kind} has no ART entry in tools/gen-atlas.js`);
-  for (const anim of Object.keys(table)) {
-    if (!ART[kind][anim]) fail(`SPRITES.${kind}.${anim} has no ART entry in tools/gen-atlas.js`);
-    table[anim].forEach((frame, team) => {
-      const label = `${kind}/${G.TEAM[team].name}/${anim}`;
-      paintCell(g, frame, ART[kind][anim], paletteFor(kind, team), label);
-      drawn.push({ label, frame });
-    });
+  const cells = [];                                      // every rect we will paint
+  let x = 0;
+  for (const u of unitAnims) {
+    const blue = { sx: x, sy: 0, sw: u.pair.w, sh: u.pair.h, dw: u.dw, dh: u.dh };
+    const red = { sx: x, sy: unitRowH, sw: u.pair.w, sh: u.pair.h, dw: u.dw, dh: u.dh };
+    SPRITES[u.kind][u.anim] = [blue, red];
+    cells.push({ label: `${u.kind}/${u.anim}/Blue`, frame: blue, img: u.pair.blue.img },
+               { label: `${u.kind}/${u.anim}/Red`, frame: red, img: u.pair.red.img });
+    x += u.pair.w;
   }
-}
+  const BLD_SPRITES = {};
+  x = 0;
+  for (const e of bldEntries) {
+    const blue = { sx: x, sy: 2 * unitRowH, sw: e.pair.w, sh: e.pair.h, dw: e.dw, dh: e.dh };
+    const red = { sx: x, sy: 2 * unitRowH + bldRowH, sw: e.pair.w, sh: e.pair.h, dw: e.dw, dh: e.dh };
+    BLD_SPRITES[e.kind] = [blue, red];
+    cells.push({ label: `BLD.${e.kind}/Blue`, frame: blue, img: e.pair.blue.img },
+               { label: `BLD.${e.kind}/Red`, frame: red, img: e.pair.red.img });
+    x += e.pair.w;
+  }
+  const WORK_ANIM = M.workAnim;
 
-for (const kind of Object.keys(G.BLD)) {
-  const cells = G.BLD_SPRITES[kind];
-  if (!cells) fail(`BLD.${kind} has no BLD_SPRITES entry in index.html`);
-  if (!BLD_ART[kind]) fail(`BLD.${kind} has no BLD_ART entry in tools/gen-atlas.js`);
-  cells.forEach((frame, team) => {
-    const label = `BLD.${kind}/${G.TEAM[team].name}`;
-    if (G.bldSpriteFor(kind, team) !== frame) fail(`${label}: cell not returned by bldSpriteFor`);
-    if (frame.dw !== G.BLD[kind].w * G.CFG.TILE || frame.dh !== G.BLD[kind].h * G.CFG.TILE) {
-      fail(`${label}: draws at ${frame.dw}x${frame.dh} but the footprint is `
-        + `${G.BLD[kind].w * G.CFG.TILE}x${G.BLD[kind].h * G.CFG.TILE}px`);
-    }
-    paintCell(g, frame, BLD_ART[kind], paletteFor(kind === 'militia' ? 'militia' : 'villager', team), label, BLD_GRID);
-    drawn.push({ label, frame });
-  });
-}
+  /* --- compose the sheet --- */
+  const canvas = napi.createCanvas(sheetW, sheetH);
+  const g = canvas.getContext('2d');
+  g.clearRect(0, 0, sheetW, sheetH);
+  if ('imageSmoothingEnabled' in g) g.imageSmoothingEnabled = false;
+  for (const c of cells) g.drawImage(c.img, c.frame.sx, c.frame.sy);
+  const png = canvas.toBuffer('image/png');
 
-const png = canvas.toBuffer('image/png');
-fs.mkdirSync(path.dirname(OUT), { recursive: true });
-fs.writeFileSync(OUT, png);
-
-/* -------- verify what we wrote: size + per-cell alpha, from the file ---- */
-napi.loadImage(png).then((img) => {
-  const probe = napi.createCanvas(img.width, img.height);
+  /* --- verify what we wrote: size + per-cell alpha, from the file --------- */
+  const decoded = await napi.loadImage(png);
+  if (decoded.width !== sheetW || decoded.height !== sheetH) {
+    fail(`decoded ${decoded.width}x${decoded.height}, table says ${sheetW}x${sheetH}`);
+  }
+  const probe = napi.createCanvas(decoded.width, decoded.height);
   const pc = probe.getContext('2d');
-  pc.drawImage(img, 0, 0);
+  pc.drawImage(decoded, 0, 0);
   const lines = [];
   let empty = 0;
-  for (const { label, frame } of drawn) {
-    const d = pc.getImageData(frame.sx, frame.sy, frame.sw, frame.sh).data;
+  for (const c of cells) {
+    const d = pc.getImageData(c.frame.sx, c.frame.sy, c.frame.sw, c.frame.sh).data;
     let opaque = 0;
     for (let i = 3; i < d.length; i += 4) if (d[i] > 0) opaque++;
     if (opaque === 0) empty++;
-    lines.push(`  ${label.padEnd(16)} cell ${frame.sx},${frame.sy} ${frame.sw}x${frame.sh}`
-      + `  opaque ${opaque}/${frame.sw * frame.sh}px  draws at ${frame.dw}x${frame.dh}`);
+    lines.push(`  ${c.label.padEnd(26)} cell ${c.frame.sx},${c.frame.sy} ${c.frame.sw}x${c.frame.sh}`
+      + `  opaque ${opaque}/${c.frame.sw * c.frame.sh}px  draws at ${c.frame.dw}x${c.frame.dh}`);
   }
-  const sizeOk = img.width === sheet.w && img.height === sheet.h;
-  console.log(`atlas  ${path.relative(ROOT, OUT)}  ${img.width}x${img.height}`
+  if (empty) fail(`${empty} cell(s) decoded fully transparent\n` + lines.join('\n'));
+  fs.mkdirSync(path.dirname(OUT), { recursive: true });
+  fs.writeFileSync(OUT, png);
+
+  /* --- regenerate the §1 sprite tables from the same data --- */
+  const cellStr = (c) => `{ sx: ${c.sx}, sy: ${c.sy}, sw: ${c.sw}, sh: ${c.sh}, `
+    + `dw: ${c.dw}, dh: ${c.dh} }`;
+  const renderSPRITES = () => 'const SPRITES = {\n' + Object.keys(SPRITES).map((kind) =>
+    `  ${kind}: {\n` + Object.keys(SPRITES[kind]).map((anim) =>
+      `    ${anim}: [${cellStr(SPRITES[kind][anim][0])},\n`
+      + `${' '.repeat(4 + anim.length + 2)}${cellStr(SPRITES[kind][anim][1])}],`).join('\n')
+    + '\n  },').join('\n') + '\n};';
+  const renderBLD = () => 'const BLD_SPRITES = {\n' + Object.keys(BLD_SPRITES).map((kind) =>
+    `  ${kind}: [${cellStr(BLD_SPRITES[kind][0])},\n`
+    + `${' '.repeat(2 + kind.length + 2)}${cellStr(BLD_SPRITES[kind][1])}],`).join('\n') + '\n};';
+  const renderSheet = () => `const SPRITE_SHEET = {\n  w: ${sheetW}, h: ${sheetH},\n};`;
+  const renderWork = () => 'const WORK_ANIM = {\n'
+    + Object.keys(WORK_ANIM).map((r) => `  ${r}: '${WORK_ANIM[r]}',`).join('\n') + '\n};';
+
+  const before = fs.readFileSync(HTML, 'utf8');
+  let html = before;
+  for (const [name, rendered] of [['SPRITE_SHEET', renderSheet()], ['SPRITES', renderSPRITES()],
+    ['WORK_ANIM', renderWork()], ['BLD_SPRITES', renderBLD()]]) {
+    html = replaceBlock(html, name, `${BANNER}\n${rendered}`);
+  }
+  fs.writeFileSync(HTML, html);
+
+  /* the file we just wrote must re-export exactly the tables we laid out */
+  const back = gameSurface();
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if (!same(back.SPRITE_SHEET, sheet) || !same(back.SPRITES, SPRITES) ||
+      !same(back.BLD_SPRITES, BLD_SPRITES) || !same(back.WORK_ANIM, WORK_ANIM)) {
+    fail('index.html section 1 does not re-export the generated sprite tables');
+  }
+
+  console.log(`atlas  ${path.relative(ROOT, OUT)}  ${decoded.width}x${decoded.height}`
     + `  sha256=${crypto.createHash('sha256').update(png).digest('hex')}`);
   console.log(lines.join('\n'));
-  if (!sizeOk) fail(`decoded ${img.width}x${img.height}, table says ${sheet.w}x${sheet.h}`);
-  if (empty) fail(`${empty} cell(s) decoded fully transparent`);
-  console.log(`ok     ${drawn.length} frames painted from the index.html table`);
-}).catch((e) => fail('decoding the written png failed: ' + (e && e.stack || e)));
+  console.log(`ok     ${cells.length} frames composed from data/sprites.json`
+    + ' and index.html section 1 regenerated from it');
+}
+
+main().catch((e) => fail(e && e.stack || String(e)));

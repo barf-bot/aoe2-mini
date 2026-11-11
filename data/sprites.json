@@ -1,0 +1,124 @@
+{
+  "buildings": {
+    "barracks": {
+      "file": {
+        "blue": "buildings/barracks_blue.png",
+        "red": "buildings/barracks_red.png"
+      }
+    },
+    "farm": {
+      "file": {
+        "blue": "buildings/farm_blue.png",
+        "red": "buildings/farm_red.png"
+      }
+    },
+    "house": {
+      "file": {
+        "blue": "buildings/house_blue.png",
+        "red": "buildings/house_red.png"
+      }
+    },
+    "lumber_camp": {
+      "file": {
+        "blue": "buildings/lumber_camp_blue.png",
+        "red": "buildings/lumber_camp_red.png"
+      }
+    },
+    "mill": {
+      "file": {
+        "blue": "buildings/mill_blue.png",
+        "red": "buildings/mill_red.png"
+      }
+    },
+    "mining_camp": {
+      "file": {
+        "blue": "buildings/mining_camp_blue.png",
+        "red": "buildings/mining_camp_red.png"
+      }
+    },
+    "town_center": {
+      "file": {
+        "blue": "buildings/town_center_blue.png",
+        "red": "buildings/town_center_red.png"
+      }
+    }
+  },
+  "source": {
+    "buildings": "Internet Archive: \"All Bitmaps of All Buildings.zip\" (AoE2 DE graphics rip)",
+    "note": "magenta keyed to transparent; the player-colour ramp is recoloured per team from index.html TEAM; the farm building frame is the v2 procedural cell because the building rip ships no farm bitmap",
+    "units": "Internet Archive: \"All Bitmaps of All Units.zip\" (AoE2 DE graphics rip)"
+  },
+  "units": {
+    "militia": {
+      "anims": {
+        "attack_a": {
+          "blue": "units/militia/attack_a_blue.png",
+          "red": "units/militia/attack_a_red.png"
+        },
+        "attack_b": {
+          "blue": "units/militia/attack_b_blue.png",
+          "red": "units/militia/attack_b_red.png"
+        },
+        "idle": {
+          "blue": "units/militia/idle_blue.png",
+          "red": "units/militia/idle_red.png"
+        },
+        "walk": {
+          "blue": "units/militia/walk_blue.png",
+          "red": "units/militia/walk_red.png"
+        }
+      },
+      "draw": {
+        "h": 22,
+        "w": 22
+      }
+    },
+    "villager": {
+      "anims": {
+        "chop_a": {
+          "blue": "units/villager/chop_a_blue.png",
+          "red": "units/villager/chop_a_red.png"
+        },
+        "chop_b": {
+          "blue": "units/villager/chop_b_blue.png",
+          "red": "units/villager/chop_b_red.png"
+        },
+        "farm_a": {
+          "blue": "units/villager/farm_a_blue.png",
+          "red": "units/villager/farm_a_red.png"
+        },
+        "farm_b": {
+          "blue": "units/villager/farm_b_blue.png",
+          "red": "units/villager/farm_b_red.png"
+        },
+        "idle": {
+          "blue": "units/villager/idle_blue.png",
+          "red": "units/villager/idle_red.png"
+        },
+        "mine_a": {
+          "blue": "units/villager/mine_a_blue.png",
+          "red": "units/villager/mine_a_red.png"
+        },
+        "mine_b": {
+          "blue": "units/villager/mine_b_blue.png",
+          "red": "units/villager/mine_b_red.png"
+        },
+        "walk": {
+          "blue": "units/villager/walk_blue.png",
+          "red": "units/villager/walk_red.png"
+        }
+      },
+      "draw": {
+        "h": 20,
+        "w": 20
+      }
+    }
+  },
+  "version": 1,
+  "workAnim": {
+    "food": "farm",
+    "gold": "mine",
+    "stone": "mine",
+    "wood": "chop"
+  }
+}

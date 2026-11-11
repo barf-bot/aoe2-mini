@@ -137,54 +137,66 @@ const KINDS = {
   },
 };
 
-/* Sprite atlas v2 -- every unit frame lives in ONE image, assets/sprites.png.
- * SPRITES maps kind -> animation -> [Blue, Red] cells (the cell columns run
- * left to right, row 0 = Blue, row 1 = Red, exactly like TEAM);
- * tools/gen-atlas.js renders the table into the sheet, so the art and the code
- * cannot drift: sx/sy/sw/sh = the cell inside the sheet, dw/dh = the size the
- * cell is drawn on screen. Which cell a unit plays right now is unitAnim(u)
- * (section 5): villagers get distinct two-frame work animations per resource
- * (farm/chop/mine) plus civilian idle/walk -- no more helmeted warrior
- * silhouette -- and militia get idle/walk plus attack_a/attack_b swings.
- * New unit kinds or animations must add cells or the
- * `sprites: every registered anim x team has a unique in-sheet cell` check
- * fails.
+/* Sprite atlas -- every frame lives in ONE image, assets/sprites.png, and every
+ * table below it is generated: data/sprites.json plus the PNGs in
+ * data/sprites/ are the art source (ripped AoE2 graphics, recoloured per team
+ * from TEAM), tools/gen-atlas.js composes the sheet and rewrites the blocks
+ * under their GENERATED FROM banners. sx/sy/sw/sh = the cell inside the sheet,
+ * dw/dh = the size the cell is drawn on screen: for units the size authored in
+ * the manifest, for buildings the footprint in px (b.w*TILE x b.h*TILE).
+ * SPRITES maps kind -> animation -> [Blue, Red]; the columns run left to right
+ * with row 0 = Blue and row 1 = Red, exactly like TEAM. Which cell a unit plays
+ * is unitAnim(u) (section 5): villagers have civilian idle/walk plus the
+ * two-frame work animations WORK_ANIM names per resource, militia idle/walk
+ * plus attack_a/attack_b swings. New unit kinds or animations must add frames
+ * to the manifest or the `sprites: every registered anim x team has a unique
+ * in-sheet cell` check fails.
  */
-const SPRITE_SHEET = { w: 308, h: 158 };  // unit rows y0-47, building rows from y48
+// GENERATED FROM data/sprites.json
+const SPRITE_SHEET = {
+  w: 1215, h: 684,
+};
+// GENERATED FROM data/sprites.json
 const SPRITES = {
-  villager: {
-    idle:   [{ sx: 0,   sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
-             { sx: 0,   sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
-    walk:   [{ sx: 24,  sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
-             { sx: 24,  sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
-    farm_a: [{ sx: 48,  sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
-             { sx: 48,  sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
-    farm_b: [{ sx: 72,  sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
-             { sx: 72,  sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
-    chop_a: [{ sx: 96,  sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
-             { sx: 96,  sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
-    chop_b: [{ sx: 120, sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
-             { sx: 120, sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
-    mine_a: [{ sx: 144, sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
-             { sx: 144, sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
-    mine_b: [{ sx: 168, sy: 0, sw: 24, sh: 24, dw: 20, dh: 20 },
-             { sx: 168, sy: 24, sw: 24, sh: 24, dw: 20, dh: 20 }],
-  },
   militia: {
-    idle:     [{ sx: 192, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 },
-               { sx: 192, sy: 24, sw: 24, sh: 24, dw: 22, dh: 22 }],
-    walk:     [{ sx: 216, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 },
-               { sx: 216, sy: 24, sw: 24, sh: 24, dw: 22, dh: 22 }],
-    attack_a: [{ sx: 240, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 },
-               { sx: 240, sy: 24, sw: 24, sh: 24, dw: 22, dh: 22 }],
-    attack_b: [{ sx: 264, sy: 0, sw: 24, sh: 24, dw: 22, dh: 22 },
-               { sx: 264, sy: 24, sw: 24, sh: 24, dw: 22, dh: 22 }],
+    attack_a: [{ sx: 0, sy: 0, sw: 64, sh: 67, dw: 22, dh: 22 },
+              { sx: 0, sy: 86, sw: 64, sh: 67, dw: 22, dh: 22 }],
+    attack_b: [{ sx: 64, sy: 0, sw: 64, sh: 67, dw: 22, dh: 22 },
+              { sx: 64, sy: 86, sw: 64, sh: 67, dw: 22, dh: 22 }],
+    idle: [{ sx: 128, sy: 0, sw: 37, sh: 50, dw: 22, dh: 22 },
+          { sx: 128, sy: 86, sw: 37, sh: 50, dw: 22, dh: 22 }],
+    walk: [{ sx: 165, sy: 0, sw: 36, sh: 50, dw: 22, dh: 22 },
+          { sx: 165, sy: 86, sw: 36, sh: 50, dw: 22, dh: 22 }],
+  },
+  villager: {
+    chop_a: [{ sx: 201, sy: 0, sw: 82, sh: 71, dw: 20, dh: 20 },
+            { sx: 201, sy: 86, sw: 82, sh: 71, dw: 20, dh: 20 }],
+    chop_b: [{ sx: 283, sy: 0, sw: 82, sh: 71, dw: 20, dh: 20 },
+            { sx: 283, sy: 86, sw: 82, sh: 71, dw: 20, dh: 20 }],
+    farm_a: [{ sx: 365, sy: 0, sw: 146, sh: 86, dw: 20, dh: 20 },
+            { sx: 365, sy: 86, sw: 146, sh: 86, dw: 20, dh: 20 }],
+    farm_b: [{ sx: 511, sy: 0, sw: 146, sh: 86, dw: 20, dh: 20 },
+            { sx: 511, sy: 86, sw: 146, sh: 86, dw: 20, dh: 20 }],
+    idle: [{ sx: 657, sy: 0, sw: 28, sh: 46, dw: 20, dh: 20 },
+          { sx: 657, sy: 86, sw: 28, sh: 46, dw: 20, dh: 20 }],
+    mine_a: [{ sx: 685, sy: 0, sw: 73, sh: 76, dw: 20, dh: 20 },
+            { sx: 685, sy: 86, sw: 73, sh: 76, dw: 20, dh: 20 }],
+    mine_b: [{ sx: 758, sy: 0, sw: 73, sh: 76, dw: 20, dh: 20 },
+            { sx: 758, sy: 86, sw: 73, sh: 76, dw: 20, dh: 20 }],
+    walk: [{ sx: 831, sy: 0, sw: 31, sh: 48, dw: 20, dh: 20 },
+          { sx: 831, sy: 86, sw: 31, sh: 48, dw: 20, dh: 20 }],
   },
 };
 
 /* Which work animation each gathered resource uses (unitAnim picks it from the
  * unit's order source). Stone mines like gold, exactly like AoE2. */
-const WORK_ANIM = { food: 'farm', wood: 'chop', gold: 'mine', stone: 'mine' };
+// GENERATED FROM data/sprites.json
+const WORK_ANIM = {
+  food: 'farm',
+  gold: 'mine',
+  stone: 'mine',
+  wood: 'chop',
+};
 
 /** The atlas cell for (kind, team, anim), or null when that frame has no art.
  *  Anim defaults to idle so callers of the v1 signature keep working. */
@@ -196,24 +208,27 @@ function spriteFor(kind, team, anim) {
   return (c && typeof c.sx === 'number' && typeof c.sw === 'number') ? c : null;
 }
 
-/* Built-building art (C5): one cell per BLD kind x team, rows below the unit
- * block. dw/dh always equal the footprint in px (b.w*TILE x b.h*TILE), so a
- * BLD size change without redrawn cells fails the 5c check. */
+/* Built-building art: one cell per BLD kind x team, the two rows below the unit
+ * block, generated from data/sprites.json like the unit tables, with dw/dh set
+ * to the footprint in px (b.w*TILE x b.h*TILE) that the 5c check re-checks
+ * against BLD. The farm frame is the old procedural cell: the ripped building
+ * set ships no farm bitmap (see data/README.md). */
+// GENERATED FROM data/sprites.json
 const BLD_SPRITES = {
-  town_center: [{ sx: 0,   sy: 48,  sw: 66, sh: 66, dw: 66, dh: 66 },
-                { sx: 66,  sy: 48,  sw: 66, sh: 66, dw: 66, dh: 66 }],
-  house:       [{ sx: 132, sy: 48,  sw: 44, sh: 44, dw: 44, dh: 44 },
-                { sx: 176, sy: 48,  sw: 44, sh: 44, dw: 44, dh: 44 }],
-  farm:        [{ sx: 220, sy: 48,  sw: 44, sh: 44, dw: 44, dh: 44 },
-                { sx: 264, sy: 48,  sw: 44, sh: 44, dw: 44, dh: 44 }],
-  barracks:    [{ sx: 0,   sy: 114, sw: 44, sh: 44, dw: 44, dh: 44 },
-                { sx: 44,  sy: 114, sw: 44, sh: 44, dw: 44, dh: 44 }],
-  mill:        [{ sx: 88,  sy: 114, sw: 44, sh: 44, dw: 44, dh: 44 },
-                { sx: 132, sy: 114, sw: 44, sh: 44, dw: 44, dh: 44 }],
-  lumber_camp: [{ sx: 176, sy: 114, sw: 22, sh: 22, dw: 22, dh: 22 },
-                { sx: 198, sy: 114, sw: 22, sh: 22, dw: 22, dh: 22 }],
-  mining_camp: [{ sx: 220, sy: 114, sw: 22, sh: 22, dw: 22, dh: 22 },
-                { sx: 242, sy: 114, sw: 22, sh: 22, dw: 22, dh: 22 }],
+  barracks: [{ sx: 0, sy: 172, sw: 316, sh: 256, dw: 44, dh: 44 },
+            { sx: 0, sy: 428, sw: 316, sh: 256, dw: 44, dh: 44 }],
+  farm: [{ sx: 316, sy: 172, sw: 44, sh: 44, dw: 44, dh: 44 },
+        { sx: 316, sy: 428, sw: 44, sh: 44, dw: 44, dh: 44 }],
+  house: [{ sx: 360, sy: 172, sw: 177, sh: 126, dw: 44, dh: 44 },
+         { sx: 360, sy: 428, sw: 177, sh: 126, dw: 44, dh: 44 }],
+  lumber_camp: [{ sx: 537, sy: 172, sw: 163, sh: 137, dw: 22, dh: 22 },
+               { sx: 537, sy: 428, sw: 163, sh: 137, dw: 22, dh: 22 }],
+  mill: [{ sx: 700, sy: 172, sw: 218, sh: 216, dw: 44, dh: 44 },
+        { sx: 700, sy: 428, sw: 218, sh: 216, dw: 44, dh: 44 }],
+  mining_camp: [{ sx: 918, sy: 172, sw: 176, sh: 110, dw: 22, dh: 22 },
+               { sx: 918, sy: 428, sw: 176, sh: 110, dw: 22, dh: 22 }],
+  town_center: [{ sx: 1094, sy: 172, sw: 121, sh: 163, dw: 66, dh: 66 },
+               { sx: 1094, sy: 428, sw: 121, sh: 163, dw: 66, dh: 66 }],
 };
 
 /** The atlas cell for one built building kind, per team; null when unknown. */
