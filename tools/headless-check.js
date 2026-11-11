@@ -1046,6 +1046,110 @@ check(!!buildOrderF && buildOrderF.house.built === 1 &&
       `after ${buildOrderF.w.n} steps, route ${buildOrderF.route.join(' ') || 'none'} ends on the ` +
       `work spot ${tileKey(buildOrderF.spot)}`);
 
+/* -- T4: formation slots replace the golden-angle scatter ----------------- *
+ * `formationSlots(Game, sel, x, y)` (the pathfinding block) answers a group move
+ * order with one tile per unit: a centred grid of ceil(sqrt(n)) columns at the tile
+ * pitch, solid cells skipped and the grid grown until everybody owns a tile.
+ * `issueOrder` writes the answer into `u.slot`, and the `move` branch walks to it —
+ * replacing the golden-angle spiral that dropped a squad on top of itself. Before
+ * T4 no unit carries a slot, so every check here fails for the missing field and
+ * passes once the group marches into ranks. */
+const fsq = (st, sel, x, y) => (typeof AoE2.formationSlots === 'function' ? AoE2.formationSlots(st, sel, x, y) : null);
+const fsqNote = (p) => (p === null ? (typeof AoE2.formationSlots === 'function' ? 'no slots returned' : 'formationSlots is not exported') : undefined);
+/** `n` team-0 villagers standing in ranks on the centred grid over their own tile
+ *  (sx, sy) — `cols = ceil(sqrt(n))` tiles, the pitch the game itself uses — and
+ *  ordered to the centre of tile (gx, gy) through `issueOrder`, exactly what a
+ *  right-click does; `water` floods tiles first when a check wants it. A squad
+ *  starts in a formation because that is what the game produces, and stacking them
+ *  on one tile would test something else entirely: 4 units sharing a square crawl at
+ *  a fraction of a pixel per frame while separate() and their own routes fight over
+ *  it. Returns the state, the squad, the ordered point and the slots the order gave. */
+const squadTo = (n, sx, sy, gx, gy, water) => {
+  const st = flatState();
+  const cols = Math.max(1, Math.ceil(Math.sqrt(n))), back = (cols - 1) >> 1;
+  const squad = [];
+  for (let i = 0; i < n; i++) squad.push(AoE2.makeUnit(st, 'villager', 0,
+    tileCentre(st, sx + (i % cols) - back, sy + ((i / cols) | 0) - back).x,
+    tileCentre(st, sx + (i % cols) - back, sy + ((i / cols) | 0) - back).y));
+  st.units = squad;                                      // just the squad under test
+  (water || []).forEach((t) => setTile(st, t[0], t[1], AoE2.T.WATER, 0));
+  st.selection = squad.map((u) => u.id);
+  const at = tileCentre(st, gx, gy);
+  AoE2.issueOrder(st, at.x, at.y);
+  return { st, sel: squad, at, slots: squad.map((u) => u.slot) };
+};
+const minPair = (us) => Math.min(...us.flatMap((a, i) => us.slice(i + 1).map((b) => distTo(a, b))));
+
+// 15. the assignment itself: 4 villagers ordered to one tile take the 2x2 block of
+// tiles there — one tile pitch, one unit per tile, every one of them walkable.
+const s4 = squadTo(4, 60, 60, 63, 60);
+const sq4 = fsq(s4.st, s4.sel, s4.at.x, s4.at.y);
+const want4 = ['63,60', '64,60', '63,61', '64,61'];
+check(!!sq4 && sq4.length === 4 &&
+      new Set(sq4.map((p) => tileKey(p.slot))).size === 4 &&
+      want4.every((k) => sq4.some((p) => tileKey(p.slot) === k)) &&
+      sq4.every((p) => AoE2.siteFree(s4.st, p.slot.tx, p.slot.ty, 1, 1)),
+  'formation: a 4-unit move order yields 4 distinct walkable slots',
+  fsqNote(sq4) || `${sq4.length} slots: ${sq4.map((p) => p.u.id + '@' + tileKey(p.slot)).join(' ')} ` +
+    `(the 2x2 at 63,60 is ${want4.join(' ')})`);
+
+/** that squad, walked until the whole group is idle. `end[i]` records where unit i's
+ *  order retired — the position this checks, because once a unit is done the rest of
+ *  the walk can still shove him aside (that is separate(), not the route): the tile he
+ *  retired on is what the order promised. 1500 steps against a ~110-step walk, so the
+ *  cap is never the point. */
+const walked = (f) => {
+  if (!f.sel.every((u) => u.slot)) return { f, n: 0, snap: f.slots, end: f.sel.map(() => null) };
+  const snap = f.sel.map((u) => u.slot);        // a retiring move order releases its tile
+  const end = f.sel.map(() => null);
+  let steps = 0;
+  while (steps < 1500 && f.sel.some((u) => u.order.kind !== 'idle')) {
+    AoE2.stepGame(f.st, DT); steps++;
+    f.sel.forEach((u, i) => { if (!end[i] && (u.order.kind === 'idle' || u.dead)) end[i] = { x: u.x, y: u.y }; });
+  }
+  return { f, n: steps, snap, end };
+};
+const walkF = walked(squadTo(4, 60, 60, 63, 60));
+
+// 16. the order's end: each of the 4 retires on the tile he was given — the plan's
+// "all 4 end within CFG.TILE / 2 of their own slot", not one shared tile.
+check(walkF.n > 0 && walkF.end.every((p, i) => p && walkF.f.sel[i].order.kind === 'idle' &&
+      walkF.f.sel[i].slot === null && tOf(p.x) === walkF.snap[i].tx && tOf(p.y) === walkF.snap[i].ty &&
+      distTo(p, walkF.snap[i]) <= AoE2.CFG.TILE / 2),
+  'formation: every unit of the group arrives on its own slot',
+  !walkF.n ? 'the move order assigned no slots to walk'
+    : walkF.f.sel.map((u, i) => `${u.id}${walkF.end[i] ? `@${tOf(walkF.end[i].x)},${tOf(walkF.end[i].y)}` : ''}` +
+      `(ordered ${walkF.snap[i] ? walkF.snap[i].tx + ',' + walkF.snap[i].ty : 'none'} ` +
+      `${walkF.end[i] ? distTo(walkF.end[i], walkF.snap[i]).toFixed(1) : '-'}px, order ${u.order.kind})`).join(' ') +
+      ` after ${walkF.n} steps`);
+
+// 17. the two separation mechanisms agree by construction: the pitch is
+// CFG.UNIT_SEP on the tile grid, so a group parked on its slots needs no pushes —
+// calling separate() moves nobody. (The spiral left pairs 9-15px apart and did.)
+const sepF = (() => {
+  if (!walkF.n || typeof AoE2.separate !== 'function') return null;
+  const before = walkF.f.sel.map((u) => ({ x: u.x, y: u.y }));
+  AoE2.separate(walkF.f.st);
+  return { before, after: walkF.f.sel.map((u) => ({ x: u.x, y: u.y })) };
+})();
+check(!!sepF && sepF.before.every((p, i) => p.x === sepF.after[i].x && p.y === sepF.after[i].y),
+  'formation: a group parked on its slots needs zero separation pushes',
+  !sepF ? (typeof AoE2.separate === 'function' ? 'the group never arrived, nothing to park' : 'separate is not exported')
+    : `moved ${sepF.before.filter((p, i) => p.x !== sepF.after[i].x || p.y !== sepF.after[i].y).length} of ` +
+      `${sepF.after.length} units; the nearest two are ${minPair(walkF.f.sel).toFixed(1)}px apart ` +
+      `(CFG.UNIT_SEP is ${AoE2.CFG.UNIT_SEP}px)`);
+
+// 18. the same order with two of the four tiles flooded: the grid grows past the
+// water and every villager still gets a tile of his own — and none of them in it.
+const s4w = squadTo(4, 67, 60, 70, 60, [[71, 60], [70, 61]]);
+const sq4w = fsq(s4w.st, s4w.sel, s4w.at.x, s4w.at.y);
+check(!!sq4w && sq4w.length === 4 &&
+      new Set(sq4w.map((p) => tileKey(p.slot))).size === 4 &&
+      sq4w.every((p) => AoE2.siteFree(s4w.st, p.slot.tx, p.slot.ty, 1, 1)),
+  'formation: slots skip water and still give every unit a distinct tile',
+  fsqNote(sq4w) || `${sq4w.length} slots: ${sq4w.map((p) => p.u.id + '@' + tileKey(p.slot)).join(' ')} ` +
+    `(71,60 and 70,61 are water, so the 2x2 there cannot hold 4)`);
+
 /* ---- 7. construction ------------------------------------------------ */
 function freeSpotAround(world, Game, tx, ty, w, h, maxR) {
   for (let r = 1; r <= maxR; r++) {

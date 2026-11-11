@@ -612,6 +612,7 @@ function makeUnit(Game, kind, team, x, y) {
     accuracy: k.accuracy,
     face: 1, anim: 0, // sprite mirror + walking clock, both set by moveUnit
     order: { kind: 'idle' }, carry: 0, carryRes: null, work: 0, cd: 0, dead: false,
+    slot: null, // the formation tile his current `move` order owns (formationSlots)
     // the A* route behind `order` (findPath/moveUnit): the tile list, the tile
     // being walked to, and the goal tile + map version that route was built for.
     path: null, pathAt: 0, pathFor: null, pathEpoch: -1,
@@ -878,9 +879,10 @@ function updateUnit(Game, u, dt) {
 
   if (o.kind === 'move') {
     // arrived, or the order has no route at all (u.path still null after the
-    // routing attempt in moveUnit): either way the order is over. Retiring it is
-    // what stops a unit from nose-pressing a shore the A* cannot cross.
-    if (moveUnit(Game, u, o.x, o.y, dt) || u.path === null) u.order = { kind: 'idle' };
+    // routing attempt in moveUnit): either way the order is over, and the
+    // formation tile it marched to goes back on the market for the next order —
+    // holding it while idle is what would make a past formation block a new one.
+    if (moveUnit(Game, u, o.x, o.y, dt) || u.path === null) { u.order = { kind: 'idle' }; u.slot = null; }
     return;
   }
 
@@ -1177,6 +1179,47 @@ function standTarget(Game, u, x, y, stop) {
               : workSpot(Game, u, tx, ty);               // its nearest walkable neighbour
 }
 
+/** The tiles the `move` orders of `sel` take around the ordered point (x, y) — the
+ *  formation that replaced the golden-angle scatter: one tile per unit on a grid of
+ *  ceil(sqrt(n)) columns, the pitch max(CFG.UNIT_SEP, CFG.TILE) px, which is exactly
+ *  one tile here (22 > 11), so a squad standing on these slots already satisfies
+ *  separate() and nobody has to be shoved out of the ranks. Cells that are not
+ *  walkable, or are held by another live move order (a squad already standing there),
+ *  are skipped and the grid grows one row and column at a time — ceil(sqrt(n)) up to
+ *  n, so at most n² cells — until it can house everybody; the i-th nearest unit is
+ *  paired to the i-th nearest free tile so nobody crosses the formation to reach it.
+ *  Returns [{ u, slot }] (the pair the `move` order walks to), or null when the point
+ *  cannot house the group at all, which leaves that order without a slot. */
+function formationSlots(Game, sel, x, y) {
+  const n = sel.length;
+  if (!n) return null;
+  const goal = tileOf(x, y);
+  const step = Math.max(1, Math.round(Math.max(CFG.UNIT_SEP, CFG.TILE) / CFG.TILE)); // pitch, in tiles
+  const mine = new Set(sel);                                  // units being re-slotted now
+  const held = new Set();                                     // tiles other live move orders own
+  for (const v of Game.units) {
+    if (!v.dead && !mine.has(v) && v.slot) held.add(`${v.slot.tx},${v.slot.ty}`);
+  }
+  let cells = null;
+  for (let size = Math.max(1, Math.ceil(Math.sqrt(n))); size <= n; size++) {
+    const rank = [];                                 // the size x size grid centred on the goal
+    const back = ((size - 1) >> 1) * step;
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        const tx = goal.tx - back + c * step, ty = goal.ty - back + r * step;
+        const px = tx * CFG.TILE + CFG.TILE / 2, py = ty * CFG.TILE + CFG.TILE / 2;
+        if (walkable(Game, px, py) && !held.has(`${tx},${ty}`)) rank.push({ tx, ty, x: px, y: py });
+      }
+    }
+    if (rank.length >= n) { cells = rank; break; }     // big enough to house the whole squad
+  }
+  if (!cells) return null;                             // nowhere to put them: no formation
+  const byDist = (list, d) => list.slice().sort((a, b) => d(a) - d(b) || (a.id ?? a.tx) - (b.id ?? b.tx));
+  const units = byDist(sel, (u) => Math.hypot(u.x - x, u.y - y));
+  const free = byDist(cells, (s) => Math.hypot(s.x - x, s.y - y));
+  return units.map((u, i) => ({ u, slot: free[i] }));   // nearest unit -> nearest tile: no crossing
+}
+
 /** The board rule (T2): a tile is walkable when it is in bounds, not water, not
  *  a resource tile with stock and not covered by a building — an unbuilt
  *  foundation counts, exactly like the AoE2 rule. Everything that walks, works
@@ -1350,7 +1393,9 @@ function orderForUnit(Game, u, wx, wy) {
   return { kind: 'move', x: at.x, y: at.y };
 }
 
-/** Right-click: hand an order to everything selected, spread out a little. */
+/** Right-click: hand an order to everything selected — the fighters take the fight
+ *  and the movers march on formation tiles, resolved once for the whole group
+ *  instead of one scattered destination per unit (T4). */
 function issueOrder(Game, wx, wy) {
   const sel = selectedUnits(Game);
   if (!sel.length) return;
@@ -1359,24 +1404,26 @@ function issueOrder(Game, wx, wy) {
   const tTx = Math.floor(wx / CFG.TILE), tTy = Math.floor(wy / CFG.TILE);
   const eB = Game.buildings.find(b => b.team !== sel[0].team && b.built &&
     tTx >= b.tx && tTx < b.tx + b.w && tTy >= b.ty && tTy < b.ty + b.h);
-  let n = 0;
-  for (const u of sel) {
+  const want = sel.map((u) => {                          // the order this unit asked for
     let o = enemy ? { kind: 'attack', target: enemy.id }
         : eB ? { kind: 'attack', b: eB.id }
         : orderForUnit(Game, u, wx, wy);
-    if (!o) continue;
+    if (!o) return null;
     if (u.kind !== 'villager' && o.kind === 'harvest') o = { kind: 'move', x: wx, y: wy };
-    u.order = spread(o, n);
+    return o;
+  });
+  const slots = formationSlots(Game, sel.filter((u, i) => want[i] && want[i].kind === 'move'), wx, wy);
+  const slotOf = {};
+  if (slots) for (const p of slots) slotOf[p.u.id] = p.slot;
+  let n = 0;
+  sel.forEach((u, i) => {
+    const o = want[i];
+    const slot = o.kind === 'move' ? slotOf[u.id] || null : null;  // a fight or a site owns no tile
+    u.order = slot ? { ...o, x: slot.x, y: slot.y } : o;           // walk onto the tile he was given
+    u.slot = slot;
     n++;
-  }
+  });
   if (n) Game.pingAt = Game.time;
-}
-
-/** Spread move destinations so a group does not walk as one blob. */
-function spread(o, i) {
-  if (o.kind !== 'move') return o;
-  const a = i * 2.39996, r = 9 * Math.sqrt(i);
-  return { kind: 'move', x: o.x + Math.cos(a) * r, y: o.y + Math.sin(a) * r };
 }
 
 /** Builder for a new site (T5, the multi-build bug): the old code took
@@ -2407,7 +2454,7 @@ const AoE2 = {
   SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor, BLD_SPRITES, bldSpriteFor,
   makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,
-  tileOf, findPath,
+  tileOf, findPath, formationSlots, separate,
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
   build, cancelConstruction, demolish, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,

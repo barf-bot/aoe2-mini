@@ -145,7 +145,7 @@ proving check and the `Map of this file` banner stays truthful.
     for the converted sites, and the two solid-target ones (a building attacked melee and
     ranged) are the ones that failed until `standTarget` existed.
 
-- [ ] T4: formation slots replace the golden-angle scatter
+- [x] T4: formation slots replace the golden-angle scatter
   - files: `index.html` §4 — `spread(o, i)` (1172-1176) deleted, new
     `formationSlots(Game, sel, x, y)` in the pathfinding block, `issueOrder` (1150-1169)
     assigns one slot per selected unit instead of calling `spread`, `makeUnit` (605-617)
@@ -171,6 +171,14 @@ proving check and the `Map of this file` banner stays truthful.
     slots skip water and still give every unit a distinct tile`; existing §10/§11
     input + command-bar checks green; visual = `node tools/render-preview.js`, look at
     `preview.png` (4 villagers on 4 tiles, none in water).
+  - note (as built): `formationSlots` answers with `{ u, slot }` pairs and the slot carries
+    its centre px, so `issueOrder` writes one destination into both the order and `u.slot`;
+    a slot lives exactly as long as the move order that owns it — the `move` branch clears it
+    when the order retires, which is what stops a finished formation from holding tiles
+    forever (and what check 16 measures: the tile the order retired on). `separate` joined the
+    export list so check 17 can call the game's rule instead of reimplementing it (T1 did the
+    same for `findPath`), and the fixture squad stands in ranks rather than stacked on one
+    tile — a stack crawls for reasons of its own, as a throwaway run proved.
 
 - [ ] T5: Docs sync and the full verification pass
   - files: `docs/GAME_RULES.md` (the `## Movement` block, 40-51: the

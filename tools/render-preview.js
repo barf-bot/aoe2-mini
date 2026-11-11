@@ -103,11 +103,21 @@ const OUT = path.resolve(arg('out', path.join(ROOT, 'preview.png')));
 /** 8s of simulated play, then paint the view into realView and write OUT. */
 function simulateAndRender(G, Game, realView) {
   const villagers = Game.units.filter((u) => u.team === 0 && u.kind === 'villager');
-  if (villagers.length) G.issueOrder(Game, villagers[0].order.src ? villagers[0].order.src.x : villagers[0].x,
-    villagers[0].order.src ? villagers[0].order.src.y : villagers[0].y);
+  // T4 (pathfinding): the frame's order is one GROUP move — the whole starting squad
+  // is selected and issued a single order, so the committed preview shows the ranks
+  // the golden-angle scatter used to fold into one dot. The destination is the first
+  // land tile three tiles off the squad (a move order needs a walkable tile, and the
+  // grid the squad takes has to be land too); with nothing legal to walk to, the
+  // squad keeps its seeded spot.
+  const squad = villagers.map((u) => u.id);
+  const goal = !squad.length ? null : [[3, 0], [2, 2], [0, 3], [-2, 2], [-3, 0], [-2, -2], [0, -3], [2, -2]]
+    .map(([dx, dy]) => ({ x: (Math.floor(villagers[0].x / G.CFG.TILE) + dx) * G.CFG.TILE + G.CFG.TILE / 2,
+                          y: (Math.floor(villagers[0].y / G.CFG.TILE) + dy) * G.CFG.TILE + G.CFG.TILE / 2 }))
+    .find((p) => G.walkable(Game, p.x, p.y));
+  if (goal) { Game.selection = squad; G.issueOrder(Game, goal.x, goal.y); }
   const steps = Math.round(SECONDS * 30);
   for (let i = 0; i < steps; i++) G.stepGame(Game, 1 / 30);
-  if (villagers[0]) Game.selection = [villagers[0].id];
+  if (squad.length) Game.selection = squad;          // the whole group keeps the selection ring
   // T4 of the content port: an archer joins the frame through the same factory
   // train() uses, so the committed preview shows the new atlas cell.
   if (villagers[0]) G.makeUnit(Game, 'archer', 0, villagers[0].x + 26, villagers[0].y + 14);
