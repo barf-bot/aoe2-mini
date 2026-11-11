@@ -53,12 +53,14 @@ repo-level workflow rules (verification, deploy, the >300-line editing rule) see
 
 ## Adding a feature (the recipe)
 
-1. Add the data to §1 (costs/stats, plus the `SPRITES` cell table for any new unit art) —
-   pure data, no logic.
+1. Add the data to `data/units.json` / `data/buildings.json` (stats, costs) and, for new unit
+   art, the frames in `data/sprites/` plus their `data/sprites.json` entry — pure data, no
+   logic. Then regenerate §1 (`node tools/check-stats.mjs --write`, `node tools/gen-atlas.js`):
+   the `CFG`/`KINDS`/`BLD`/`SPRITES` blocks in `index.html` are generated, never hand-edited.
 2. Implement the logic in §4 as pure functions; export them in the `AoE2` object.
 3. Add the visible layer: draw function in §5, command wiring in §6.
 4. Add the assertion to `tools/headless-check.js` **before** declaring it works, then run
-   the harness, the preview renderer and `tools/audit-line-refs.js`.
+   the harness, `tools/check-stats.mjs`, the preview renderer and `tools/audit-line-refs.js`.
 5. Update `docs/GAME_RULES.md` (numbers) and `docs/CHANGELOG.md` in the same commit.
 6. Commit with an imperative subject; commit the regenerated `preview.png` if visuals moved.
 
