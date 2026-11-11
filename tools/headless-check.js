@@ -1005,6 +1005,42 @@ check(!!tp && tp.t === foe7 && tp.team === 0 &&
   'ranged: the Town Center shoots through the same path',
   tp ? 'team=' + tp.team + ' dmg=' + tp.dmg + ' accuracy=' + tp.accuracy : 'no arrow from the TC');
 
+/* ---- 9e. game over (2026-11-11 content port, T6) --------------------- */
+/* Win/lose read off the board: the Town Center is the only building whose loss
+ * ends the game, and every way a building leaves it (combat raze, cancel,
+ * demolish) goes through removeBuilding. Its own booted Game, because the shared
+ * one is §10/§11's input and command-bar fixture: razing red's wins, razing
+ * blue's loses, a set result freezes the simulation, and the overlay's button
+ * restarts through the same resetGame the command bar's "New map" uses. */
+const overlayHtml = (g) => (g.dom && g.dom.result ? g.dom.result.innerHTML : '<no #result element>');
+const go = AoE2.boot(makeDoc());
+const winTc = go.buildings.find((b) => b.team === 1 && b.kind === 'town_center');
+AoE2.hitBuilding(go, winTc, 99999);
+check(go.result === 'victory', 'game over: razing the enemy Town Center wins',
+  'result=' + String(go.result));
+const gl = AoE2.createState();                                   // the booted one has already ended
+AoE2.hitBuilding(gl, gl.buildings.find((b) => b.team === 0 && b.kind === 'town_center'), 99999);
+check(gl.result === 'defeat' && /Defeat/.test(AoE2.resultHtml(gl)),
+  'game over: razing your own Town Center loses',
+  'result=' + String(gl.result) + ' overlay=' + JSON.stringify(AoE2.resultHtml(gl)));
+const frozen = go.units.map((u) => u.x + ',' + u.y).join(';');
+const timeGo = go.time;
+for (let i = 0; i < 60; i++) AoE2.stepSim(go, DT);
+check(go.units.length === 10 && go.units.map((u) => u.x + ',' + u.y).join(';') === frozen && go.time > timeGo,
+  'game over: the simulation freezes once a result is set',
+  go.units.length + ' units, time ' + timeGo.toFixed(2) + ' -> ' + go.time.toFixed(2));
+AoE2.renderFrame(go);
+const winOverlay = overlayHtml(go);
+const newBtn = stubEl('button', 'btnNew', 80, 24);
+newBtn.setAttribute('data-act', 'restart');
+((go.dom.result.listeners && go.dom.result.listeners.click) || []).forEach((fn) => fn({ target: newBtn }));
+AoE2.renderFrame(go);
+check(/Victory/.test(winOverlay) && winOverlay.includes('data-act="restart"') &&
+      go.result === null && go.units.length === 10 && overlayHtml(go) === '',
+  'ui: the result overlay renders and its button resets the game',
+  'overlay=' + JSON.stringify(winOverlay) + ' -> result=' + String(go.result) +
+  ' units=' + go.units.length);
+
 /* ---- 10. input ------------------------------------------------------ */
 const view = doc.getElementById('view');
 const mine = blueVill();

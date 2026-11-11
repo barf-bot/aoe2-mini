@@ -199,7 +199,7 @@ HD/DE files later is a directory replacement and nothing else.
     table's range`, plus `ranged: the Town Center shoots through the same path` (the
     building half of the change needs its own proving check) — written first, then the code.
 
-- [ ] T6: Win/lose on top of the same buildings
+- [x] T6: Win/lose on top of the same buildings
   - files: `index.html` §4 (`hitBuilding` 656-668 / `removeBuilding` 574-582 set the
     result, `stepSim` 621-646 freezes, `createState` gains `result: null`), §5 HUD/overlay
     markup + `renderHud` (1494-1536) + the `#result` styles (31-34 neighbourhood), §7 boot

@@ -32,6 +32,13 @@
     background:rgba(20,22,28,.92);border:1px solid var(--gold-dk);color:var(--gold);
     opacity:0;transition:opacity .18s;pointer-events:none;white-space:nowrap}
   #toast.show{opacity:1}
+  #result{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+    justify-content:center;gap:16px;background:rgba(9,11,15,.78);text-align:center}
+  #result.show{display:flex}
+  #result h2{margin:0;font-size:46px;letter-spacing:8px;text-transform:uppercase}
+  #result h2.win{color:var(--ok);text-shadow:0 0 24px rgba(111,191,115,.45)}
+  #result h2.lose{color:var(--bad);text-shadow:0 0 24px rgba(209,88,79,.45)}
+  #result p{margin:0;color:var(--dim)}
   footer{flex:0 0 auto;display:flex;align-items:stretch;gap:0;
     background:linear-gradient(#1f2330,#171a22);border-top:1px solid var(--line);min-height:74px}
   #info{flex:0 0 250px;padding:8px 12px;border-right:1px solid var(--line);font-size:12px;color:var(--dim)}
@@ -67,6 +74,7 @@
     <canvas id="view"></canvas>
     <canvas id="minimap" width="168" height="168"></canvas>
     <div id="toast"></div>
+    <div id="result"></div>
   </div>
 
   <footer>
@@ -657,10 +665,24 @@ function rebuildBlocks(Game) {
  *  Game.selectedBuilding dangling on raze. */
 function removeBuilding(Game, b) {
   const i = Game.buildings.indexOf(b);
-  if (i >= 0) Game.buildings.splice(i, 1);
+  if (i < 0) return false;
+  Game.buildings.splice(i, 1);
   rebuildBlocks(Game);
   if (Game.selectedBuilding === b) Game.selectedBuilding = null;
-  return i >= 0;
+  setResult(Game);
+  return true;
+}
+
+/** The win condition, read off the board instead of remembered: the side with no
+ *  Town Center left has lost, and the first side to lose one decides the game —
+ *  hitBuilding (combat), cancelConstruction and demolish all remove through
+ *  removeBuilding, so a raze and a demolish are the same event to the rules.
+ *  stepSim freezes on a set result and renderHud paints the #result overlay. */
+function setResult(Game) {
+  if (Game.result) return;
+  const alive = (team) => Game.buildings.some((b) => b.kind === 'town_center' && b.team === team);
+  if (!alive(1)) Game.result = 'victory';
+  else if (!alive(0)) Game.result = 'defeat';
 }
 
 /** Free tile next to a building for a unit to spawn / stand on. */
@@ -704,6 +726,7 @@ function standingSpots(Game, b, n) {
 /** One fixed simulation step. Pure logic, no DOM. */
 function stepSim(Game, dt) {
   Game.time += dt;
+  if (Game.result) return;                 // game over: camera and rendering keep running, nothing moves
 
   for (const b of Game.buildings) {
     if (b.built < 1 || !b.queue.length) continue;
@@ -1686,6 +1709,21 @@ function renderHud(Game) {
   setHTML(d.info, infoHtml(Game));
   setHTML(d.commands, commandsHtml(Game));
   setHTML(d.queue, queueHtml(Game));
+  setHTML(d.result, resultHtml(Game));          /* '' while the game is still running */
+  if (d.result && d.result.classList) {         /* CSS hides it while the class is off */
+    if (Game.result) d.result.classList.add('show'); else d.result.classList.remove('show');
+  }
+}
+
+/** The end-of-game overlay markup: empty while the game runs, otherwise the
+ *  result title and the same data-act="restart" action the command bar's
+ *  "New map" button uses (boot wires a click listener on this element too). */
+function resultHtml(Game) {
+  if (!Game.result) return '';
+  const win = Game.result === 'victory';
+  return '<h2 class="' + (win ? 'win' : 'lose') + '">' + (win ? 'Victory' : 'Defeat') + '</h2>' +
+    '<p>' + (win ? 'The enemy Town Center is razed.' : 'Your Town Center is gone.') + '</p>' +
+    '<button data-act="restart">New game</button>';
 }
 
 function infoHtml(Game) {
@@ -1805,6 +1843,15 @@ function unitsInBox(Game, ax, ay, bx, by) {
   return Game.units.filter(u => !u.dead && u.team === 0 && u.x >= ax && u.x <= bx && u.y >= ay && u.y <= by);
 }
 
+/** The BUTTON a click landed on, walked up from the event target: the command bar
+ *  and the result overlay are rebuilt every frame, so both delegate clicks from
+ *  their parent element and the target may be the label inside a button. */
+function buttonAt(e) {
+  let t = e.target;
+  while (t && t.tagName !== 'BUTTON' && t.parentNode) t = t.parentNode;
+  return t && t.tagName === 'BUTTON' ? t : null;
+}
+
 function attachInput(Game, d) {
   const view = Game.dom.view;
   const rect = () => {
@@ -1898,10 +1945,9 @@ function attachInput(Game, d) {
   /* the command bar is rebuilt every frame -> delegate clicks off its parent */
   if (Game.dom.commands && Game.dom.commands.addEventListener) {
     Game.dom.commands.addEventListener('click', (e) => {
-      let t = e.target;
-      while (t && t.tagName !== 'BUTTON' && t.parentNode) t = t.parentNode;
-      if (!t || t.tagName !== 'BUTTON') return;
-      const act = t.getAttribute('data-act'), arg = t.getAttribute('data-arg');
+      const b = buttonAt(e);
+      if (!b) return;
+      const act = b.getAttribute('data-act'), arg = b.getAttribute('data-arg');
       if (act === 'build') Game.placing = arg;
       else if (act === 'train' && Game.selectedBuilding) train(Game, Game.selectedBuilding, arg);
       else if (act === 'cancel' && Game.selectedBuilding) cancelConstruction(Game, Game.selectedBuilding);
@@ -1976,7 +2022,7 @@ function createState() {
     res: [{ food: 0, wood: 0, gold: 0, stone: 0 }, { food: 0, wood: 0, gold: 0, stone: 0 }],
     selection: [], selectedBuilding: null, groups: {}, keys: {},
     cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, placing: null,
-    time: 0, wave: 0, age: 0, ageBonus: 0, nextId: 1, started: false, rnd: mulberry32(CFG.SEED),
+    time: 0, wave: 0, age: 0, ageBonus: 0, nextId: 1, started: false, result: null, rnd: mulberry32(CFG.SEED),
     dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0,
   };
   Game.toast = (m) => toast(Game, m);
@@ -1991,7 +2037,7 @@ function resetGame(Game) {
   Game.buildings = [];
   Game.nextId = 1;
   Game.time = 0; Game.wave = 0; Game.age = 0; Game.ageBonus = 0; Game.rnd = mulberry32(CFG.SEED);
-  Game.selection = []; Game.selectedBuilding = null; Game.placing = null;
+  Game.selection = []; Game.selectedBuilding = null; Game.placing = null; Game.result = null;
   Game.mmBase = null;
   Game.res[0] = Object.assign({}, CFG.START);
   Game.res[1] = Object.assign({}, CFG.START);
@@ -2082,6 +2128,7 @@ function boot(doc) {
     commands: d.getElementById('commands'),
     queue: d.getElementById('queue'),
     toast: d.getElementById('toast'),
+    result: d.getElementById('result'),
   };
   for (const k of ['food', 'wood', 'gold', 'stone', 'pop', 'age']) {
     const box = d.getElementById('r_' + k);
@@ -2095,6 +2142,15 @@ function boot(doc) {
   if (!Game.view.ok) return Game;
 
   attachInput(Game, d);
+
+  /* the game-over overlay sits outside the command bar, so its button is wired
+     here with the same data-act="restart" the bar's "New map" button uses. */
+  if (Game.dom.result && Game.dom.result.addEventListener) {
+    Game.dom.result.addEventListener('click', (e) => {
+      const b = buttonAt(e);
+      if (b && b.getAttribute('data-act') === 'restart') resetGame(Game);
+    });
+  }
   Game.started = true;
   renderFrame(Game);
   startLoop(Game);
@@ -2149,7 +2205,7 @@ const AoE2 = {
   unitAnim,
   build, cancelConstruction, demolish, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
-  popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame, commandsHtml,
+  popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame, commandsHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };
 
