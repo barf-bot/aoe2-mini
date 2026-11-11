@@ -84,20 +84,22 @@ HD/DE files later is a directory replacement and nothing else.
     guards); existing §5 `tuning:` check untouched this task; `node tools/audit-line-refs.js`
     stays green because `README.md` now lists `tools/check-stats.mjs`.
 
-- [ ] T2: Generate §1 `CFG`/`KINDS`/`BLD` from `data/` — the numbers become real
+- [x] T2: Generate §1 `CFG`/`KINDS`/`BLD` from `data/` — the numbers become real
   - files: `index.html` §1 (`CFG` 101-119, `KINDS` 121-126, `BLD` 215-230, export block
     1964-1975), `tools/headless-check.js` §5 (229-237), §7b (700-740), §9 (811-828)
   - change: run `node tools/check-stats.mjs --write` so the three tables come from `data/`:
     villager hp 25 / atk 3 / atkTime 0.64 / cost 50 food / time 25 s, militia hp 40 /
-    atk 4 / atkTime 0.5 / cost 50 food + 20 gold / time 35 s, speeds converted through the
-    table (`speed = round(tiles_per_s * CFG.TILE)` → villager 18 px/s, militia 20 px/s —
+    atk 4 / atkTime 0.5 / cost 50 food + 20 gold / time 21 s (the table's TrainTime),
+    speeds converted through the table (`speed = round(tiles_per_s * CFG.TILE)` →
+    villager 18 px/s, militia 20 px/s —
     the design's tiles/s → px rule), `CFG.CARRY_MAX` 15 → 10, `BLD` hp/cost from the table
     (Town Center 2400 hp, 275 wood + 100 stone; farm 480/60; barracks 1200/175; mill
-    600/100; camps 600/100) with `w`/`h`/`pop`/`field` unchanged so the footprint rule in
+    600/100; mining camp 600/100; lumber camp 1800/150 — the camp row the sources share)
+    with `w`/`h`/`pop`/`field` unchanged so the footprint rule in
     §5b3 keeps holding; each block gets a `// generated from data/units.json` banner.
     Section 4 stays DOM-free; the `Map of this file` banner (85-97) is untouched.
   - done when: `node tools/check-stats.mjs` exits 0 (`KINDS/BLD/CFG match data/ — N
-    fields`) and `node tools/headless-check.js` prints `121/121 checks passed`.
+    fields`) and `node tools/headless-check.js` prints `122/122 checks passed`.
   - test: the §5 `tuning: CFG and KINDS match the agreed numbers` check is amended in
     place to read `data/units.json` + `data/buildings.json` instead of six hand-typed
     literals (not duplicated); one new §5 check

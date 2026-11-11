@@ -173,11 +173,10 @@ function gameSurface() {
 }
 
 function replaceBlock(html, name, rendered) {
-  const re = new RegExp(`(?:^|\n)(?:(// GENERATED FROM [^\n]*\n)?const ${name} = \\{[\\s\\S]*?\n\\};)`);
-  const m = re.exec(html);
+  const m = new RegExp(`(^|\\n)((?:// GENERATED FROM [^\\n]*\\n)?const ${name} = \\{[\\s\\S]*?\\n\\};)`).exec(html);
   if (!m) fail(`no \`const ${name} = { ... };\` block found in index.html`);
-  const start = m.index + (m[0] === '\n' ? 1 : 0);
-  return html.slice(0, start) + rendered + html.slice(m.index + m[0].length);
+  // m[1] is the newline the match consumed; re-emitting it keeps the block on its own line.
+  return html.slice(0, m.index) + m[1] + rendered + html.slice(m.index + m[0].length);
 }
 
 function writeBlocks() {

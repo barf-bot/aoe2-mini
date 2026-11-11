@@ -98,13 +98,14 @@
 
 /* ------------------------------ 1. config ------------------------------ */
 
+// GENERATED FROM data/units.json -- edit the data or run `node tools/check-stats.mjs --write`.
 const CFG = {
   MAP_W: 96,
   MAP_H: 96,
   TILE: 22,                       // px per tile (single zoom level for now)
   SEED: 1337,                     // fixed map => reproducible, testable
   START: { food: 100, wood: 100, gold: 50, stone: 50 },
-  CARRY_MAX: 15,                  // villager carry capacity (AoE2 uses 10)
+  CARRY_MAX: 10,                  // villager carry capacity (AoE2 uses 10 - see design{})
   WORKERS_PER_TILE: 2,            // max villagers per tile (spreads the start squad)
   GATHER_RATE: 1.5,               // resource units per second while working
   CANCEL_REFUND: 0.8,             // fraction of a building's cost refunded on construction cancel
@@ -118,11 +119,22 @@ const CFG = {
   RES: { tree: 60, gold: 800, stone: 450, berry: 150 },
 };
 
+// GENERATED FROM data/units.json -- edit the data or run `node tools/check-stats.mjs --write`.
 const KINDS = {
-  villager: { label:'Villager', hp:60,  speed:46, atk:3,  atkTime:1.0, r:5,
-              cost:{food:50},          time:2.5, buildable:true },
-  militia:  { label:'Militia',  hp:110, speed:58, atk:11, atkTime:0.9, r:6,
-              cost:{food:60, gold:20}, time:3, buildable:false },
+  villager: {
+    label: 'Villager', hp: 25, speed: 18, atk: 3,
+    atkTime: 0.64, r: 5, time: 25, buildable: true,
+    cost: { food: 50 }, meleeArmor: 0,
+    pierceArmor: 0, lineOfSight: 4,
+    range: 0, minRange: 0, reload: 2, accuracy: 100,
+  },
+  militia: {
+    label: 'Militia', hp: 40, speed: 20, atk: 4,
+    atkTime: 0.5, r: 6, time: 21, buildable: true,
+    cost: { food: 50, gold: 20 }, meleeArmor: 0,
+    pierceArmor: 1, lineOfSight: 4,
+    range: 0, minRange: 0, reload: 2, accuracy: 100,
+  },
 };
 
 /* Sprite atlas v2 -- every unit frame lives in ONE image, assets/sprites.png.
@@ -212,21 +224,50 @@ function bldSpriteFor(kind, team) {
   return (c && typeof c.sx === 'number' && typeof c.sw === 'number') ? c : null;
 }
 
+// GENERATED FROM data/buildings.json -- edit the data or run `node tools/check-stats.mjs --write`.
 const BLD = {
-  town_center: { label:'Town Center', hp:1800, w:3, h:3, cost:{wood:275},
-                 time:25, pop:5, trains:['villager'] },
-  house:       { label:'House',       hp:560,  w:2, h:2, cost:{wood:25},
-                 time:4,  pop:5, trains:[] },
-  farm:        { label:'Farm',        hp:320,  w:2, h:2, cost:{wood:60},
-                 time:6,  pop:0, trains:[], field:170 },
-  barracks:    { label:'Barracks',    hp:1300, w:2, h:2, cost:{wood:175},
-                 time:12, pop:0, trains:['militia'] },
-  lumber_camp: { label:'Lumber Camp', hp:950,  w:1, h:1, cost:{wood:100},
-                 time:8,  pop:0, trains:[] },
-  mining_camp: { label:'Mining Camp', hp:950,  w:1, h:1, cost:{wood:100},
-                 time:8,  pop:0, trains:[] },
-  mill:        { label:'Mill',        hp:1100, w:2, h:2, cost:{wood:175},
-                 time:10, pop:0, trains:[], field:170 },
+  town_center: {
+    label: 'Town Center', hp: 2400, w: 3, h: 3,
+    cost: { wood: 275, stone: 100 }, time: 100, pop: 5,
+    trains: ['villager'],
+    attack: 5, meleeArmor: 3, pierceArmor: 5, lineOfSight: 8, range: 6, reload: 2, accuracy: 100, garrisonCapacity: 15,
+  },
+  house: {
+    label: 'House', hp: 550, w: 2, h: 2,
+    cost: { wood: 25 }, time: 25, pop: 5,
+    trains: [],
+    attack: 0, meleeArmor: -2, pierceArmor: 7, lineOfSight: 2, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 0,
+  },
+  farm: {
+    label: 'Farm', hp: 480, w: 2, h: 2,
+    cost: { wood: 60 }, time: 15, pop: 0,
+    trains: [],
+    attack: 0, meleeArmor: 0, pierceArmor: 0, lineOfSight: 1, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 0, field: 170,
+  },
+  barracks: {
+    label: 'Barracks', hp: 1200, w: 2, h: 2,
+    cost: { wood: 175 }, time: 50, pop: 0,
+    trains: ['militia'],
+    attack: 0, meleeArmor: 0, pierceArmor: 7, lineOfSight: 6, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 10,
+  },
+  lumber_camp: {
+    label: 'Lumber Camp', hp: 1800, w: 1, h: 1,
+    cost: { wood: 150 }, time: 40, pop: 0,
+    trains: [],
+    attack: 0, meleeArmor: 0, pierceArmor: 7, lineOfSight: 6, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 0,
+  },
+  mining_camp: {
+    label: 'Mining Camp', hp: 600, w: 1, h: 1,
+    cost: { wood: 100 }, time: 35, pop: 0,
+    trains: [],
+    attack: 0, meleeArmor: 0, pierceArmor: 7, lineOfSight: 6, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 0,
+  },
+  mill: {
+    label: 'Mill', hp: 600, w: 2, h: 2,
+    cost: { wood: 100 }, time: 35, pop: 0,
+    trains: [],
+    attack: 0, meleeArmor: 0, pierceArmor: 7, lineOfSight: 6, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 0, field: 170,
+  },
 };
 
 const AGES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];

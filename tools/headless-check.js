@@ -19,6 +19,12 @@ const cp = require('child_process');
 
 const HTML = process.argv[2] || path.join(__dirname, '..', 'index.html');
 const html = fs.readFileSync(HTML, 'utf8');
+
+// The stat tables index.html's section 1 is generated from (tools/check-stats.mjs
+// proves the two agree). The checks below read them instead of re-typing numbers,
+// so the harness can never pass on a stale literal.
+const dataUnits = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'units.json'), 'utf8'));
+const dataBuildings = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'buildings.json'), 'utf8'));
 const m = html.match(/<script>([\s\S]*?)<\/script>/);
 if (!m) { console.error('FAIL  no <script> block found in ' + HTML); process.exit(1); }
 
@@ -226,15 +232,28 @@ check(AoE2.popCap(Game, 0) === 5, 'pop: Town Center caps population at 5', Strin
 check(AoE2.popUsed(Game, 0) === 4, 'pop: 4 of 5 used', String(AoE2.popUsed(Game, 0)));
 const startRes = JSON.stringify(Game.res[0]);
 check(Game.res[0].wood === 100 && Game.res[0].food === 100, 'roster: starting stock 100 food / 100 wood', startRes);
-// T1 tuning pass: pin the six agreed numbers so a future revert cannot pass silently.
-check(AoE2.CFG.START.food === 100 && AoE2.CFG.START.wood === 100 &&
-      AoE2.CFG.START.gold === 50 && AoE2.CFG.START.stone === 50 &&
-      AoE2.CFG.CARRY_MAX === 15 && AoE2.CFG.GATHER_RATE === 1.5 &&
-      AoE2.KINDS.villager.time === 2.5 && AoE2.KINDS.militia.time === 3 &&
-      AoE2.CFG.RES.berry === 150,
-  'tuning: CFG and KINDS match the agreed numbers',
+// T1 pinned six numbers by hand; they now come from data/, so compare against the
+// tables instead of literals (tools/check-stats.mjs is the equality proof, this is
+// the in-game assertion that the generated section 1 is what the sim uses).
+check(AoE2.CFG.START.food === dataUnits.cfg.START.food &&
+      AoE2.CFG.START.wood === dataUnits.cfg.START.wood &&
+      AoE2.CFG.START.gold === dataUnits.cfg.START.gold &&
+      AoE2.CFG.START.stone === dataUnits.cfg.START.stone &&
+      AoE2.CFG.CARRY_MAX === dataUnits.cfg.CARRY_MAX &&
+      AoE2.CFG.GATHER_RATE === dataUnits.cfg.GATHER_RATE &&
+      AoE2.KINDS.villager.time === dataUnits.units.villager.time &&
+      AoE2.KINDS.militia.time === dataUnits.units.militia.time &&
+      AoE2.CFG.RES.berry === dataUnits.cfg.RES.berry,
+  'tuning: CFG and KINDS carry the data/ table values',
   JSON.stringify({ start: AoE2.CFG.START, carry: AoE2.CFG.CARRY_MAX, gather: AoE2.CFG.GATHER_RATE,
     villagerTime: AoE2.KINDS.villager.time, militiaTime: AoE2.KINDS.militia.time, berry: AoE2.CFG.RES.berry }));
+// The bug class this port introduces: a tiles/s number written into a px field.
+check(Object.keys(dataUnits.units).every((k) => AoE2.KINDS[k] &&
+      AoE2.KINDS[k].speed === Math.round(AoE2.CFG.TILE * dataUnits.units[k].speedTps)),
+  'tuning: KINDS.speed is always the table\'s tiles/s x CFG.TILE',
+  Object.keys(dataUnits.units)
+    .map((k) => `${k}=${AoE2.KINDS[k] ? AoE2.KINDS[k].speed : 'missing'}/` +
+                `${Math.round(AoE2.CFG.TILE * dataUnits.units[k].speedTps)}px`).join(' '));
 // Phase-2 T1: refunds have their own writer — credit exactly the given cost.
 const rf = AoE2.createState();
 const rfWood = rf.res[0].wood;
@@ -665,8 +684,9 @@ check(house && v0.order.kind === 'build', 'build: villager reassigned to the sit
 check((Game.blocks.get(house.id) || []).length === 4, 'build: occupancy registered (4 tiles)',
   String((Game.blocks.get(house.id) || []).length));
 check(house.built < 1, 'build: starts under construction', 'built=' + house.built);
-stepRender(30 * 12);
-check(house.built >= 1, 'build: reaches completion in ~4s of villager work', 'built=' + Math.round(house.built * 100) + '%');
+stepRender(Math.ceil(AoE2.BLD.house.time / DT) + 2);          // exactly the table's build time
+check(house.built >= 1, 'build: reaches completion in ~' + AoE2.BLD.house.time + 's of villager work',
+  'built=' + Math.round(house.built * 100) + '%');
 check(house.hp === house.maxHp, 'build: hp scales with progress to full', house.hp + '/' + house.maxHp);
 check(AoE2.popCap(Game, 0) === 10, 'pop: house raises the cap to 10', String(AoE2.popCap(Game, 0)));
 check(AoE2.siteFree(Game, house.tx, house.ty, 2, 2) === false, 'site: occupied land rejected after building', 'rejected');
@@ -687,7 +707,8 @@ const mbFarmSpot = mbHouse && freeSpotAround(mb.world, mb, tOf(mv[1].x), tOf(mv[
 const mbFarm = mbFarmSpot && AoE2.build(mb, 'farm', mbFarmSpot.tx * AoE2.CFG.TILE + 4, mbFarmSpot.ty * AoE2.CFG.TILE + 4);
 const buildersOn = (bid) => mb.units.filter((u) => u.order.kind === 'build' && u.order.b === bid).map((u) => u.id);
 const mbBuilders = mbHouse && mbFarm ? [buildersOn(mbHouse.id), buildersOn(mbFarm.id)] : null;
-for (let i = 0; i < 30 * 20; i++) AoE2.stepGame(mb, DT);
+// the slower of the two parallel sites (the house) decides the window, from BLD
+for (let i = 0; i < Math.ceil(AoE2.BLD.house.time / DT) + 2; i++) AoE2.stepGame(mb, DT);
 check(!!mbHouse && !!mbFarm && !!mbBuilders &&
       mbBuilders[0].length === 1 && mbBuilders[1].length === 1 &&
       mbBuilders[0][0] !== mbBuilders[1][0] && mbHouse.built >= 1 && mbFarm.built >= 1,
@@ -712,7 +733,9 @@ check(['food', 'wood', 'gold', 'stone'].every((res) => dropId(res) === vt.id),
   'dropoff: with only a Town Center every resource walks there',
   ['food', 'wood', 'gold', 'stone'].map((res) => res + '->' + dropId(res)).join(' '));
 cg.selection = [cv.id];
-cg.res[0].wood = 500;
+const woodCost = (k) => Object.values(dataBuildings.buildings[k].cost).reduce((s, v) => s + v, 0);
+const secCost = ['lumber_camp', 'mining_camp', 'mill', 'farm'].reduce((s, k) => s + woodCost(k), 0);
+cg.res[0].wood = secCost;   // fund exactly the four sites this section builds, priced from the table
 const vTx = Math.floor(cv.x / AoE2.CFG.TILE), vTy = Math.floor(cv.y / AoE2.CFG.TILE);
 const put = (kind, size) => {
   const spot = freeSpotAround(cg.world, cg, vTx, vTy, size, size, 6);
@@ -723,8 +746,10 @@ const ml = put('mill', 2), f2 = put('farm', 2);
 const okShapes = lc && mc && f2 && lc.w === 1 && lc.h === 1 && mc.w === 1 && mc.h === 1 && ml && ml.w === 2 && ml.h === 2;
 check(!!okShapes, 'build: camps are 1x1 and the mill is 2x2, all placeable',
   [lc && lc.w + 'x' + lc.h, mc && mc.w + 'x' + mc.h, ml && ml.w + 'x' + ml.h, f2 && f2.w + 'x' + f2.h].join(' '));
-check(Math.floor(cg.res[0].wood) === 500 - 100 - 100 - 175 - 60,
-  'build: lumber/mining camps cost 100 wood, the mill 175', String(Math.floor(cg.res[0].wood)));
+check(Math.floor(cg.res[0].wood) === 0,
+  'build: every site costs exactly its table price (' +
+  ['lumber_camp', 'mining_camp', 'mill', 'farm'].map((k) => k.replace('_camp', '') + ' ' + woodCost(k)).join(', ') + ' wood)',
+  String(Math.floor(cg.res[0].wood)));
 [lc, mc, ml, f2].forEach((b) => { if (b) b.built = 1; });
 check(dropId('wood') === lc.id, 'dropoff: wood walks to the Lumber Camp, not the Town Center',
   String(dropId('wood')));
@@ -798,7 +823,7 @@ check(Math.floor(Game.res[0].food) === Math.floor(foodBt - 50), 'train: exactly 
   Math.floor(foodBt) + ' -> ' + Math.floor(Game.res[0].food));
 check(AoE2.train(Game, tc, 'militia') === undefined && Game.toastMsg === 'Militia needs a Town Center',
   'train: militia rejected from a Town Center', JSON.stringify(Game.toastMsg));
-stepRender(30 * 7);
+stepRender(Math.ceil(AoE2.KINDS.villager.time / DT) + 2);     // the table's train time, not 7s
 check(Game.units.length === unitsBt + 2, 'train: unit spawns when the timer expires',
   unitsBt + ' -> ' + Game.units.length);
 check(blueVill().length === 5, 'train: the new unit is a villager', String(blueVill().length));
@@ -815,8 +840,9 @@ const foeHp0 = foe.hp;
 const foeId = foe.id;
 scout.x = foe.x - AoE2.CFG.TILE; scout.y = foe.y;
 scout.order = { kind: 'attack', target: foeId };
-for (let i = 0; i < 30 * 12 && !foe.dead; i++) { AoE2.stepGame(Game, DT); if (i % 30 === 0) AoE2.renderFrame(Game); }
-check(foe.dead, 'combat: militia kills a 60hp villager in ~5.4s of swings',
+const killSecs = Math.ceil(foeHp0 / AoE2.KINDS.militia.atk) * AoE2.KINDS.militia.atkTime;
+for (let i = 0; i < Math.ceil(killSecs / DT) + 2 && !foe.dead; i++) { AoE2.stepGame(Game, DT); if (i % 30 === 0) AoE2.renderFrame(Game); }
+check(foe.dead, `combat: militia kills a ${foeHp0}hp villager in ~${killSecs.toFixed(1)}s of swings`,
   'hp ' + foeHp0 + ' -> ' + Math.max(0, foe.hp) + (foe.dead ? ' (dead)' : ''));
 check(!Game.units.includes(foe), 'combat: corpse pruned from the roster', 'removed');
 const hurt = Game.units.find(u => u.team === 1 && u.hp < u.maxHp);
