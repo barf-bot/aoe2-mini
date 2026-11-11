@@ -217,7 +217,7 @@ HD/DE files later is a directory replacement and nothing else.
     set`, `ui: the result overlay renders and its button resets the game` — plus the
     existing §12 reset checks and `preview.png` unchanged (the overlay is DOM, not canvas).
 
-- [ ] T7: Docs sync and the full verification pass
+- [x] T7: Docs sync and the full verification pass
   - files: `docs/GAME_RULES.md` (stats come from `data/`; speeds in tiles/s × `TILE`; ranged
     rules — range/min range/reload/accuracy; Town Center attack; win/lose),
     `docs/ARCHITECTURE.md` (`data/` + `tools/check-stats.mjs` rows, the new §4

@@ -3,7 +3,7 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions are the git
 commits on `main`.
 
-## [Unreleased] — 2026-11-04
+## [Unreleased] — 2026-11-11
 
 ### Board rules pass (T1–T5) — plan `docs/plans/2026-11-04-board-rules.md`
 
@@ -51,6 +51,54 @@ buildings with a training queue (T4); the footer renders and dispatches `Cancel`
 `Demolish` buttons (T5). Harness 111 → 119 checks (the `tuning:` pass plus refund, three
 `cancel:`, three `demolish:` and the `ui:` dispatch checks; the §9b raze check now also
 asserts the selection clears).
+
+### OG content port (T1–T7) — plan `docs/plans/2026-11-11-og-content-port.md`
+
+The invented numbers and the drawn art are gone: the stats come from the vendored AoE2 tables
+and every sprite frame from the ripped graphics (f3ff6e6 → 08ca6a8), and the harness went
+121 → 137 checks across the plan.
+
+- **T1 — vendored tables + the stats check (f3ff6e6):** `data/units.json`,
+  `data/buildings.json` and `data/README.md` vendor the community `.dat` / `aoe2techtree`
+  rows the game is built from (id + `internal_name` per row, fetch date and swap rule
+  documented); `tools/check-stats.mjs` extracts the `<script>`, requires it and exits 1 with
+  one line per drifted field, `--write` renders the three §1 blocks. Written before the code
+  it guards, and documented in `README.md` + `AGENTS.md` so `audit-line-refs` stays green.
+- **T2 — section 1 becomes generated (ba010c6):** `CFG`/`KINDS`/`BLD` are now the rendered
+  form of `data/` — villager 25 hp, atk 3, 0.64 s, 18 px/s (0.8 tiles/s), 50 food, 25 s;
+  militia 40 hp, atk 4, 0.5 s, 20 px/s, 50 food + 20 gold, 21 s; `CFG.CARRY_MAX` 15 → 10;
+  Town Center 2400 hp (275 wood + 100 stone), farm 480/60, barracks 1200/175, mill 600/100,
+  lumber camp 1800/150, mining camp 600/100 — with `w`/`h`/`pop`/`field` untouched so the
+  footprint rule keeps holding. The §5 `tuning:` check reads `data/` instead of six
+  hand-typed literals, and a second one pins `KINDS.speed === round(tiles/s × CFG.TILE)` —
+  the exact bug class the tiles/s → px conversion introduces (121 → 122 checks).
+- **T3 — the atlas is composed, not drawn (629d0ec):** `data/sprites/` + `data/sprites.json`
+  carry the ripped frames (the source's player-colour ramp mapped onto
+  `TEAM[t].dark/main/light`) and `tools/gen-atlas.js` composes `assets/sprites.png` and
+  regenerates `SPRITE_SHEET`/`SPRITES`/`WORK_ANIM`/`BLD_SPRITES` — no hand-authored cells
+  left in `index.html`; `preview.png` is the real renderer's own frame.
+- **T4 — the archer line, from the same table (fc21c75):** `data/units.json` gains `archer`
+  (id 4 `ARCHR`: 30 hp, atk 4, range 4, min 0, reload 2 s, accuracy 80 %, 25 wood + 45 gold,
+  0.96 tiles/s) and `data/buildings.json` gains `archery_range` (id 87 `ARRG`: 1500 hp,
+  175 wood, 2×2, `trains: ['archer']`), with hotkey `R`, the footer button, the delegate case
+  and the sprite cells; `preview.png` now places an archer. New §8 train check (the table's
+  stats, not new ones) and the §11 placement check.
+- **T5 — ranged combat off the table (d51a499):** `KINDS.atkType` splits melee from ranged.
+  A shooter faces its mark, stops at `range × CFG.TILE` and fires on the `reload` cadence;
+  `Game.projectiles` + `spawnArrow`/`updateProjectiles`/`stepBuildingAttacks` and
+  `cfg.PROJ_SPEED` 176 px/s join §4, the hit is gated by `Game.rnd` against `accuracy`, one
+  arrow never hits twice and a shot at a corpse doesn't splash. `autoAcquire` compares against
+  the per-kind range instead of the single global radius, and the Town Center (attack 5,
+  LOS 8) shoots through the same path — 133 checks, incl. the new §9c (125 → 133).
+- **T6 — win/lose (08ca6a8):** `setResult` computes the result from the board inside
+  `removeBuilding` (the one exit shared by raze, cancel and demolish): no Town Center left on
+  one side ends the game — `victory` for the enemy's, `defeat` for yours. `stepSim` stops
+  after the clock tick once a result is set, and the `#result` overlay (`resultHtml`, styled
+  in the head) renders Victory/Defeat with a `New game` button that calls `resetGame`.
+  New §9e (133 → 137).
+- **T7 — docs sync:** this entry plus `docs/GAME_RULES.md`, `docs/ARCHITECTURE.md`,
+  `README.md` and `docs/ROADMAP.md` re-pointed at the final file — every `index.html:NNN`
+  reference and section range re-measured through `tools/audit-line-refs.js`.
 
 ### Added
 - **Building sprites (task 5):** every built building now blits a team-coloured atlas

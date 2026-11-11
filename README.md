@@ -11,13 +11,17 @@ no framework, one PNG of unit art. Open `index.html` and play.
 
 - Procedural map: grass, water, forest, berry bushes, gold and stone deposits, plus fog of war
 - A Town Center with villagers that harvest → carry → deposit → retarget when a tile empties
-- Buildings: house (population), farm (food field), all constructed over time with hp scaling
+- Buildings: house (population), farm (food field), barracks, lumber camp, mining camp, mill
+  and archery range, all constructed over time with hp scaling
 - Ages: Dark → Feudal → Castle, with the food costs and unlock rules
-- Units: villager and militia drawn from ripped AoE2 sprite frames (`assets/sprites.png`),
-  a training queue at the Town Center, attack cooldowns, deaths
+- Units: villager, militia and archer, every frame real ripped art from
+  `assets/sprites.png`; training queues at the Town Center and the Archery Range, melee
+  swings and arrows in flight, deaths
+- Win / lose: razing the enemy Town Center ends the game with a `Victory` overlay, losing
+  your own a `Defeat` one; the simulation freezes and the overlay's `New game` restarts
 - Controls: click / drag-select, control groups (`Ctrl+1…9`, `1…9` to recall), right-click
   move / attack / gather, hotkeys (`H` house, `F` farm, `B` barracks, `L` lumber camp,
-  `G` mining camp, `M` mill, `T` age, `Esc` to cancel), minimap camera drag
+  `G` mining camp, `M` mill, `R` archery range, `T` age, `Esc` to cancel), minimap camera drag
 - An enemy village that reacts and fights back
 
 ## Known limits (it's a prototype)
@@ -46,18 +50,18 @@ Start with `AGENTS.md` if you're an agent picking the repo up cold.
 | File | Purpose |
 |---|---|
 | `index.html` | the entire game (markup, styles, engine, renderer) |
-| `assets/sprites.png` | the sprite atlas (1215×684): unit rows — villager idle/walk/farm_a/farm_b/chop_a/chop_b/mine_a/mine_b and militia idle/walk/attack_a/attack_b, blue row then red row — above the building cells drawn at their footprints |
+| `assets/sprites.png` | the sprite atlas (1522×684): unit cells — villager idle/walk/farm_a/farm_b/chop_a/chop_b/mine_a/mine_b, militia and archer idle/walk/attack_a/attack_b, blue above red — above the building cells drawn at their footprints |
 | `data/units.json`, `data/buildings.json` | the vendored AoE2 stat tables (sources in [`data/README.md`](data/README.md)) — the only place unit/building/world numbers are authored |
 | `data/sprites.json`, `data/sprites/` | the vendored sprite frames (ripped AoE2 art, recoloured per team) and the atlas manifest `tools/gen-atlas.js` composes the sheet from |
 | `tools/gen-atlas.js` | composes `assets/sprites.png` from `data/sprites.json` + `data/sprites/` and regenerates section 1's `SPRITE_SHEET`/`SPRITES`/`WORK_ANIM`/`BLD_SPRITES` |
 | `tools/check-stats.mjs` | renders section 1's `CFG`/`KINDS`/`BLD` from `data/` and fails with one line per field when `index.html` drifts (`--write` regenerates the blocks) |
-| `tools/headless-check.js` | extracts the `<script>` from the HTML, stubs the DOM, runs the simulation and asserts 122 invariants — currently **122/122 pass** |
+| `tools/headless-check.js` | extracts the `<script>` from the HTML, stubs the DOM, runs the simulation and asserts 137 invariants — currently **137/137 pass** |
 | `tools/render-preview.js` | boots the same code against a real canvas (`@napi-rs/canvas`) and writes `preview.png`, so the renderer is verified, not just assumed |
 | `tools/audit-line-refs.js` | checks that every `index.html:NNN` reference in the docs still points at the code it names, and that the documented section ranges match the real ones |
 | `preview.png` | a real frame of the game rendered headlessly |
 
 ```bash
-node tools/headless-check.js        # 122/122 checks passed
+node tools/headless-check.js        # 137/137 checks passed
 node tools/check-stats.mjs          # verifies index.html against the vendored stat tables
 node tools/render-preview.js        # rewrites preview.png
 node tools/gen-atlas.js             # composes assets/sprites.png from data/sprites/ and rewrites the tables

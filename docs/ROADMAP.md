@@ -32,8 +32,10 @@ prototypes stall.
 6. **Wooden barricade (Feudal Age wall segment) + gated choke points.** 1×1 segment
    placement, needs a `BLD.age` gate so buildings unlock by age; pathing through gaps.
    Folded into phase 2 of the 2026-11-04 board-rules plan.
-7. **Win/lose conditions.** Currently there is no game-over; add "destroy the enemy Town
-   Center" and a victory overlay.
+7. **Win/lose conditions.** Shipped 2026-11-11 by the OG-content port
+   (`docs/plans/2026-11-11-og-content-port.md`, T6): `setResult` ends the game the moment a
+   side has no Town Center left, `stepSim` freezes on the result and the `#result` overlay
+   renders Victory/Defeat with a `New game` button.
 
 ## P2 — presentation and reach
 
@@ -85,7 +87,7 @@ frames, the archer line, ranged combat, win/lose, docs). Left over on purpose:
 
 ## Process items (not features)
 
-- **Split the harness checks by domain.** Today it's 133 checks in one file; group them into
+- **Split the harness checks by domain.** Today it's 137 checks in one file; group them into
   `economy / build / combat / input / ui` sections so a failure names its area instantly.
 - **Pin the toolchain**: a `package.json` with `devDependencies` (`@napi-rs/canvas`) and an
   `npm test` script would make CI possible without touching the game's dependency-free rule.
