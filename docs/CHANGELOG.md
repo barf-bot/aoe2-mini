@@ -115,7 +115,7 @@ ranks (a1bcebd → 452a269); the harness went 137 → 156 checks across the plan
   waypoint list (`u.path` / `u.pathFor` / `u.pathAt`), the walk follows the route's tile
   centres and then the exact ordered point, and one rule says when the cache dies — a changed
   goal tile or a bumped `Game.mapEpoch` (a building went up, a tile ran dry) — which is what
-  re-paths mid-walk; `walkable` now asks `tileOf`/`solidTile` instead of repeating the floor
+  re-paths mid-walk; `walkable` now asks the shared `tileOf` instead of repeating the floor
   maths inline (142 → 147 checks).
 - **T3 — every order kind routes to a standing spot (1174571):** `standTarget` answers with
   a tile to stand on — the ordered point itself when it is walkable or already within the

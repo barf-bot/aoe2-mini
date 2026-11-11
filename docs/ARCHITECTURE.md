@@ -25,7 +25,8 @@ function — no hidden globals, which is what makes the logic testable from node
 ```
 Game = { world, units[], buildings[], projectiles[], blocks(Map buildingId -> tiles), sprites{atlas},
          res[2], age, ageBonus, rnd(mulberry32(CFG.SEED)), cam{x,y}, keys, mouse, drag, selection[],
-         selectedBuilding, groups{}, placing, started, wave, time, frame, mapEpoch(route cache epoch),
+         selectedBuilding, groups{}, placing, started, wave, time, frame,
+         mapEpoch(route cache epoch), pathQueries(findPath calls),
          result('victory' | 'defeat' | null), dom{...}, view, minimapCache }
 ```
 
