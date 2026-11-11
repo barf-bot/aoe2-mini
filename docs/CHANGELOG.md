@@ -100,6 +100,41 @@ and every sprite frame from the ripped graphics (f3ff6e6 → 08ca6a8), and the h
   `README.md` and `docs/ROADMAP.md` re-pointed at the final file — every `index.html:NNN`
   reference and section range re-measured through `tools/audit-line-refs.js`.
 
+### A\* pathfinding — walk around, not into (T1–T5) — plan `docs/plans/2026-11-11-astar-pathfinding.md`
+
+Movement stops being straight-line: orders route over the tile grid and squads arrive in
+ranks (a1bcebd → 452a269); the harness went 137 → 155 checks across the plan.
+
+- **T1 — `findPath`, the A\* core (b24d020):** an 8-connected, uniform-cost A\* over the
+  tiles `walkable` allows — no diagonal squeezed between two solid tiles, `CFG.ASTAR_MAX_NODES`
+  capping one query — exported for the harness and graded against the harness's own Dijkstra:
+  the new §6c pins an open-grass route at exactly its optimal length, a route around a water
+  inlet within 15% of it, the corner rule and one capped query for an unreachable goal
+  (137 → 142 checks).
+- **T2 — `moveUnit` walks routes instead of sliding (ddf0a0c):** the move order carries a
+  waypoint list (`u.path` / `u.pathFor` / `u.pathAt`), the walk follows the route's tile
+  centres and then the exact ordered point, and one rule says when the cache dies — a changed
+  goal tile or a bumped `Game.mapEpoch` (a building went up, a tile ran dry) — which is what
+  re-paths mid-walk; `walkable` now asks `tileOf`/`solidTile` instead of repeating the floor
+  maths inline (142 → 147 checks).
+- **T3 — every order kind routes to a standing spot (1174571):** `standTarget` answers with
+  a tile to stand on — the ordered point itself when it is walkable or already within the
+  order's arrival radius, else `workPos` for a building / `workSpot` for any other tile — so
+  harvest, build, deposit and attack orders stop walking at a solid centre and all run one
+  pipeline, order → standTarget → findPath → step (147 → 151 checks).
+- **T4 — formation slots replace the golden-angle scatter (452a269):** `formationSlots` gives
+  a group's `move` orders one distinct walkable tile each on a centred `cols = ceil(sqrt(n))`
+  grid (the `CFG.UNIT_SEP` pitch expressed on the tile grid, solid and already-held cells
+  skipped, the grid grown until everybody is housed, the nearest free slot paired to the
+  nearest unit); the slot is written into the order *and* `u.slot` and released when the order
+  retires, so a squad arrives in ranks instead of stacked on one tile and a parked group needs
+  zero `separate()` pushes (151 → 155 checks).
+- **T5 — docs sync:** this entry plus `docs/GAME_RULES.md` (its `## Movement` section now
+  documents the routing rule instead of the straight-line limit), `docs/ARCHITECTURE.md` (the
+  `pathfinding` sub-block and a `### Pathfinding` section), `docs/ROADMAP.md` (P0.2 shipped)
+  and `AGENTS.md` re-pointed at the final file — every `index.html:NNN` reference and section
+  range re-measured through `tools/audit-line-refs.js`.
+
 ### Added
 - **Building sprites (task 5):** every built building now blits a team-coloured atlas
   cell instead of the flat footprint rectangle — `BLD_SPRITES`/`bldSpriteFor` join the

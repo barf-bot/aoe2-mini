@@ -1,6 +1,6 @@
 # A\* pathfinding — walk around, not into (round: movement)
 
-Status: in progress
+Status: done
 
 ## Design
 
@@ -180,7 +180,7 @@ proving check and the `Map of this file` banner stays truthful.
     same for `findPath`), and the fixture squad stands in ranks rather than stacked on one
     tile — a stack crawls for reasons of its own, as a throwaway run proved.
 
-- [ ] T5: Docs sync and the full verification pass
+- [x] T5: Docs sync and the full verification pass
   - files: `docs/GAME_RULES.md` (the `## Movement` block, 40-51: the
     "Movement itself is still straight-line axis-sliding … no A\* yet (roadmap P0.2)"
     bullets replaced by the A\* rule — uniform cost, route caching + re-path triggers,

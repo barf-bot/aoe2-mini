@@ -10,12 +10,13 @@ prototypes stall.
    stub DOM + a headless render, not by a human clicking. Run the page in
    `browser_navigate`/Playwright, screenshot the live site and compare against
    `preview.png`. *Done when:* a live-site screenshot is attached and matches the sim state.
-2. **A\* pathfinding around water.** Movement is straight-line + walkability today, so
-   units stall on coastlines and stack against each other. *Done when:* a test paths a
-   villager around a water inlet and the route length is within ~15% of optimal.
-   **Known limit the 2026-11-04 board-rules pass leaves in place:** terrain and buildings
-   went solid (T2), so straight-line movement against a now-solid tile can still
-   detour-stall around big blobs — the pass bought solidity, not pathfinding.
+2. **A\* pathfinding around water.** Shipped 2026-11-11 by the pathfinding plan
+   (`docs/plans/2026-11-11-astar-pathfinding.md`): `findPath` routes over the tile grid
+   (uniform cost, 8-connected, no diagonal cut between two solid tiles), the route is
+   cached per order and re-pathed when the world changes, `standTarget` resolves a solid
+   target into a tile to stand on and `formationSlots` gives every unit in a group its own
+   tile. The exit condition is proven by the §6c harness checks, which grade every route
+   against the harness's own Dijkstra (within ~15% of optimal).
 3. **Ranged combat + a second unit line (archer).** Shipped 2026-11-11 by the
    OG-content port (`docs/plans/2026-11-11-og-content-port.md`, T4 + T5): `KINDS.archer`
    (hp 30, atk 4, range 4, reload 2, accuracy 80) trains from the Archery Range and
