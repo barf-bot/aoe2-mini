@@ -64,7 +64,7 @@ proving check and the `Map of this file` banner stays truthful.
     shifted refs after this task — every code task shifts lines and T5 re-points the docs,
     the 2026-11-11 content-port precedent.
 
-- [ ] T2: `moveUnit` follows routes — a move order carries a path and re-paths
+- [x] T2: `moveUnit` follows routes — a move order carries a path and re-paths
   - files: `index.html` §4 `moveUnit` (959-974, rewritten; the X/Y-slide rules at
     971-972 are deleted because the route's own neighbourhood replaces them), `updateUnit`
     (863, its `move` branch 873-876), `makeUnit` (605-617: `path: null, pathAt: 0,
@@ -98,6 +98,12 @@ proving check and the `Map of this file` banner stays truthful.
     clean walk uses at most two A* queries in 60 steps`, `path: an unreachable move order
     leaves the unit idle`; plus the existing §6 movement-invariant and §6b
     facing/walk-phase checks unchanged.
+  - note (as built): the X/Y slide did not disappear with the route — it now lives in the
+    extracted `stepToward`, which every order whose target tile is solid (`harvest` at a
+    berry, `go_deposit` at a dropoff, `attack`/`build` until T3) still walks, because A*
+    has no route to a solid tile and deleting the slide outright froze those units in
+    place (§5a/§6 went red). T3's `standTarget` gives those orders a routable spot and
+    then the straight step has no caller left.
 
 - [ ] T3: every order kind routes to a standing spot, not at a solid centre
   - files: `index.html` §4 — new `standTarget(Game, u, x, y, stop)` in the pathfinding

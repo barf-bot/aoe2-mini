@@ -792,6 +792,148 @@ check(!!foundRoute && foundRoute[0].tx === 0 && foundRoute[0].ty === 0 &&
     refSteps(FOUNDATION, foundFrom, foundTo) + '; ' +
     (routeProblems(FOUNDATION, foundRoute).join(' ') || 'all later tiles walkable')));
 
+/* -- T2: the move order carries a route (moveUnit, mapEpoch) ------------ */
+// Fixtures: a seeded state flattened to grass (so the only solids are the two
+// Town Centers plus whatever water or pad a check adds), one ordered villager,
+// and walkOrder(), which steps the sim while the order lives and reports every
+// position he occupied plus how many findPath calls it cost (Game.pathQueries —
+// the plan pins the "re-paths every frame" bug class with a number).
+const DIRS8H = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+/** flatState plus a villager ordered `dist` tiles in `dir` (default: the first
+ *  direction with `dist` free tiles in a row). `at` is the ordered point, always
+ *  a tile centre, so arriving exactly and arriving on the tile are the same act. */
+const flatWithOrder = (dist, dir) => {
+  const st = flatState();
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const V = { x: tOf(v.x), y: tOf(v.y) };
+  const free = (x, y) => x >= 0 && y >= 0 && x < st.world.w && y < st.world.h &&
+    !st.occupied.has(tIdx(st, x, y));
+  const d = dir || DIRS8H.find((o) => {
+    for (let k = 1; k <= dist; k++) if (!free(V.x + o[0] * k, V.y + o[1] * k)) return false;
+    return true;
+  });
+  if (!d) return null;
+  const goal = { tx: V.x + d[0] * dist, ty: V.y + d[1] * dist };
+  return { st, v, V, goal, at: tileCentre(st, goal.tx, goal.ty) };
+};
+const orderTo = (f) => { f.v.order = { kind: 'move', x: f.at.x, y: f.at.y }; };
+/** Step the sim while the order lives; report the positions, the step count and
+ *  the findPath calls they cost. */
+const walkOrder = (st, u, max) => {
+  const seen = [], q0 = st.pathQueries || 0;
+  const from = { x: u.x, y: u.y };
+  let n = 0;
+  while (n < max && u.order.kind !== 'idle' && !u.dead) {
+    AoE2.stepGame(st, DT);
+    n++;
+    seen.push({ x: u.x, y: u.y });
+  }
+  return { seen, n, from, queries: (st.pathQueries || 0) - q0 };
+};
+const orderAndWalk = (f, max) => { orderTo(f); return walkOrder(f.st, f.v, max); };
+const routeOf = (u) => (u.path || []).map((t) => t.tx + ',' + t.ty);
+const distTo = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
+
+// 6. one tile of water between the villager and his goal, so the straight line
+// is NOT walkable: every position he stood on must be a tile of the route he
+// cached, and the route must be longer than the straight line to count.
+const detourF = (() => {
+  for (const d of DIRS8H) {
+    const f = flatWithOrder(2, d);
+    if (!f) continue;
+    setTile(f.st, tOf(f.v.x) + d[0], tOf(f.v.y) + d[1], AoE2.T.WATER, 0);   // the middle
+    const w = orderAndWalk(f, 240);
+    if (!w.seen.length) continue;
+    return { f, w, route: routeOf(f.v) };
+  }
+  return null;
+})();
+check(!!detourF && detourF.route.length > 2 &&
+      detourF.w.seen.every((p) => detourF.route.indexOf(tOf(p.x) + ',' + tOf(p.y)) >= 0),
+  'path: a move order walks the stored route, not the straight line',
+  !detourF ? 'no move order cached a route to walk'
+    : `${detourF.w.n} steps over ${detourF.route.length} route tiles ` +
+      `${detourF.route.join(' ')}; ` +
+      `${detourF.w.seen.filter((p) => detourF.route.indexOf(tOf(p.x) + ',' + tOf(p.y)) < 0).length} ` +
+      `positions off the route`);
+
+// 7. the same walk, graded on its end: the order is retired and he stands on the
+// tile he was ordered to (the plan's "ends within CFG.TILE / 2 of the point").
+check(!!detourF && detourF.f.v.order.kind === 'idle' &&
+      distTo(detourF.f.v, detourF.f.at) < AoE2.CFG.TILE / 2,
+  'path: the move order completes on the ordered tile',
+  !detourF ? 'no move order cached a route to walk'
+    : `order ${detourF.f.v.order.kind} after ${detourF.w.n} steps, ${distTo(detourF.f.v, detourF.f.at).toFixed(1)}px ` +
+      `from the ordered point (${detourF.f.at.x},${detourF.f.at.y}), tile ${tOf(detourF.f.v.x)},${tOf(detourF.f.v.y)}`);
+
+// 8. a house lands on the road he is walking — the plan's "a building placed
+// mid-walk": Game.mapEpoch moves, so the very next step re-paths. The pad is
+// chosen so it never swallows his own tile or the goal tile, which are the two
+// other reasons a route can stop being valid.
+const repathF = (() => {
+  for (const d of DIRS8H) {
+    for (let dist = 2; dist <= 5; dist++) {
+      const f = flatWithOrder(dist, d);
+      if (!f) continue;
+      orderTo(f);
+      AoE2.stepGame(f.st, DT);                          // one step: the route is cached
+      const before = routeOf(f.v);
+      if (before.length < 3) continue;
+      const own = tOf(f.v.x) + ',' + tOf(f.v.y), goal = f.goal.tx + ',' + f.goal.ty;
+      const pad = f.v.path.slice(1, -1).find((t) => AoE2.siteFree(f.st, t.tx, t.ty, 2, 2) &&
+        [[0, 0], [1, 0], [0, 1], [1, 1]].every((o) => {
+          const k = (t.tx + o[0]) + ',' + (t.ty + o[1]);
+          return k !== own && k !== goal;
+        }));
+      if (!pad) continue;
+      AoE2.makeBuilding(f.st, 'house', 0, pad.tx, pad.ty);
+      AoE2.stepGame(f.st, DT);                          // the very next step
+      const after = routeOf(f.v);
+      return { f, before, after, w: walkOrder(f.st, f.v, 400), pad };
+    }
+  }
+  return null;
+})();
+check(!!repathF && repathF.after.length > 0 &&
+      repathF.after.join(' ') !== repathF.before.join(' ') &&
+      distTo(repathF.f.v, repathF.f.at) < AoE2.CFG.TILE / 2,
+  'path: a building placed on the route re-paths on the next step',
+  !repathF ? 'no move order cached a route a house could be placed on'
+    : `house at ${repathF.pad.tx},${repathF.pad.ty}: ${repathF.before} -> ${repathF.after}, ` +
+      `${repathF.w.n} further steps, ${distTo(repathF.f.v, repathF.f.at).toFixed(1)}px from the ordered point`);
+
+// 9. the number that pins the bug class: a walk with nothing changing around it
+// must not ask findPath again every frame (60 steps, at most 2 queries).
+const cleanF = flatWithOrder(1);
+const cleanW = cleanF ? orderAndWalk(cleanF, 60) : null;
+check(!!cleanW && cleanW.queries >= 1 && cleanW.queries <= 2 && cleanW.n >= 20,
+  'path: a clean walk uses at most two A* queries in 60 steps',
+  !cleanF ? 'no free tile next to a villager to order him to'
+    : `${cleanW.n} steps, ${cleanW.queries} findPath calls (the bound is 2), moved ` +
+      `${distTo(cleanW.from, { x: cleanF.v.x, y: cleanF.v.y }).toFixed(1)}px`);
+
+// 10. an order with no route at all: ringed with water, the villager neither
+// nose-presses the shore nor twitches — the order is refused and retired.
+const stuckF = (() => {
+  const st = flatState();
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const V = { x: tOf(v.x), y: tOf(v.y) };
+  const d = DIRS8H.find((o) => !st.occupied.has(tIdx(st, V.x + o[0] * 2, V.y + o[1] * 2)));
+  if (!d) return null;
+  for (const o of DIRS8H) setTile(st, V.x + o[0], V.y + o[1], AoE2.T.WATER, 0);
+  const at = tileCentre(st, V.x + d[0] * 2, V.y + d[1] * 2);
+  v.order = { kind: 'move', x: at.x, y: at.y };
+  const w = walkOrder(st, v, 5);
+  return { v, at, w };
+})();
+check(!!stuckF && stuckF.v.order.kind === 'idle' && stuckF.v.x === stuckF.w.from.x &&
+      stuckF.v.y === stuckF.w.from.y,
+  'path: an unreachable move order leaves the unit idle',
+  !stuckF ? 'no villager with a free tile two steps away'
+    : `order ${stuckF.v.order.kind} after ${stuckF.w.n} steps, at ${stuckF.v.x.toFixed(1)},` +
+      `${stuckF.v.y.toFixed(1)} (ordered ${stuckF.at.x},${stuckF.at.y}), ` +
+      `${stuckF.w.queries} findPath calls`);
+
 /* ---- 7. construction ------------------------------------------------ */
 function freeSpotAround(world, Game, tx, ty, w, h, maxR) {
   for (let r = 1; r <= maxR; r++) {

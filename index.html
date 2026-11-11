@@ -612,6 +612,9 @@ function makeUnit(Game, kind, team, x, y) {
     accuracy: k.accuracy,
     face: 1, anim: 0, // sprite mirror + walking clock, both set by moveUnit
     order: { kind: 'idle' }, carry: 0, carryRes: null, work: 0, cd: 0, dead: false,
+    // the A* route behind `order` (findPath/moveUnit): the tile list, the tile
+    // being walked to, and the goal tile + map version that route was built for.
+    path: null, pathAt: 0, pathFor: null, pathEpoch: -1,
   };
   Game.units.push(u);
   return u;
@@ -627,6 +630,7 @@ function makeBuilding(Game, kind, team, tx, ty) {
   };
   Game.buildings.push(b);
   rebuildBlocks(Game);                       // occupancy first: workPos reads it
+  Game.mapEpoch++;                           // the walkable set moved: every cached route is stale
   /* The footprint is solid ground now, so anyone who was standing on it moves to
      the work spot beside the building instead of living inside it (AoE2 does the
      same when a house goes up under a villager). */
@@ -669,6 +673,7 @@ function removeBuilding(Game, b) {
   if (i < 0) return false;
   Game.buildings.splice(i, 1);
   rebuildBlocks(Game);
+  Game.mapEpoch++;                         // the walkable set moved again (findPath)
   if (Game.selectedBuilding === b) Game.selectedBuilding = null;
   setResult(Game);
   return true;
@@ -872,7 +877,10 @@ function updateUnit(Game, u, dt) {
   }
 
   if (o.kind === 'move') {
-    if (moveUnit(Game, u, o.x, o.y, dt)) u.order = { kind: 'idle' };
+    // arrived, or the order has no route at all (u.path still null after the
+    // routing attempt in moveUnit): either way the order is over. Retiring it is
+    // what stops a unit from nose-pressing a shore the A* cannot cross.
+    if (moveUnit(Game, u, o.x, o.y, dt) || u.path === null) u.order = { kind: 'idle' };
     return;
   }
 
@@ -1051,14 +1059,16 @@ function findPath(Game, from, to) {
   return null;
 }
 
-/** Move `u` toward (x,y); returns true on arrival. Slides along water edges. */
-function moveUnit(Game, u, x, y, dt, stop) {
-  const s = stop || 1;
-  const dx = x - u.x, dy = y - u.y;
+/** The pre-route walk, now a named primitive: one frame's step of `u` toward
+ *  (ax,ay) — the sprite mirror, the walking clock the step bob reads, the step
+ *  and the X/Y slide that keeps a unit moving along a water edge instead of
+ *  sticking to it. Returns true when the step lands within `s` of the aim.
+ *  moveUnit is the only caller; the aim comes from the route, or from the
+ *  ordered point itself when there is no route (see moveUnit). */
+function stepToward(Game, u, ax, ay, s, dt) {
+  const dx = ax - u.x, dy = ay - u.y;
   const d = Math.hypot(dx, dy);
   if (d <= s) return true;
-  // walking somewhere: mirror the sprite toward the walk and run the clock that
-  // drives the step bob -- an idle unit never gets here, so its pose stays put.
   if (dx > 0) u.face = 1; else if (dx < 0) u.face = -1;
   u.anim += dt;
   const stepLen = Math.min(d - s * 0.5, u.speed * dt);
@@ -1069,10 +1079,71 @@ function moveUnit(Game, u, x, y, dt, stop) {
   return false;
 }
 
+/** Move `u` toward (x,y) ALONG his A* route (findPath) instead of in a straight
+ *  line: the route's own tiles are the walkability answer, so a unit walks
+ *  *around* the inlet, the forest and the house instead of nose-pressing them,
+ *  and the waypoint list (the route's tile centres, then the exact ordered
+ *  point) is what T4's formation slots will be judged by.
+ *
+ *  One rule says when the cached route is thrown away, and it is the design's
+ *  re-path rule: the order's goal tile changed (`u.pathFor`), the walkable set
+ *  moved under it (`Game.mapEpoch` — a building went up, a tile was depleted),
+ *  or the tile he is walking to stopped being walkable ("the path's end was
+ *  taken"). The answer is cached even when it is `null`, so a doomed order costs
+ *  one query and the `move` branch retires it instead of letting him press the
+ *  shore forever.
+ *
+ *  The route's last tile IS the tile holding (x,y), so the last leg aims at the
+ *  exact point: the ≤ 15.6 px between a tile centre and any point inside it are
+ *  walked straight, which is what keeps the `d <= stop` rule — and every
+ *  caller's radius (attack range, work-spot stop) — meaning exactly what it
+ *  meant before routes existed. `u.face`/`u.anim` are still written by
+ *  stepToward, so §6b keeps pinning them.
+ *
+ *  A goal A* cannot route at all (`u.path === null`) still gets the old straight
+ *  step: today that is every order but `move` — `harvest` aims at a berry tile
+ *  and `go_deposit` at a dropoff, both solid, so no route may end on them until
+ *  T3's standTarget turns such orders into standing spots. */
+function moveUnit(Game, u, x, y, dt, stop) {
+  const s = stop || 1;
+  if (Math.hypot(x - u.x, y - u.y) <= s) return true;             // the caller's own arrival rule
+  const goal = tileOf(x, y), own = tileOf(u.x, u.y);
+  // A route can only END on a walkable tile (T1: any tile but the start must
+  // satisfy walkable), so an order that names a solid thing's centre — `harvest`
+  // at a berry, `go_deposit` at a dropoff, `attack`/`build` before T3's
+  // standTarget gives them a spot — has nothing to route to and keeps the old
+  // straight step. Orders that do name a walkable tile get route semantics:
+  // `u.path` is their route, and `null` (routed, nowhere to go) retires the
+  // order in updateUnit instead of letting him press the shore — the one case
+  // where refusing is right is a move order over water, and that is exactly
+  // where findPath answers null.
+  if (!((goal.tx === own.tx && goal.ty === own.ty) || walkable(Game, x, y))) {
+    return stepToward(Game, u, x, y, s, dt);
+  }
+  const same = u.pathFor !== null && u.pathEpoch === Game.mapEpoch
+    && u.pathFor.tx === goal.tx && u.pathFor.ty === goal.ty;      // built for THIS order, THIS map
+  const next = u.path !== null && u.pathAt < u.path.length ? u.path[u.pathAt] : null;
+  if (!same || !(next === null
+    || walkable(Game, next.tx * CFG.TILE + CFG.TILE / 2, next.ty * CFG.TILE + CFG.TILE / 2))) {
+    u.path = findPath(Game, own, goal);                            // counts itself in pathQueries
+    u.pathFor = goal;                                              // a null route is cached too
+    u.pathEpoch = Game.mapEpoch;
+    u.pathAt = u.path && u.path.length > 1 ? 1 : 0;                // path[0] is the tile he stands on
+  }
+  if (u.path === null) return false;                // routed and found nothing: nothing to walk
+  const endLeg = u.pathAt >= u.path.length - 1;     // the last tile IS the ordered tile
+  const ax = endLeg ? x : u.path[u.pathAt].tx * CFG.TILE + CFG.TILE / 2;
+  const ay = endLeg ? y : u.path[u.pathAt].ty * CFG.TILE + CFG.TILE / 2;
+  const done = stepToward(Game, u, ax, ay, s, dt);
+  if (endLeg || !done) return done;
+  u.pathAt++;                                       // that leg is walked: aim at the next tile
+  return false;
+}
+
 /** The board rule (T2): a tile is walkable when it is in bounds, not water, not
  *  a resource tile with stock and not covered by a building — an unbuilt
  *  foundation counts, exactly like the AoE2 rule. Everything that walks, works
- *  or spawns asks this: moveUnit's X/Y slide, workSpot, workPos, makeBuilding. */
+ *  or spawns asks this: stepToward's step and slide, workSpot, workPos, makeBuilding. */
 function walkable(Game, px, py) {
   const { tx, ty } = tileOf(px, py);
   if (tx < 0 || ty < 0 || tx >= Game.world.w || ty >= Game.world.h) return false;
@@ -1178,6 +1249,7 @@ function depleteTile(Game, tx, ty) {
   const i = ty * world.w + tx;
   if (!RES_OF_TILE[world.type[i]] || world.amount[i] > 0) return false;
   world.type[i] = T.GRASS;
+  Game.mapEpoch++;                         // the tile walks now: routes across it are stale
   return true;
 }
 
@@ -2119,6 +2191,7 @@ function createState() {
     selection: [], selectedBuilding: null, groups: {}, keys: {},
     cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, placing: null,
     time: 0, wave: 0, age: 0, ageBonus: 0, nextId: 1, started: false, result: null, rnd: mulberry32(CFG.SEED),
+    mapEpoch: 0, pathQueries: 0, // walkable-set epoch + findPath budget, both section-4 path state
     dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0,
   };
   Game.toast = (m) => toast(Game, m);
@@ -2133,6 +2206,7 @@ function resetGame(Game) {
   Game.buildings = [];
   Game.nextId = 1;
   Game.time = 0; Game.wave = 0; Game.age = 0; Game.ageBonus = 0; Game.rnd = mulberry32(CFG.SEED);
+  Game.mapEpoch = 0; Game.pathQueries = 0; // section-4 path state: fresh map, no cached routes
   Game.selection = []; Game.selectedBuilding = null; Game.placing = null; Game.result = null;
   Game.mmBase = null;
   Game.res[0] = Object.assign({}, CFG.START);
