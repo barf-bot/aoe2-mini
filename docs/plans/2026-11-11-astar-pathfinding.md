@@ -105,7 +105,7 @@ proving check and the `Map of this file` banner stays truthful.
     place (§5a/§6 went red). T3's `standTarget` gives those orders a routable spot and
     then the straight step has no caller left.
 
-- [ ] T3: every order kind routes to a standing spot, not at a solid centre
+- [x] T3: every order kind routes to a standing spot, not at a solid centre
   - files: `index.html` §4 — new `standTarget(Game, u, x, y, stop)` in the pathfinding
     block, `orderForUnit` (1117-1147, whose `workSpot` fallback 1141-1145 becomes a call
     to it) and the four remaining walking branches of `updateUnit`: `attack` (892,
@@ -134,6 +134,16 @@ proving check and the `Map of this file` banner stays truthful.
     close to contact`, `path: a build order routes to workPos instead of the straight
     line`; the existing §7, §7b, §9, §9b, §9c checks re-run unmodified as the regression
     proof for the branches being converted.
+  - note (as built): the helper answers from the caller's own radius first — the point
+    itself when it is walkable *or* when the unit already stands within `stop` of it (a
+    villager parked on the keep he feeds has to deposit without a walk, which §5a pins),
+    and only then looks the spot up; `workPos` answers for every building, so `attack`,
+    `build` and `go_deposit` now send units to the same tile for the same building
+    (`standingSpots` is its ordered sibling). Two of the four new checks (the melee
+    attack on a unit, the build order) already passed before the helper existed — those
+    branches aimed at a walkable tile and so already routed; they stay as the contract
+    for the converted sites, and the two solid-target ones (a building attacked melee and
+    ranged) are the ones that failed until `standTarget` existed.
 
 - [ ] T4: formation slots replace the golden-angle scatter
   - files: `index.html` §4 — `spread(o, i)` (1172-1176) deleted, new

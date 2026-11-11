@@ -934,6 +934,118 @@ check(!!stuckF && stuckF.v.order.kind === 'idle' && stuckF.v.x === stuckF.w.from
       `${stuckF.v.y.toFixed(1)} (ordered ${stuckF.at.x},${stuckF.at.y}), ` +
       `${stuckF.w.queries} findPath calls`);
 
+/* -- T3: the other four order kinds route to a standing spot -------------- *
+ * `standTarget(Game, u, x, y, stop)` (the pathfinding block) names the tile an
+ * order's route must end on: the ordered point when it is walkable, otherwise the
+ * spot the game already assigns for that kind of thing (a building's `workPos`, a
+ * resource tile's `workSpot`), otherwise nothing — and `null` REFUSES the order
+ * instead of letting the unit walk at a solid thing forever. Every check below
+ * orders one unit and then reads `u.path`: an order walked with the old straight
+ * step has no route at all, so these are the checks that prove a branch converted.
+ * `scene()` is the shared fixture — a flat board plus one unit of the kind under
+ * test, parked on a named tile. */
+const scene = (kind, team, tx, ty) => {
+  const st = flatState();
+  return { st, u: AoE2.makeUnit(st, kind, team, tileCentre(st, tx, ty).x, tileCentre(st, tx, ty).y) };
+};
+const tileKey = (p) => tOf(p.x) + ',' + tOf(p.y);
+
+// 11. a militia ordered to an enemy 3 tiles east with a tile of water in front of
+// him: the route ends on the enemy's own tile — what standTarget answers for a
+// walkable point, which is also what this branch already aimed at — and the swing
+// lands. The contract for the `attack`-on-a-unit site.
+const atkUnitF = (() => {
+  const f = scene('militia', 0, 60, 60);
+  const foe = AoE2.makeUnit(f.st, 'villager', 1, tileCentre(f.st, 63, 60).x, tileCentre(f.st, 63, 60).y);
+  setTile(f.st, 61, 60, AoE2.T.WATER, 0);
+  setTile(f.st, 62, 60, AoE2.T.WATER, 0);
+  f.u.order = { kind: 'attack', target: foe.id };
+  const hp0 = foe.hp, w = walkOrder(f.st, f.u, 900);
+  return { f, foe, hp0, w, route: routeOf(f.u) };
+})();
+check(!!atkUnitF && atkUnitF.route.length > 1 &&
+      atkUnitF.route[atkUnitF.route.length - 1] === tileKey(atkUnitF.foe) &&
+      distTo(atkUnitF.f.u, atkUnitF.foe) <= atkUnitF.f.u.r + atkUnitF.foe.r + 4 &&
+      atkUnitF.foe.hp < atkUnitF.hp0,
+  'path: a melee attack route ends at contact range of the target unit',
+  !atkUnitF ? 'no state to order a unit in'
+    : `${atkUnitF.w.n} steps, route ${atkUnitF.route.join(' ')}, ended ` +
+      `${distTo(atkUnitF.f.u, atkUnitF.foe).toFixed(1)}px from the enemy (the table's contact is ` +
+      `${atkUnitF.f.u.r + atkUnitF.foe.r + 4}px), its hp ${atkUnitF.hp0}->${atkUnitF.foe.hp}`);
+
+// 12. a 3x3 Town Center is a block of solid tiles: the route cannot end on the tile
+// the order names, it has to end on a ring tile — the plan's "ends on its reach
+// ring, never on its footprint". Aimed at the building's own tile (the pre-T3
+// branch) the order had no route at all and the fighter stopped wherever the
+// straight step left him.
+const atkBuildF = (() => {
+  const f = scene('militia', 0, 65, 51);
+  const tc = f.st.buildings.find((b) => b.team === 1 && b.kind === 'town_center');
+  if (!tc) return null;
+  const spot = AoE2.workPos(f.st, tc);
+  f.u.order = { kind: 'attack', b: tc.id };
+  const hp0 = tc.hp, w = walkOrder(f.st, f.u, 900);
+  return { f, tc, spot, hp0, w, route: routeOf(f.u) };
+})();
+check(!!atkBuildF && atkBuildF.route.length > 1 &&
+      atkBuildF.route[atkBuildF.route.length - 1] === tileKey(atkBuildF.spot) &&
+      AoE2.siteFree(atkBuildF.f.st, tOf(atkBuildF.f.u.x), tOf(atkBuildF.f.u.y), 1, 1) &&
+      atkBuildF.tc.hp < atkBuildF.hp0,
+  'path: a melee attack on a building stops on its reach ring, not its footprint',
+  !atkBuildF ? 'no enemy Town Center to order a unit against'
+    : `TC ${atkBuildF.tc.tx},${atkBuildF.tc.ty}: route ${atkBuildF.route.join(' ') || 'none'} ends on ` +
+      `${tileKey(atkBuildF.spot)} (its work spot), the fighter stands on ${tileKey(atkBuildF.f.u)} ` +
+      `${distTo(atkBuildF.f.u, atkBuildF.tc).toFixed(1)}px from the tower, its hp ${atkBuildF.hp0}->${atkBuildF.tc.hp}`);
+
+// 13. the same target with an archer: the table's range, not contact, decides where
+// the route ends, so he stops 4 tiles out and looses an arrow instead of walking
+// onto the tower.
+const atkRangedF = (() => {
+  const f = scene('archer', 0, 65, 50);
+  const tc = f.st.buildings.find((b) => b.team === 1 && b.kind === 'town_center');
+  if (!tc) return null;
+  const spot = AoE2.workPos(f.st, tc);
+  const hp0 = tc.hp;
+  f.u.order = { kind: 'attack', b: tc.id };
+  const w = walkOrder(f.st, f.u, 900);
+  return { f, tc, spot, hp0, w, route: routeOf(f.u) };
+})();
+check(!!atkRangedF && atkRangedF.route.length > 1 &&
+      atkRangedF.route[atkRangedF.route.length - 1] === tileKey(atkRangedF.spot) &&
+      Math.abs(distTo(atkRangedF.f.u, atkRangedF.spot) - AoE2.CFG.TILE * 4) <= AoE2.CFG.TILE / 2 &&
+      (atkRangedF.tc.hp < atkRangedF.hp0 || atkRangedF.f.st.projectiles.length > 0),
+  'path: a ranged attack route stops at the table range and does not close to contact',
+  !atkRangedF ? 'no enemy Town Center to order an archer against'
+    : `route ${atkRangedF.route.join(' ') || 'none'} ends on ${tileKey(atkRangedF.spot)}, he stopped ` +
+      `${distTo(atkRangedF.f.u, atkRangedF.spot).toFixed(1)}px from that spot (the table range is ` +
+      `${AoE2.CFG.TILE * 4}px), tower hp ${atkRangedF.hp0}->${atkRangedF.tc.hp}, ` +
+      `${atkRangedF.f.st.projectiles.length} arrows in the air`);
+
+// 14. a villager ordered to build a house whose work spot sits on the far side of a
+// strip of water: he finishes it standing on that spot, reached by a route. The
+// branch already handed moveUnit the work spot; this pins the plan's "harvest /
+// build / move orders all route the same way" for it.
+const buildOrderF = (() => {
+  const f = scene('villager', 0, 60, 60);
+  setTile(f.st, 61, 59, AoE2.T.WATER, 0);
+  setTile(f.st, 61, 60, AoE2.T.WATER, 0);
+  setTile(f.st, 61, 61, AoE2.T.WATER, 0);
+  if (!AoE2.siteFree(f.st, 62, 60, 1, 1)) return null;
+  const house = AoE2.makeBuilding(f.st, 'house', 0, 62, 60);
+  const spot = AoE2.workPos(f.st, house);
+  f.u.order = { kind: 'build', b: house.id };
+  const w = walkOrder(f.st, f.u, 2400);
+  return { f, house, spot, w, route: routeOf(f.u) };
+})();
+check(!!buildOrderF && buildOrderF.house.built === 1 &&
+      buildOrderF.f.u.order.kind === 'idle' && buildOrderF.route.length > 1 &&
+      buildOrderF.route[buildOrderF.route.length - 1] === tileKey(buildOrderF.spot),
+  'path: a build order routes to workPos instead of the straight line',
+  !buildOrderF ? 'no free house pad across water to order a villager to'
+    : `house 62,60 built ${buildOrderF.house.built.toFixed(2)}, order ${buildOrderF.f.u.order.kind} ` +
+      `after ${buildOrderF.w.n} steps, route ${buildOrderF.route.join(' ') || 'none'} ends on the ` +
+      `work spot ${tileKey(buildOrderF.spot)}`);
+
 /* ---- 7. construction ------------------------------------------------ */
 function freeSpotAround(world, Game, tx, ty, w, h, maxR) {
   for (let r = 1; r <= maxR; r++) {

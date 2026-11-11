@@ -894,11 +894,16 @@ function updateUnit(Game, u, dt) {
     }
     /* The table decides how far a fighter fights from and how often it hits: a
      * ranged unit halts at `range` tiles and every `reload` seconds looses an
-     * arrow; a melee one walks to contact and swings every `atkTime`. */
+     * arrow; a melee one walks to contact and swings every `atkTime`. The route ends
+     * on the tile standTarget picks for the target — the enemy's own tile, or a tile
+     * of a building's reach ring — and he stops at the table's radius from it, so an
+     * archer shooting a Tower never walks onto its footprint. */
     const ranged = u.atkType === 'ranged';
     const contact = isB ? reachOf(t) : u.r + t.r + 4;
     const stopR = ranged ? Math.max(u.range * CFG.TILE, contact) : contact;
-    if (moveUnit(Game, u, t.x, t.y, dt, stopR)) {
+    const at = standTarget(Game, u, t.x, t.y, stopR);
+    if (!at) { u.order = { kind: 'idle' }; return; }        // nowhere to stand: no fight
+    if (moveUnit(Game, u, at.x, at.y, dt, stopR)) {
       u.cd -= dt;
       if (u.cd <= 0) {
         u.cd = ranged ? (u.reload || u.atkTime) : u.atkTime;     // the table's cadence
@@ -915,8 +920,9 @@ function updateUnit(Game, u, dt) {
   if (o.kind === 'build') {
     const b = Game.buildings.find(x => x.id === o.b);
     if (!b || b.built >= 1) { u.order = { kind: 'idle' }; return; }
-    const p = workPos(Game, b);
-    if (!moveUnit(Game, u, p.x, p.y, dt, CFG.TILE)) return;
+    const at = standTarget(Game, u, b.x, b.y, CFG.TILE);    // the site's ring tile (was workPos)
+    if (!at) { u.order = { kind: 'idle' }; return; }        // no way to reach the site
+    if (!moveUnit(Game, u, at.x, at.y, dt, CFG.TILE)) return;
     b.built = Math.min(1, b.built + dt / Math.max(0.5, b.time));
     b.hp = Math.max(1, Math.round(b.maxHp * b.built));
     if (b.built >= 1) {
@@ -930,7 +936,9 @@ function updateUnit(Game, u, dt) {
   if (o.kind === 'go_deposit') {
     const drop = Game.buildings.find(x => x.id === o.b);
     if (!drop) { u.carry = 0; u.order = { kind: 'idle' }; return; }
-    if (!moveUnit(Game, u, drop.x, drop.y, dt, reachOf(drop))) return;
+    const at = standTarget(Game, u, drop.x, drop.y, reachOf(drop));
+    if (!at) { u.carry = 0; u.order = { kind: 'idle' }; return; }
+    if (!moveUnit(Game, u, at.x, at.y, dt, reachOf(drop))) return;
     deposit(Game, u, drop);
     u.order = o.src ? resumeGather(Game, u, o.src) : { kind: 'idle' };
     return;
@@ -939,8 +947,12 @@ function updateUnit(Game, u, dt) {
   if (o.kind === 'harvest') {
     const src = o.src;
     const reach = CFG.TILE * 0.9;
-    if (Math.hypot(src.x - u.x, src.y - u.y) > reach) {
-      if (!moveUnit(Game, u, src.x, src.y, dt, reach)) return;
+    // the tile he works from, not the resource's centre: standTarget answers with
+    // the source's own tile (a farm cell) or its walkable neighbour (a berry).
+    const at = standTarget(Game, u, src.x, src.y, reach);
+    if (!at) { u.order = { kind: 'idle' }; return; }
+    if (Math.hypot(at.x - u.x, at.y - u.y) > reach) {
+      if (!moveUnit(Game, u, at.x, at.y, dt, reach)) return;
     }
     const tick = 1 / CFG.GATHER_RATE;
     u.work += dt;
@@ -1101,9 +1113,11 @@ function stepToward(Game, u, ax, ay, s, dt) {
  *  stepToward, so §6b keeps pinning them.
  *
  *  A goal A* cannot route at all (`u.path === null`) still gets the old straight
- *  step: today that is every order but `move` — `harvest` aims at a berry tile
- *  and `go_deposit` at a dropoff, both solid, so no route may end on them until
- *  T3's standTarget turns such orders into standing spots. */
+ *  step: `standTarget` below hands every order a walkable tile to end on, so what
+ *  is left for the fallback are the two cases routing has nothing to say about —
+ *  the ordered tile is the one he already stands on (a villager working from a farm
+ *  cell or a fresh foundation), and a site whose whole ring is solid, where
+ *  `workPos` answers with the building's own centre. */
 function moveUnit(Game, u, x, y, dt, stop) {
   const s = stop || 1;
   if (Math.hypot(x - u.x, y - u.y) <= s) return true;             // the caller's own arrival rule
@@ -1138,6 +1152,29 @@ function moveUnit(Game, u, x, y, dt, stop) {
   if (endLeg || !done) return done;
   u.pathAt++;                                       // that leg is walked: aim at the next tile
   return false;
+}
+
+/** The tile a route to (x, y) must end on, or `null` — and `null` REFUSES the order
+ *  instead of letting a unit walk at something he can never enter. A route can only
+ *  end on a walkable tile, and four of the five order kinds aim at the middle of a
+ *  solid thing (a berry tile, a farm cell, a dropoff, a barracks foundation) and
+ *  stop at a radius — `stop`, the same number the caller hands `moveUnit` — instead
+ *  of on top of it. So the answer is the tile that radius is satisfied from: the
+ *  point itself when it is walkable or the unit already stands within `stop` of it
+ *  (a villager on the keep he feeds, an archer's enemy already at arrow range),
+ *  otherwise the spot the game assigns for the kind of thing ordered to — `workPos`
+ *  for a building (the ring `standingSpots` draws squads along, stood at `reachOf`),
+ *  `workSpot` for any other tile — and otherwise nothing. Every order kind then runs
+ *  one path, order → standTarget → findPath → step, which is the design's "harvest /
+ *  build / move orders all route the same way". */
+function standTarget(Game, u, x, y, stop) {
+  const s = stop || 1;                                   // the caller's arrival radius
+  if (walkable(Game, x, y) || Math.hypot(x - u.x, y - u.y) <= s) return { x, y };
+  const { tx, ty } = tileOf(x, y);
+  const site = Game.buildings.find((b) => tx >= b.tx && tx < b.tx + b.w &&
+                                          ty >= b.ty && ty < b.ty + b.h);
+  return site ? workPos(Game, site)                      // its own ring tile
+              : workSpot(Game, u, tx, ty);               // its nearest walkable neighbour
 }
 
 /** The board rule (T2): a tile is walkable when it is in bounds, not water, not
@@ -1303,15 +1340,14 @@ function orderForUnit(Game, u, wx, wy) {
       if (s) return { kind: 'harvest', src: s };
     }
   }
-  /* A unit can never stand on a solid tile, so a plain right-click on one (water,
-     a resource the villager could not work, a building) becomes the walkable spot
-     next to it instead of a destination the order never reaches. */
-  if (!walkable(Game, wx, wy)) {
-    const spot = workSpot(Game, u, tx, ty);
-    if (!spot) return null;
-    return { kind: 'move', x: spot.x, y: spot.y };
-  }
-  return { kind: 'move', x: wx, y: wy };
+  /* A route can only end on a walkable tile, so a plain right-click on a solid one
+     (water, a resource the villager could not work, one of your own buildings)
+     becomes the standing spot the order can actually reach — the same answer every
+     other order kind gets from standTarget — instead of a destination the unit
+     presses the shore at forever. */
+  const at = standTarget(Game, u, wx, wy, CFG.TILE);
+  if (!at) return null;
+  return { kind: 'move', x: at.x, y: at.y };
 }
 
 /** Right-click: hand an order to everything selected, spread out a little. */
