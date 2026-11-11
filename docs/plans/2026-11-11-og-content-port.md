@@ -1,6 +1,6 @@
 # OG content port — real sprites and the real stat table (round 1)
 
-Status: in progress
+Status: done
 
 ## Design
 
