@@ -8,7 +8,9 @@
    2. the file-map ranges in docs/ARCHITECTURE.md, the named sub-blocks of section 4, and
       the config range in docs/GAME_RULES.md must equal the real spans measured from the
       banners in index.html;
-   3. everything in tools/ must be documented in AGENTS.md and README.md.
+   3. everything in tools/ must be documented in AGENTS.md and README.md;
+   4. the `index.html is N lines` claim AGENTS.md quotes for the patch-not-rewrite rule must
+      equal the real file length.
 
    usage: node tools/audit-line-refs.js
  */
@@ -135,6 +137,13 @@ for (const rel of ['AGENTS.md', 'README.md']) {
   const missing = present.filter((f) => !doc.includes(f));
   if (missing.length) bad(rel, `tools not documented: ${missing.join(', ')}`);
   else ok(rel, `all ${present.length} tool(s) documented: ${present.join(', ')}`);
+}
+
+/* ---- 4. the file length AGENTS.md quotes ---- */
+const agentsDoc = fs.readFileSync(path.join(ROOT, 'AGENTS.md'), 'utf8');
+for (const m of agentsDoc.matchAll(/`index\.html` is (\d+) lines/g)) {
+  if (+m[1] !== lines.length) bad('AGENTS.md', `says index.html is ${m[1]} lines, the file has ${lines.length}`);
+  else ok('AGENTS.md', `index.html length ${lines.length}`);
 }
 
 console.log('\n' + (fail ? fail + ' ref problem(s)' : 'all doc line refs agree with index.html'));
