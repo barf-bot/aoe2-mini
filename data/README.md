@@ -6,9 +6,9 @@ runtime (the product is still one dependency-free file); it carries what the too
 
 | File | Contains | Consumed by |
 |---|---|---|
-| `units.json` | the unit stat rows the game ships (`villager`, `militia`) plus the `CFG` block — hp, attack, armours, attack delay, speed in **tiles/s**, costs, train times | `tools/check-stats.mjs` (renders section 1's `CFG`/`KINDS`) |
-| `buildings.json` | the seven building rows — hp, costs, build times, footprints, armours, and the Town Center's attack/range | `tools/check-stats.mjs` (renders section 1's `BLD`) |
-| `sprites/` | *planned, 2026-11-11 OG-content port T3:* the ripped PNG frames the atlas is composed from, plus `sprites.json`, the manifest mapping kind → anim → file | `tools/gen-atlas.js` |
+| `units.json` | the unit stat rows the game ships (`villager`, `militia`, `archer`) plus the `CFG` block — hp, attack, attack type (melee/ranged), armours, attack delay, speed in **tiles/s**, costs, train times | `tools/check-stats.mjs` (renders section 1's `CFG`/`KINDS`) |
+| `buildings.json` | the eight building rows — hp, costs, build times, footprints, armours, and the Town Center's attack/range | `tools/check-stats.mjs` (renders section 1's `BLD`) |
+| `sprites/` + `sprites.json` | the ripped PNG frames the atlas is composed from (the farm frame is the old procedural cell vendored as a PNG — the building rip ships no farm bitmap) and the manifest mapping kind → anim → file | `tools/gen-atlas.js` |
 
 ## Where the numbers come from
 
@@ -43,7 +43,8 @@ node tools/headless-check.js        # the sim has to still pass on the new numbe
 
 ## Swapping the art source
 
-One path, `data/sprites/`, is the asset source (see the T3 manifest work): `gen-atlas.js`
-composes `assets/sprites.png` from that directory and nothing else, so replacing the ripped
-frames with someone's own HD/DE asset export — or deleting the folder to fall back to the
-procedural cells — is a one-path change. The game still ships exactly one image.
+One path, `data/sprites/`, is the asset source: `gen-atlas.js` composes `assets/sprites.png`
+from that directory and nothing else — a frame `sprites.json` names but the folder lacks is a
+hard error, there is no built-in drawing left to fall back to — so replacing the ripped frames
+with someone's own HD/DE asset export is a one-path change. The game still ships exactly one
+image.
