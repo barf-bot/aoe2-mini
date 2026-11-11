@@ -55,7 +55,7 @@ a bug.
 | Unit | HP | Speed | ATK | Attack time | Cost | Train time | Trained by |
 |---|---|---|---|---|---|---|---|
 | Villager | 25 | 18 px/s (0.8 tiles/s) | 3 | 0.64 s | 50 food | 25 s | Town Center |
-| Militia | 40 | 20 px/s (0.9 tiles/s) | 4 | 0.5 s | 50 food + 20 gold | 21 s | Town Center, Barracks |
+| Militia | 40 | 20 px/s (0.9 tiles/s) | 4 | 0.5 s | 50 food + 20 gold | 21 s | Barracks |
 | Archer | 30 | 21 px/s (0.96 tiles/s) | 4 | 0.35 s (+ 2 s reload, 4-tile range) | 25 wood + 45 gold | 35 s | Archery Range |
 
 - Melee range = `attacker.r + target.r + 4` px (the table's `r`: villager 5, militia 6,
