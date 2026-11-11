@@ -1,0 +1,98 @@
+{
+  "source": {
+    "table": "SiegeEngineers/aoe2techtree - data/data.json, key path data.Unit[<id>]; cross-checked against HSZemi/aoe2dat - data/units_buildings_techs.json (same ids, same values)",
+    "urls": [
+      "https://raw.githubusercontent.com/SiegeEngineers/aoe2techtree/master/data/data.json",
+      "https://raw.githubusercontent.com/HSZemi/aoe2dat/master/data/units_buildings_techs.json"
+    ],
+    "fetched": "2026-11-11",
+    "rule": "Table numbers are copied, never retuned. Everything the table cannot carry is listed in authored[] or design{} below. tools/check-stats.mjs regenerates index.html section 1 from this file and fails when the file and the game disagree."
+  },
+  "authored": [
+    "cfg.MAP_W", "cfg.MAP_H", "cfg.TILE", "cfg.SEED", "cfg.START", "cfg.WORKERS_PER_TILE",
+    "cfg.GATHER_RATE", "cfg.CANCEL_REFUND", "cfg.AGE_FOOD", "cfg.WAVE_EVERY", "cfg.ACQUIRE",
+    "cfg.BUILDING_ACQUIRE", "cfg.UNIT_SEP", "cfg.PAN_SPEED", "cfg.EDGE", "cfg.RES",
+    "units.*.label", "units.*.r", "units.*.buildable"
+  ],
+  "design": {
+    "cfg.CARRY_MAX": "10 - the agreed port number (the pre-port block said 15 and its own comment named 10 as the AoE2 value; the table carries no carry capacity for this row)",
+    "units.villager.atkTime": "0.64 - agreed port number (the table's AttackDelaySeconds is 0 on this legacy row, ReloadTime 2)",
+    "units.militia.atkTime": "0.5 - agreed port number (same shape as the villager row)"
+  },
+  "cfg": {
+    "MAP_W": 96,
+    "MAP_H": 96,
+    "TILE": 22,
+    "SEED": 1337,
+    "START": { "food": 100, "wood": 100, "gold": 50, "stone": 50 },
+    "CARRY_MAX": 10,
+    "WORKERS_PER_TILE": 2,
+    "GATHER_RATE": 1.5,
+    "CANCEL_REFUND": 0.8,
+    "AGE_FOOD": 500,
+    "WAVE_EVERY": 45,
+    "ACQUIRE": 6,
+    "BUILDING_ACQUIRE": 5,
+    "UNIT_SEP": 11,
+    "PAN_SPEED": 620,
+    "EDGE": 14,
+    "RES": { "tree": 60, "gold": 800, "stone": 450, "berry": 150 }
+  },
+  "cfgNotes": {
+    "TILE": "px per tile (single zoom level for now)",
+    "SEED": "fixed map => reproducible, testable",
+    "CARRY_MAX": "villager carry capacity (AoE2 uses 10 - see design{})",
+    "WORKERS_PER_TILE": "max villagers per tile (spreads the start squad)",
+    "GATHER_RATE": "resource units per second while working",
+    "CANCEL_REFUND": "fraction of a building's cost refunded on construction cancel",
+    "AGE_FOOD": "food cost of Feudal Age",
+    "WAVE_EVERY": "seconds between enemy attack waves",
+    "ACQUIRE": "tiles: idle fighters spot enemy units this far",
+    "BUILDING_ACQUIRE": "tiles: ... and raze enemy buildings this close",
+    "UNIT_SEP": "min px between two units",
+    "PAN_SPEED": "px/s camera pan",
+    "EDGE": "px edge-scroll band"
+  },
+  "units": {
+    "villager": {
+      "id": 83,
+      "internalName": "VMBAS",
+      "label": "Villager",
+      "hp": 25,
+      "atk": 3,
+      "meleeArmor": 0,
+      "pierceArmor": 0,
+      "atkTime": 0.64,
+      "speedTps": 0.8,
+      "lineOfSight": 4,
+      "range": 0,
+      "minRange": 0,
+      "reload": 2,
+      "accuracy": 100,
+      "cost": { "food": 50 },
+      "time": 25,
+      "r": 5,
+      "buildable": true
+    },
+    "militia": {
+      "id": 74,
+      "internalName": "SPRMN",
+      "label": "Militia",
+      "hp": 40,
+      "atk": 4,
+      "meleeArmor": 0,
+      "pierceArmor": 1,
+      "atkTime": 0.5,
+      "speedTps": 0.9,
+      "lineOfSight": 4,
+      "range": 0,
+      "minRange": 0,
+      "reload": 2,
+      "accuracy": 100,
+      "cost": { "food": 50, "gold": 20 },
+      "time": 21,
+      "r": 6,
+      "buildable": true
+    }
+  }
+}

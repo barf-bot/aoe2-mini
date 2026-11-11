@@ -1,6 +1,6 @@
 # OG content port — real sprites and the real stat table (round 1)
 
-Status: planned
+Status: in progress
 
 ## Design
 
@@ -57,7 +57,7 @@ HD/DE files later is a directory replacement and nothing else.
 
 ## Tasks
 
-- [ ] T1: Vendor the stat table and write the stats check (before touching `index.html`)
+- [x] T1: Vendor the stat table and write the stats check (before touching `index.html`)
   - files: `data/units.json`, `data/buildings.json`, `data/README.md`,
     `tools/check-stats.mjs`, `README.md` (tool table + command list), `AGENTS.md`
     (`tools/` row wording)

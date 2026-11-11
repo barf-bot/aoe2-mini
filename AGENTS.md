@@ -27,6 +27,7 @@ may live beside it in `tools/`; the game may not.
 node tools/headless-check.js     # must end with "NN/NN checks passed", exit 0
 node tools/render-preview.js     # rewrites preview.png from the real renderer
 node tools/gen-atlas.js          # rewrites assets/sprites.png when the sprite table changes
+node tools/check-stats.mjs       # verifies section 1 against data/ (exit 1 prints every drifted field)
 ```
 
 `tools/headless-check.js` extracts the `<script>` from `index.html`, stubs the DOM, boots
@@ -34,6 +35,12 @@ the game and asserts economy/construction/training/combat/input/UI/sprite invari
 `tools/render-preview.js` renders a real frame through `@napi-rs/canvas` so the *renderer*
 is proven too — commit the regenerated `preview.png` when visuals change, and look at it
 before committing (a blank sprite sheet once passed every assertion).
+
+`tools/check-stats.mjs` renders the `CFG` / `KINDS` / `BLD` tables of section 1 from
+`data/units.json` + `data/buildings.json` — the vendored AoE2 stat tables those numbers come
+from (see `data/README.md`) — so the game cannot drift from them: run it to verify, run it
+with `--write` to regenerate the blocks. Section 4 stays DOM-free; the game still never reads
+the JSON at runtime, it carries the rendered result.
 
 The game exports its internals for exactly this reason:
 
@@ -63,14 +70,15 @@ stubbed `Image` that reports the right dimensions can still paint nothing (see
 
 | File | Contains |
 |---|---|
-| `index.html` | the game and every tunable number |
+| `index.html` | the game — its `CFG`/`KINDS`/`BLD` numbers come from `data/`, the rest of them live here |
 | `assets/sprites.png` | the unit atlas, generated — never hand-edited |
+| `data/units.json`, `data/buildings.json` | the vendored AoE2 stat tables section 1 is generated from; `data/README.md` names the sources and the swap path |
 | `docs/GAME_RULES.md` | the ruleset as implemented, with line refs — update with the code |
 | `docs/ARCHITECTURE.md` | file map, data shapes, render/input model, test harness design |
 | `docs/CONVENTIONS.md` | code style and the rules above in full |
 | `docs/ROADMAP.md` | prioritized open work |
 | `docs/CHANGELOG.md` | dated entries of what shipped |
-| `tools/` | verification harnesses and the atlas generator; `tools/node_modules` is gitignored |
+| `tools/` | verification harnesses (`headless-check.js`, `check-stats.mjs`, `render-preview.js`, `audit-line-refs.js`) and the atlas generator; `tools/node_modules` is gitignored |
 
 The tool set itself is not trusted by eye: `tools/audit-line-refs.js` is what proves the
 line references above and in `docs/` still match `index.html`, and AGENTS/README must list
