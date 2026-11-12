@@ -1,6 +1,6 @@
 # Blacksmith tech tree
 
-Status: in progress
+Status: done
 
 ## Design
 
