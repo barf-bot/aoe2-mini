@@ -2148,6 +2148,16 @@ function commandsHtml(Game) {
         (!canAfford(Game, b.team, t.cost) || b.research ? ' disabled' : '') + '>' +
         t.label + '<span class="c">' + fmtCost(t.cost) + '</span></button>');
     }
+    const rates = BLD[b.kind].trade;                  // the Market's sell/buy pair
+    if (rates) for (const res of ['food', 'wood', 'stone']) {
+      const label = res[0].toUpperCase() + res.slice(1);
+      out.push('<button data-act="trade" data-arg="' + res + ':sell"' +
+        (canAfford(Game, b.team, { [res]: 100 }) ? '' : ' disabled') + '>' +
+        'Sell ' + label + '<span class="c">' + fmtCost({ gold: rates.sell }) + '</span></button>');
+      out.push('<button data-act="trade" data-arg="' + res + ':buy"' +
+        (canAfford(Game, b.team, { gold: rates.buy }) ? '' : ' disabled') + '>' +
+        'Buy ' + label + '<span class="c">' + fmtCost({ gold: rates.buy }) + '</span></button>');
+    }
   }
   if (b && b.built < 1) {
     out.push('<button data-act="cancel">Cancel<span class="c">80% back</span></button>');
@@ -2351,6 +2361,10 @@ function attachInput(Game, d) {
       if (act === 'build') Game.placing = arg;
       else if (act === 'train' && Game.selectedBuilding) train(Game, Game.selectedBuilding, arg);
       else if (act === 'research' && Game.selectedBuilding) researchTech(Game, Game.selectedBuilding, arg);
+      else if (act === 'trade' && Game.selectedBuilding) {
+        const [res, dir] = arg.split(':');
+        trade(Game, Game.selectedBuilding, res, dir);
+      }
       else if (act === 'cancel' && Game.selectedBuilding) cancelConstruction(Game, Game.selectedBuilding);
       else if (act === 'demolish' && Game.selectedBuilding) demolish(Game, Game.selectedBuilding);
       else if (act === 'age') upgradeAge(Game);

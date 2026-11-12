@@ -2113,6 +2113,39 @@ check(!!bsB.research && bsB.research.id === 'scale_mail' &&
   'slot ' + JSON.stringify(bsB.research) + ' food ' + Game.res[0].food + ' was ' + uiFood0);
 Game.selectedBuilding = null;
 
+// T3: the Market's trade surface (this plan, T3). Six buttons on a built Market,
+// each carrying `disabled` exactly when its own half would be refused (the
+// affordance rule the train buttons follow), and the delegated click handler
+// dispatching one of them through trade in the same tick the panel is rebuilt.
+// The stockpile is funded to the row's needs first: §11's earlier checks spent
+// the town down to 75 wood, and selling 100 of anything needs 100 of it.
+Game.selection = [];
+Game.selectedBuilding = { kind: 'market', team: 0, built: 1, hp: 1800, maxHp: 1800, queue: [], research: null };
+Game.res[0] = { food: 300, wood: 300, gold: 300, stone: 300 };
+const mkCmd = AoE2.commandsHtml(Game);
+check(['food', 'wood', 'stone'].every((res) =>
+  mkCmd.includes('data-act="trade" data-arg="' + res + ':sell"') &&
+  mkCmd.includes('data-act="trade" data-arg="' + res + ':buy"')),
+  'ui: a built Market offers sell and buy for each resource',
+  (mkCmd.match(/data-act="trade" data-arg="[^"]+"/g) || []).join(' ') || 'no trade buttons');
+const sellBtn = stubEl('button', 'btnSellWood', 60, 24);
+sellBtn.setAttribute('data-act', 'trade');
+sellBtn.setAttribute('data-arg', 'wood:sell');
+const mkSell0 = Game.res[0].wood, mkGold0 = Game.res[0].gold;
+Game.dom.commands.listeners.click.forEach((fn) => fn({ target: sellBtn }));
+check(Game.res[0].wood === mkSell0 - 100 && Game.res[0].gold === mkGold0 + AoE2.BLD.market.trade.sell,
+  'ui: clicking Sell Wood moves exactly 100 wood into gold',
+  'wood ' + Game.res[0].wood + ' (was ' + mkSell0 + ') gold ' + Game.res[0].gold +
+  ' (was ' + mkGold0 + ')');
+Game.res[0].food = 40;                                  // below the 100 a sell half needs
+Game.res[0].wood = 100;                                 // wood is still sellable, so its button stays live
+const mkShort = AoE2.commandsHtml(Game);
+check(mkShort.includes('data-act="trade" data-arg="food:sell" disabled') &&
+  !mkShort.includes('data-act="trade" data-arg="wood:sell" disabled'),
+  'ui: a sell button is disabled while that stockpile is short',
+  (mkShort.match(/data-act="trade" data-arg="[^"]+"( disabled)?/g) || []).join(' ') || 'no trade buttons');
+Game.selectedBuilding = null;
+
 /* ---- 12. reset ------------------------------------------------------ */
 const unitsBeforeReset = Game.units.length;
 AoE2.resetGame(Game);

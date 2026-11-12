@@ -124,7 +124,7 @@ proving check and the `Map of this file` banner stays truthful.
     construction cannot trade` (`Still building`), `trade: a barracks cannot trade`
     (`Barracks cannot trade`) — plus §8 and §8b re-run unmodified.
 
-- [ ] T3: the Market's trade surface — six buttons and their dispatch
+- [x] T3: the Market's trade surface — six buttons and their dispatch
   - files: `index.html` §5 `commandsHtml` (`index.html:2102-2145`, the `b.built >= 1` branch,
     after the train and research loops), §6's delegated click handler (`index.html:2312-2322`),
     `tools/headless-check.js` §11 (append before the §12 banner at `tools/headless-check.js:1960`)
