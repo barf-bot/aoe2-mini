@@ -1871,6 +1871,58 @@ check(/Victory/.test(winOverlay) && winOverlay.includes('data-act="restart"') &&
   'overlay=' + JSON.stringify(winOverlay) + ' -> result=' + String(go.result) +
   ' units=' + go.units.length);
 
+/* ---- 9f. watch tower (2026-11-12 market plan, T4) -------------------- */
+/* The tower brought no combat code of its own: stepBuildingAttacks drives every
+ * built building whose row carries an attack, so the row's numbers (attack 5,
+ * accuracy 100, reload 2, reach = line of sight 10 tiles) are all these checks
+ * can read. Each fixture empties the state the way §9c does -- no other unit or
+ * building fires -- and steps once, so any arrow in the air is the tower's. */
+const towerState = (kind) => {
+  const st = AoE2.createState();
+  st.units = [];
+  const tc = st.buildings[0];
+  st.buildings = [];
+  const tw = tc && AoE2.makeBuilding(st, kind, 0, tOf(tc.x), tOf(tc.y));
+  if (tw) tw.built = 1;
+  return { st, tw };
+};
+const twNear = towerState('watch_tower');
+const twFoe = twNear &&
+  AoE2.makeUnit(twNear.st, 'militia', 1, twNear.tw.x + 3 * AoE2.CFG.TILE, twNear.tw.y);
+if (twNear) AoE2.stepSim(twNear.st, DT);
+const twArrow = twNear && twNear.st.projectiles[0];
+check(!!twArrow && twNear.st.projectiles.length === 1 && twArrow.team === 0 && twArrow.t === twFoe &&
+      twArrow.dmg === AoE2.BLD.watch_tower.attack * (1 + 0.25 * twNear.st.ageBonus) &&
+      twArrow.accuracy === AoE2.BLD.watch_tower.accuracy &&
+      twNear.tw.cd === AoE2.BLD.watch_tower.reload,
+  'tower: a built Watch Tower shoots the nearest enemy inside its line of sight',
+  !twNear ? 'no site for the tower'
+    : !twArrow ? 'no projectile'
+      : 'n=' + twNear.st.projectiles.length + ' dmg=' + twArrow.dmg + ' accuracy=' + twArrow.accuracy +
+        ' cd=' + twNear.tw.cd + ' (row ' + AoE2.BLD.watch_tower.attack + '/' +
+        AoE2.BLD.watch_tower.accuracy + '/' + AoE2.BLD.watch_tower.reload + ')');
+/* A building measures reach with lineOfSight -- the row's `range: 8` is only
+ * ever read by units (autoAcquire) -- so 12 tiles away the tower holds fire and
+ * keeps the cooldown it had. */
+const twFar = towerState('watch_tower');
+const farFoe = twFar &&
+  AoE2.makeUnit(twFar.st, 'militia', 1, twFar.tw.x + 12 * AoE2.CFG.TILE, twFar.tw.y);
+const farCd = twFar && twFar.tw.cd;
+if (twFar) AoE2.stepSim(twFar.st, DT);
+check(!!farFoe && twFar.st.projectiles.length === 0 && twFar.tw.cd === farCd,
+  'tower: a Watch Tower holds fire while the enemy stands beyond its line of sight',
+  !twFar ? 'no site for the tower'
+    : 'projectiles=' + twFar.st.projectiles.length + ' cd=' + twFar.tw.cd + ' (was ' + farCd + ')');
+const mkShot = towerState('market');
+const mkFoe = mkShot &&
+  AoE2.makeUnit(mkShot.st, 'militia', 1, mkShot.tw.x + AoE2.CFG.TILE, mkShot.tw.y);
+if (mkShot) AoE2.stepSim(mkShot.st, DT);
+check(!!mkFoe && mkShot.st.projectiles.length === 0 && mkShot.tw.cd === 0,
+  'tower: a built Market never shoots',
+  !mkShot ? 'no site for the market'
+    : 'projectiles=' + mkShot.st.projectiles.length + ' cd=' + mkShot.tw.cd +
+      ' (row attack ' + AoE2.BLD.market.attack + ')');
+
 /* ---- 10. input ------------------------------------------------------ */
 const view = doc.getElementById('view');
 const mine = blueVill();

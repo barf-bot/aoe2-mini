@@ -150,7 +150,7 @@ proving check and the `Map of this file` banner stays truthful.
     (food 40 → `data-arg="food:sell"` carries `disabled` while `data-arg="wood:sell"` does
     not) — plus §11's existing button checks re-run unmodified.
 
-- [ ] T4: the Watch Tower's shot — the row driving the combat path that already exists
+- [x] T4: the Watch Tower's shot — the row driving the combat path that already exists
   - files: `tools/headless-check.js` only (a new
     `/* ---- 9f. watch tower (this plan, T4) ---- */` between §9e, which ends at
     `tools/headless-check.js:1725`, and §10 at 1726); `index.html` untouched
