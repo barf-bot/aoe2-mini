@@ -109,8 +109,9 @@ checks across the plan.
 
 ### Wooden barricade and gated choke points (T1–T6) — plan `docs/plans/2026-11-12-wooden-barricade.md`
 
-A Feudal-gated wall segment (d88ecae → 03ccb2e); the harness went 198 → 216 checks
-across the plan.
+A Feudal-gated wall segment (d88ecae → 03ccb2e, review fixes 7a4d7cd and 9d8849b); the
+harness went 198 → 217 checks across the plan — 216 from T1–T6 and the controls check
+the first fix adds.
 
 - **T1 — the `barricade` row, the `w` hotkey (d88ecae):** `data/buildings.json` gains
   `barricade` — the vendored `WALL` row (150 hp, 3 wood, 7 s, melee armour 2, pierce
@@ -122,10 +123,12 @@ across the plan.
   game — `siteFree`/`near`/`findSite` placement including the shared-corner case, the
   exact 3-wood spend and 7 s site detail, the `floor(3 × CFG.CANCEL_REFUND)` = 2 cancel
   refund, and a free demolish of a finished segment (201 → 207 checks).
-- **T3 — routing around, through and after (baaace0):** five §6d checks walk the gate
-  story — a standing segment reroutes a villager's cached path, the raze path makes the
-  tile walkable again and the same route comes back, and a segment built under a
-  standing unit moves the unit off it (207 → 212 checks).
+- **T3 — routing around, through and after (baaace0, 9d8849b):** five §6d checks walk
+  the gate story on the §6c boards — a built segment's own tile stops being walkable, a
+  segment dropped on a cached route reroutes the walker on the next step, demolishing it
+  restores the pre-build route, a villager ringed with segments is left idle without a
+  route, and popping one ring segment gives him one back — with every expected length
+  graded by the harness's own Dijkstra rather than by `findPath` (207 → 212 checks).
 - **T4 — the raze path (50a59fb):** four §9g checks put the row inside the existing
   combat fixture — an idle enemy militia acquires the adjacent barricade, the swing
   costs it the table's damage (`atk` − the row's melee armour), the toast names the
@@ -137,7 +140,8 @@ across the plan.
   with the fourth flat team-coloured footprint.
 - **T6 — docs sync:** this entry plus `docs/GAME_RULES.md` (the table row, the four-row
   age-gate bullet, the new barricade rule, the rewritten controls line naming `W` and
-  `ArrowUp`), `docs/ARCHITECTURE.md` (the File map spans, the render/input prose) and
+  `ArrowUp` — the wording the `index.html` banner and the footer help line have carried
+  since 7a4d7cd), `docs/ARCHITECTURE.md` (the File map spans, the render/input prose) and
   `docs/ROADMAP.md` (P1.6 shipped, the wall leftovers folded into P2.8) and `AGENTS.md`
   (the file-length claim, the export line) re-pointed at the final file — every
   `index.html:NNN` reference and section range re-measured through
