@@ -104,7 +104,7 @@ proving check and the `Map of this file` banner stays truthful.
     ``no `const TECHS = { ... };` block found in index.html`` and then green; the existing
     §5 table checks plus a `160/160` headless run are the regression proof.
 
-- [ ] T3: `unitAttack` / `unitArmor` — one place for the damage math, `Game.techs` added
+- [x] T3: `unitAttack` / `unitArmor` — one place for the damage math, `Game.techs` added
   - files: `index.html` §4 (a new `/* ---- combat math ---- */` sub-block directly above
     `hitUnit` at `index.html:763` holding `unitAttack(Game, u)` and `unitArmor(Game, u, type)`;
     `hitUnit` 762-769 and `hitBuilding` 835-844 take the armour type; `spawnArrow` 778-787 and

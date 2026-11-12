@@ -789,9 +789,42 @@ function stepSim(Game, dt) {
   aiStep(Game, dt);
 }
 
-/** Apply damage to a unit, clamped at 0; returns true if it died. */
-function hitUnit(Game, u, dmg) {
-  u.hp -= dmg;
+/* ---- combat math ---- */
+
+/** The attack an attacker deals: the row's number scaled by the age bonus,
+ * plus every researched tech's attack for the damage class the attacker uses.
+ * A unit uses KINDS (and gets techs); a built building uses BLD.attack and
+ * never gets a unit tech. Damage class: atkType 'ranged' units and built
+ * buildings' arrows are pierce, everything else is melee. The single place
+ * attack math happens - spawnArrow and the melee swing both call this. */
+function unitAttack(Game, u) {
+  const isUnit = u.atk !== undefined;                     // units carry atk, buildings don't
+  const table = isUnit ? u.atk : BLD[u.kind].attack;
+  const cls = !isUnit || u.atkType === 'ranged' ? 'pierce' : 'melee';
+  const atk = table * (1 + 0.25 * Game.ageBonus);         // the shipped age scaling
+  if (!isUnit) return atk;
+  let total = atk;
+  for (const id of Game.techs) total += TECHS[id].atk[cls];
+  return total;
+}
+
+/** Armour a defender has against 'melee' or 'pierce' damage: the table row's
+ * own armour, plus every researched tech's armour of that type for unit
+ * defenders (building rows have armour, unit techs never apply to them). */
+function unitArmor(Game, u, type = 'melee') {
+  const isUnit = u.atk !== undefined;
+  const row = isUnit ? KINDS[u.kind] : BLD[u.kind];
+  let armor = type === 'pierce' ? row.pierceArmor : row.meleeArmor;
+  if (!isUnit) return armor;
+  for (const id of Game.techs) armor += TECHS[id].armor[type];
+  return armor;
+}
+
+/** Apply damage to a unit - unitArmor softens the hit but never absorbs it
+ * below 1 - clamped at 0; returns true if it died. The damage type defaults
+ * to the 'melee' a plain swing deals. */
+function hitUnit(Game, u, dmg, type = 'melee') {
+  u.hp -= Math.max(1, dmg - unitArmor(Game, u, type));
   if (u.hp > 0) return false;
   u.hp = 0;
   u.dead = true;
@@ -806,12 +839,10 @@ function hitUnit(Game, u, dmg) {
  *  only ever hit once, so a kill mid-flight cannot splash onto the next body.
  *  Pure logic, no DOM. */
 function spawnArrow(Game, from, target) {
-  const stats = from.atk === undefined ? { atk: BLD[from.kind].attack,
-                                            accuracy: BLD[from.kind].accuracy }
-                                       : { atk: from.atk, accuracy: from.accuracy };
+  const accuracy = from.atk === undefined ? BLD[from.kind].accuracy : from.accuracy;
   const dx = target.x - from.x, dy = target.y - from.y, d = Math.hypot(dx, dy) || 1;
   const p = { x: from.x, y: from.y, team: from.team, t: target, dx: dx / d, dy: dy / d,
-              dmg: stats.atk * (1 + 0.25 * Game.ageBonus), accuracy: stats.accuracy };
+              dmg: unitAttack(Game, from), accuracy };
   Game.projectiles.push(p);
   return p;
 }
@@ -834,7 +865,7 @@ function updateProjectiles(Game, dt) {
     if (d <= (isB ? reachOf(t) : t.r) + step) {                  // arrived: resolve, vanish
       Game.projectiles.splice(i, 1);
       if (Game.rnd() * 100 < p.accuracy) {
-        if (isB) hitBuilding(Game, t, p.dmg); else hitUnit(Game, t, p.dmg);
+        if (isB) hitBuilding(Game, t, p.dmg, 'pierce'); else hitUnit(Game, t, p.dmg, 'pierce');
       }
       continue;
     }
@@ -862,9 +893,11 @@ function stepBuildingAttacks(Game, dt) {
   }
 }
 
-/** Apply damage to a building; at 0 hp it is razed and removed from the world. */
-function hitBuilding(Game, b, dmg) {
-  b.hp -= dmg;
+/** Apply damage to a building - unitArmor softens the hit but never absorbs
+ * it below 1 - ; at 0 hp it is razed and removed from the world. The damage
+ * type defaults to the 'melee' a plain swing deals. */
+function hitBuilding(Game, b, dmg, type = 'melee') {
+  b.hp -= Math.max(1, dmg - unitArmor(Game, b, type));
   if (b.hp > 0) return false;
   b.hp = 0;
   const removed = removeBuilding(Game, b);
@@ -941,8 +974,8 @@ function updateUnit(Game, u, dt) {
         u.cd = ranged ? (u.reload || u.atkTime) : u.atkTime;     // the table's cadence
         if (ranged) spawnArrow(Game, u, t);                       // the hit lands on arrival
         else {
-          const dmg = u.atk * (1 + 0.25 * Game.ageBonus);
-          if (isB) hitBuilding(Game, t, dmg); else hitUnit(Game, t, dmg);
+          const dmg = unitAttack(Game, u);
+          if (isB) hitBuilding(Game, t, dmg, 'melee'); else hitUnit(Game, t, dmg, 'melee');
         }
       }
     }
@@ -2309,7 +2342,7 @@ function createState() {
     res: [{ food: 0, wood: 0, gold: 0, stone: 0 }, { food: 0, wood: 0, gold: 0, stone: 0 }],
     selection: [], selectedBuilding: null, groups: {}, keys: {},
     cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, placing: null,
-    time: 0, wave: 0, age: 0, ageBonus: 0, nextId: 1, started: false, result: null, rnd: mulberry32(CFG.SEED),
+    time: 0, wave: 0, age: 0, ageBonus: 0, techs: new Set(), nextId: 1, started: false, result: null, rnd: mulberry32(CFG.SEED),
     mapEpoch: 0, pathQueries: 0, // walkable-set epoch + findPath budget, both section-4 path state
     dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0,
   };
@@ -2324,7 +2357,7 @@ function resetGame(Game) {
   Game.projectiles = [];
   Game.buildings = [];
   Game.nextId = 1;
-  Game.time = 0; Game.wave = 0; Game.age = 0; Game.ageBonus = 0; Game.rnd = mulberry32(CFG.SEED);
+  Game.time = 0; Game.wave = 0; Game.age = 0; Game.ageBonus = 0; Game.techs = new Set(); Game.rnd = mulberry32(CFG.SEED);
   Game.mapEpoch = 0; Game.pathQueries = 0; // section-4 path state: fresh map, no cached routes
   Game.selection = []; Game.selectedBuilding = null; Game.placing = null; Game.result = null;
   Game.mmBase = null;
@@ -2494,7 +2527,7 @@ const AoE2 = {
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
   build, cancelConstruction, demolish, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
-  hitUnit, hitBuilding, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
+  hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame, commandsHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };

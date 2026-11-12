@@ -1558,6 +1558,72 @@ check(!!tp && tp.t === foe7 && tp.team === 0 &&
   'ranged: the Town Center shoots through the same path',
   tp ? 'team=' + tp.team + ' dmg=' + tp.dmg + ' accuracy=' + tp.accuracy : 'no arrow from the TC');
 
+/* ---- 9d. attack & armour math (2026-11-12 blacksmith tech tree, T3) -- */
+/* The two helpers below become the only place damage math lives, so pin the
+ * numbers they must return: the pre-tech Dark Age table values §9 and §9c
+ * just measured off the live sim, the stacked age+Forge number (ageBonus 2
+ * -> multiplier 1.5), each tech's own line, and the max(1, dmg - armour)
+ * floor. */
+const mCall = (fn, ...args) => { try { return { v: fn(...args) }; } catch (e) { return { err: String((e && e.message) || e) }; } };
+const mkMath = (ageBonus, techs) => {
+  const st = AoE2.createState();
+  st.ageBonus = ageBonus;
+  let err = '';
+  try { for (const id of techs) st.techs.add(id); } catch (e) { err = String((e && e.message) || e); }
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  return { err, st, mil: AoE2.makeUnit(st, 'militia', 0, v.x + 2, v.y),
+    arc: AoE2.makeUnit(st, 'archer', 0, v.x + 4, v.y) };
+};
+const mxD = mkMath(0, []);
+const dAtk = mxD.err ? { err: mxD.err } : mCall(AoE2.unitAttack, mxD.st, mxD.mil);
+check(!dAtk.err && dAtk.v === AoE2.KINDS.militia.atk,
+  'math: a Dark Age militia swings the table\'s number',
+  dAtk.err ? 'unitAttack threw ' + dAtk.err : dAtk.v + ' want ' + AoE2.KINDS.militia.atk);
+const s2 = mkMath(2, ['forge']);
+const sAtk = s2.err ? { err: s2.err } : mCall(AoE2.unitAttack, s2.st, s2.mil);
+check(!sAtk.err && sAtk.v === 4 * 1.5 + 1,
+  'math: the age multiplier and a Forge bonus stack in one number',
+  sAtk.err ? 'unitAttack threw ' + sAtk.err : sAtk.v + ' want 4 * 1.5 + 1');
+const mxG = mkMath(0, ['forge']);
+const gMil = mxG.err ? { err: mxG.err } : mCall(AoE2.unitAttack, mxG.st, mxG.mil);
+const gArc = mxG.err ? { err: mxG.err } : mCall(AoE2.unitAttack, mxG.st, mxG.arc);
+check(!gMil.err && gMil.v === AoE2.KINDS.militia.atk + AoE2.TECHS.forge.atk.melee &&
+  gArc.v === AoE2.KINDS.archer.atk,
+  'math: Forge raises the melee line and not the archer line',
+  gMil.err ? 'unitAttack threw ' + gMil.err : 'militia ' + gMil.v + ', archer ' + gArc.v);
+const f0 = mkMath(0, ['fletching']);
+const fMil = f0.err ? { err: f0.err } : mCall(AoE2.unitAttack, f0.st, f0.mil);
+const fArc = f0.err ? { err: f0.err } : mCall(AoE2.unitAttack, f0.st, f0.arc);
+check(!fMil.err && fArc.v === AoE2.KINDS.archer.atk + AoE2.TECHS.fletching.atk.pierce &&
+  fMil.v === AoE2.KINDS.militia.atk,
+  'math: Fletching raises the archer line and not the melee line',
+  fMil.err ? 'unitAttack threw ' + fMil.err : 'militia ' + fMil.v + ', archer ' + fArc.v);
+const sm0 = mkMath(0, ['scale_mail']);
+const br0 = mkMath(0, ['bracer']);
+const smMil = sm0.err ? { err: sm0.err } : mCall(AoE2.unitArmor, sm0.st, sm0.mil, 'melee');
+const smArc = sm0.err ? { err: sm0.err } : mCall(AoE2.unitArmor, sm0.st, sm0.arc, 'pierce');
+const brArc = br0.err ? { err: br0.err } : mCall(AoE2.unitArmor, br0.st, br0.arc, 'pierce');
+const brMil = br0.err ? { err: br0.err } : mCall(AoE2.unitArmor, br0.st, br0.mil, 'melee');
+check(!smMil.err && !brArc.err &&
+  smMil.v === AoE2.KINDS.militia.meleeArmor + AoE2.TECHS.scale_mail.armor.melee &&
+  smArc.v === AoE2.KINDS.archer.pierceArmor + AoE2.TECHS.scale_mail.armor.pierce &&
+  brArc.v === AoE2.KINDS.archer.pierceArmor + AoE2.TECHS.bracer.armor.pierce &&
+  brMil.v === AoE2.KINDS.militia.meleeArmor,
+  'math: Scale Mail raises the melee line\'s armour and Bracer the archer line\'s',
+  smMil.err ? 'unitArmor threw ' + smMil.err
+    : 'militia melee ' + smMil.v + ', archer pierce ' + smArc.v + '/' + brArc.v);
+const hR = (() => {
+  const f = mkMath(0, []);
+  if (f.err) return { err: f.err };
+  const gb = AoE2.makeBuilding(f.st, 'barracks', 0, tOf(f.mil.x), tOf(f.mil.y));
+  const hp0 = gb.hp;
+  const r = mCall(AoE2.hitBuilding, f.st, gb, 4, 'pierce');
+  return r.err ? r : { err: '', dmg: hp0 - gb.hp, want: Math.max(1, 4 - AoE2.BLD.barracks.pierceArmor) };
+})();
+check(!hR.err && hR.dmg === hR.want, 'math: armour softens a hit but never below 1',
+  hR.err ? 'hitBuilding threw ' + hR.err : hR.dmg + ' damage for 4 vs pierceArmor ' +
+    AoE2.BLD.barracks.pierceArmor + ' (want ' + hR.want + ')');
+
 /* ---- 9e. game over (2026-11-11 content port, T6) --------------------- */
 /* Win/lose read off the board: the Town Center is the only building whose loss
  * ends the game, and every way a building leaves it (combat raze, cancel,
