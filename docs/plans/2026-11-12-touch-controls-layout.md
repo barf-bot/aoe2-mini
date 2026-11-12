@@ -1,6 +1,6 @@
 # Touch controls + responsive layout (round: P2 #11)
 
-Status: in progress
+Status: done
 
 ## Design
 
@@ -82,9 +82,10 @@ to re-decide):
 - **No new `/* ---- name ---- */` banner in §6** — `tools/audit-line-refs.js:107-124` requires
   every quoted sub-block to exist, and the sound plan's precedent
   (`docs/plans/2026-11-12-sound.md:128-130`) is to add functions under the existing section banner.
-- **Check count:** 266 (measured on current `main`) → 269 (T1) → 272 (T2) → 275 (T3); T4 is
-  docs-only. `index.html` grows from 3057 lines to ~3080; the exact number is restamped in T4,
-  the precedent being `docs/plans/2026-11-12-uniform-hud-frame.md:87`.
+- **Check count:** 266 (measured on current `main`) → 269 (T1) → 272 (T2) → 275 (T3), and
+  278 after the review round added its three checks; T4 is docs-only. `index.html` grew from
+  3057 lines to 3105 as shipped by T4, 3116 with the review fixes — the exact number is
+  restamped there, the precedent being `docs/plans/2026-11-12-uniform-hud-frame.md:87`.
 
 ## Tasks
 
