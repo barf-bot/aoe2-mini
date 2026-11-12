@@ -81,7 +81,7 @@ function stubEl(tag, id, w, h) {
     e.getContext = (kind) => (kind === '2d' ? (ctx = ctx || stubCtx(e)) : null);
   }
   e.fire = (type, ev) => (e.listeners[type] || []).forEach((fn) => fn(Object.assign({
-    button: 0, clientX: 0, clientY: 0, key: '', ctrlKey: false, target: e,
+    button: 0, pointerId: 1, timeStamp: 0, clientX: 0, clientY: 0, key: '', ctrlKey: false, target: e,
     preventDefault() {}, stopPropagation() {},
   }, ev)));
   return e;
@@ -101,7 +101,7 @@ function makeDoc() {
   doc.createElement = (t) => stubEl(t, 'created', 96, 96);
   doc.addEventListener = (t, fn) => { (doc.listeners[t] = doc.listeners[t] || []).push(fn); };
   doc.fire = (type, ev) => (doc.listeners[type] || []).forEach((fn) => fn(Object.assign({
-    button: 0, clientX: 0, clientY: 0, key: '', ctrlKey: false, target: null,
+    button: 0, pointerId: 1, timeStamp: 0, clientX: 0, clientY: 0, key: '', ctrlKey: false, target: null,
     preventDefault() {}, stopPropagation() {},
   }, ev)));
   doc.body = forId('body');
@@ -2280,16 +2280,16 @@ const view = doc.getElementById('view');
 const mine = blueVill();
 const pick = mine[0];
 const px = pick.x - Game.cam.x, py = pick.y - Game.cam.y;
-doc.fire('mousemove', { clientX: px, clientY: py, target: view });
-doc.fire('mousedown', { clientX: px, clientY: py, target: view });
-doc.fire('mouseup', { clientX: px, clientY: py, target: view });
+doc.fire('pointermove', { clientX: px, clientY: py, target: view });
+doc.fire('pointerdown', { clientX: px, clientY: py, target: view });
+doc.fire('pointerup', { clientX: px, clientY: py, target: view });
 check(Game.selection.length === 1 && Game.selection[0] === pick.id,
   'input: click selects the unit under the cursor', JSON.stringify(Game.selection));
 const other = mine[1];
 const ox = other.x - Game.cam.x, oy = other.y - Game.cam.y;
-doc.fire('mousedown', { clientX: ox - 6, clientY: oy - 6, target: view });
-doc.fire('mousemove', { clientX: ox + 6, clientY: oy + 6, target: view });
-doc.fire('mouseup', { clientX: ox + 6, clientY: oy + 6, target: view });
+doc.fire('pointerdown', { clientX: ox - 6, clientY: oy - 6, target: view });
+doc.fire('pointermove', { clientX: ox + 6, clientY: oy + 6, target: view });
+doc.fire('pointerup', { clientX: ox + 6, clientY: oy + 6, target: view });
 check(Game.selection.length >= 1 && Game.selection.indexOf(other.id) >= 0,
   'input: drag box selects the units inside it', JSON.stringify(Game.selection));
 doc.fire('keydown', { key: '1', ctrlKey: true, target: view });
@@ -2299,13 +2299,13 @@ check(Game.selection.length === 0 && Game.groups['1'].length >= 1,
   'group1=' + Game.groups['1'].length + ' sel=' + Game.selection.length);
 doc.fire('keydown', { key: '1', target: view });
 check(Game.selection.length >= 1, 'input: 1 recalls the control group', String(Game.selection.length));
-doc.fire('mousedown', { clientX: px, clientY: py, target: view });
-doc.fire('mouseup', { clientX: px, clientY: py, target: view });
+doc.fire('pointerdown', { clientX: px, clientY: py, target: view });
+doc.fire('pointerup', { clientX: px, clientY: py, target: view });
 check(Game.selection.length === 1 && Game.selection[0] === pick.id,
   'input: re-click still selects the right unit', JSON.stringify(Game.selection));
 const enemyNear = Game.units.find(u => u.team === 1 && !u.dead);
 enemyNear.x = pick.x + 20; enemyNear.y = pick.y;
-doc.fire('mousemove', { clientX: enemyNear.x - Game.cam.x, clientY: enemyNear.y - Game.cam.y, target: view });
+doc.fire('pointermove', { clientX: enemyNear.x - Game.cam.x, clientY: enemyNear.y - Game.cam.y, target: view });
 doc.fire('contextmenu', { clientX: enemyNear.x - Game.cam.x, clientY: enemyNear.y - Game.cam.y, target: view });
 check(pick.order.kind === 'attack' && pick.order.target === enemyNear.id,
   'command: right-click on an enemy orders an attack', pick.order.kind);
@@ -2372,10 +2372,53 @@ check(kPlacing === 'blacksmith' && Game.placing === null,
    so both have to carry the post-barricade wording, not `WASD to pan.` */
 const bannerCtl = (html.match(/^ +Controls: (.+)$/m) || [])[1] || '';
 const footerCtl = (AoE2.infoHtml(AoE2.createState()).match(/>([^<]*screen edges pan)/) || [])[1] || '';
-check(bannerCtl === 'left click / drag to select, right click to command, WASD / arrows to pan.' &&
+check(bannerCtl === 'left click / tap / drag to select, right click / press-and-hold to command, WASD / arrows to pan.' &&
       footerCtl === 'WASD / arrows or screen edges pan',
   'input: the advertised controls name the keys the handler implements',
   'banner=' + JSON.stringify(bannerCtl) + ' footer=' + JSON.stringify(footerCtl));
+/* One-pointer rule (T1): a drag belongs to the pointer that started it, so a second
+   finger cannot drag the anchored box around and its release cannot end the first
+   finger's drag. The owning pointer's pointerup then answers exactly what the
+   mouse click at the same canvas point answers, so both routes agree. */
+const twoFinger = (() => {
+  const s = {};
+  doc.fire('pointerdown', { clientX: px, clientY: py, target: view, pointerId: 1 });
+  s.anchor = Game.drag ? { x0: Game.drag.x0, x1: Game.drag.x1, id: Game.drag.id } : null;
+  doc.fire('pointermove', { clientX: px + 12, clientY: py + 12, target: view, pointerId: 2 });
+  s.x1AfterOtherMove = Game.drag ? Game.drag.x1 : null;
+  doc.fire('pointerup', { clientX: px + 12, clientY: py + 12, target: view, pointerId: 2 });
+  s.idAfterOtherUp = Game.drag ? Game.drag.id : null;
+  doc.fire('pointerup', { clientX: px, clientY: py, target: view, pointerId: 1 });
+  s.dragAfterOwnUp = Game.drag;
+  s.selAfterOwnUp = Game.selection.slice();
+  return s;
+})();
+check(twoFinger.anchor !== null && twoFinger.anchor.id === 1 &&
+      twoFinger.anchor.x1 === twoFinger.anchor.x0 &&
+      twoFinger.x1AfterOtherMove === twoFinger.anchor.x0 &&
+      twoFinger.idAfterOtherUp === 1 && twoFinger.dragAfterOwnUp === null &&
+      JSON.stringify(twoFinger.selAfterOwnUp) === JSON.stringify([pick.id]),
+  'input: a second finger cannot move the anchored box', JSON.stringify(twoFinger));
+
+/* pointercancel is how a browser hands the pointer back (a system gesture, a
+   disconnected device): drop the drag, select nobody, order nobody. */
+const cancelled = (() => {
+  const s = { sel: Game.selection.slice(), bld: Game.selectedBuilding, ord: JSON.stringify(pick.order) };
+  doc.fire('pointerdown', { clientX: px, clientY: py, target: view, pointerId: 1 });
+  s.live = !!Game.drag;
+  doc.fire('pointercancel', { target: view, pointerId: 1 });
+  s.drag = Game.drag;
+  s.nowSel = Game.selection.slice();
+  s.nowBld = Game.selectedBuilding;
+  s.nowOrd = JSON.stringify(pick.order);
+  return s;
+})();
+check(cancelled.live && cancelled.drag === null &&
+      JSON.stringify(cancelled.nowSel) === JSON.stringify(cancelled.sel) &&
+      cancelled.nowBld === cancelled.bld && cancelled.nowOrd === cancelled.ord,
+  'input: pointercancel drops the drag without selecting or commanding',
+  JSON.stringify(cancelled));
+
 const mmBefore = Game.cam.x;
 doc.getElementById('minimap').fire('mousedown', { clientX: 84, clientY: 84, target: doc.getElementById('minimap') });
 check(Game.cam.x !== mmBefore, 'input: minimap click moves the camera', mmBefore + ' -> ' + Math.round(Game.cam.x));
@@ -2390,19 +2433,19 @@ check(Game.cam.x !== mmBefore, 'input: minimap click moves the camera', mmBefore
 const headerEl = doc.getElementById('header');
 const cmdBarEl = doc.getElementById('commands');
 Game.cam.x = 500; Game.cam.y = 300;
-doc.fire('mousemove', { clientX: 3, clientY: 3, target: view });
+doc.fire('pointermove', { clientX: 3, clientY: 3, target: view });
 AoE2.stepGame(Game, DT);
 check(Game.cam.x < 500 && Game.cam.y < 300,
   'input: cursor on the canvas top-left corner still pans up+left (kept)',
   Math.round(Game.cam.x) + ',' + Math.round(Game.cam.y));
 const camH = Game.cam.y;
-doc.fire('mousemove', { clientX: 300, clientY: -18, target: headerEl });
+doc.fire('pointermove', { clientX: 300, clientY: -18, target: headerEl });
 AoE2.stepGame(Game, DT);
 check(Game.cam.y === camH && Game.mouse === null,
   'input: hovering the header bar does not pan (off-canvas coords)', camH + ' -> ' + Game.cam.y);
-doc.fire('mousemove', { clientX: 300, clientY: 300, target: view });
+doc.fire('pointermove', { clientX: 300, clientY: 300, target: view });
 const camF = Game.cam.y;
-doc.fire('mousemove', { clientX: 300, clientY: 712, target: cmdBarEl });
+doc.fire('pointermove', { clientX: 300, clientY: 712, target: cmdBarEl });
 AoE2.stepGame(Game, DT);
 check(Game.cam.y === camF && Game.mouse === null,
   'input: hovering the footer command bar does not pan', camF + ' -> ' + Game.cam.y);
@@ -2613,13 +2656,18 @@ check(sums[0] === '<span class="sum">1 Villager, 1 Militia, 1 Archer</span>' &&
   'hud: a group selection renders one summary element for any squad size',
   sums.join('  ...  '));
 
-const footerRule = ((html.match(/<style>([\s\S]*?)<\/style>/) || [0, ''])[1]
-  .match(/(?:^|[\s};])footer\s*\{([^}]*)\}/) || [])[1];
+const styleCss = (html.match(/<style>([\s\S]*?)<\/style>/) || [0, ''])[1];
+const footerRule = (styleCss.match(/(?:^|[\s};])footer\s*\{([^}]*)\}/) || [])[1];
 check(!!footerRule && footerRule.includes('height:74px') && !/min-height:74px/.test(html),
   'hud: the CSS declares one fixed footer height, not a min-height',
   footerRule === undefined ? 'no footer{…} rule in <style>'
     : 'footer{' + footerRule.replace(/\s+/g, ' ').trim().slice(0, 90) + '} | min-height:74px=' +
       /min-height:74px/.test(html));
+const viewRule = (styleCss.match(/(?:^|[\s};])#view\s*\{([^}]*)\}/) || [])[1];
+check(!!viewRule && /touch-action:\s*none/.test(viewRule),
+  'ui: the canvas declares touch-action:none so a touch drag cannot scroll the page',
+  viewRule === undefined ? 'no #view{…} rule in <style>'
+    : '#view{' + viewRule.replace(/\s+/g, ' ').trim().slice(0, 90) + '}');
 
 /* renderHud's half of the contract: the checks above read the pure builders, so a
    footer that never gets written (or never gets stamped) still passes them. Render

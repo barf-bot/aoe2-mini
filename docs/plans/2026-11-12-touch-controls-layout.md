@@ -1,6 +1,6 @@
 # Touch controls + responsive layout (round: P2 #11)
 
-Status: planned
+Status: in progress
 
 ## Design
 
@@ -88,7 +88,7 @@ to re-decide):
 
 ## Tasks
 
-- [ ] T1: one input path — `pointerDown`/`pointerUp` in §6, pointer listeners, `touch-action:none`
+- [x] T1: one input path — `pointerDown`/`pointerUp` in §6, pointer listeners, `touch-action:none`
   - files: `index.html` — the `#view` rule (`index.html:31`, append `;touch-action:none`), the
     header comment's `Controls:` line (`index.html:99`), the new pure `pointerDown`/`pointerUp`
     (inserted at `index.html:2645`, between `unitsInBox` and the `buttonAt` comment), §6
