@@ -204,6 +204,51 @@ byte-identical (no render path changed).
   carry that wording since 5cdf080) re-pointed at the final file — every `index.html:NNN`
   reference and section range re-measured through `tools/audit-line-refs.js`.
 
+### Sound (T1–T6) — plan `docs/plans/2026-11-12-sound.md`
+
+The game makes noise (d5de1de → 1e5e342); the harness went 249 → 266 checks across the plan,
+and `assets/sprites.png` / `preview.png` stayed byte-identical (no render path changed).
+
+- **T1 — the SFX table and `MUTE_PATH` (d5de1de):** `SFX` joins section 1 beside `AGES`, one
+  row per sound (`hit`, `arrow`, `build`, `age`, `victory`, `defeat`) with its waveform,
+  frequency ramp, duration, gain and the name of the function that fires it, and `MUTE_PATH`
+  joins the two storage keys beside `SAVE_PATH`; the new §14 section reads the table instead of
+  re-typing specs, so the first check fails on `SFX is undefined` before the table exists and
+  then proves every row carries all five fields with a `fire` name the script really defines
+  (249 → 250 checks).
+- **T2 — `playSfx` (362b9c1):** the synthesiser lands in section 5 — one oscillator ramped
+  through the row's `freq` list into a gain envelope, no audio file in the repo — behind
+  `Game.sound = { ctx, at, fired }`: `ctx` is one reused `AudioContext` (a platform without one
+  answers `false` rather than throwing, which is how node and `render-preview.js` stay quiet),
+  `at`/`fired` are the per-frame gate that turns ten hits in one frame into one thud, and
+  `isMuted` becomes the single mute read. The five new checks install a counting
+  `AudioContext` stub and assert one node per row, the gate, and each silence (250 → 255).
+- **T3 — the header speaker toggle (f2d03b6):** the header gains
+  `<button id="mute" class="mute" type="button">Sound on</button>` with a dimmed
+  `[aria-pressed="true"]` variant, and mute gets two writers with one setter —
+  `applyMuteButton` stamps only the button (so `boot` can honour a saved preference without
+  writing the key back) and `setMuted` stamps plus persists to `aoe2mini:muted`; the click
+  listener joins `boot`'s wiring block. Sound stays out of `Game` and out of the save slot —
+  presentation, not simulation (255 → 259 checks).
+- **T4 — the combat rows wired (e3f25b0):** `hitUnit` opens with `playSfx(Game, 'hit')` before
+  the hp maths and `spawnArrow` with `playSfx(Game, 'arrow')` before the projectile is pushed,
+  and the harness gains `callSites()` — a scan that maps every `playSfx` call in the file to
+  the function that owns it, so a row cannot be fired from the wrong place or a fourth place
+  (259 → 262 checks).
+- **T5 — the remaining rows wired (1e5e342):** the `b.built >= 1` branch of `updateUnit` plays
+  `build`, `upgradeAge` plays `age` only when the age actually goes up, and `setResult` ends
+  with `playSfx(Game, Game.result)` — one statement serving the `victory` and `defeat` rows and
+  the `if (Game.result) return` guard keeping it to one chord per game; `updateUnit`,
+  `upgradeAge` and `setResult` join the exports so the checks drive the real paths
+  (262 → 266 checks, the call-site expectation now all five owners).
+- **T6 — docs sync:** this entry plus `docs/GAME_RULES.md` (the `## Sound (SFX)` section and
+  the `sound` field added to the save section's excluded list), `docs/ARCHITECTURE.md` (the §1
+  row gaining `SFX`/`MUTE_PATH`, the §5 row naming the audio door, §6/§7 wording, the
+  public-surface export list, the harness count and every restamped span), `docs/ROADMAP.md`
+  (P2.10 shipped) and `AGENTS.md` (the file-length claim) re-pointed at the final file — every
+  `index.html:NNN` reference and section range re-measured through
+  `tools/audit-line-refs.js`.
+
 ## [Unreleased] — 2026-11-11
 
 ### Board rules pass (T1–T5) — plan `docs/plans/2026-11-04-board-rules.md`

@@ -67,7 +67,12 @@ prototypes stall.
    `loadGame(path, Game, raw)` validates it and puts the game back on the board (the page now
    reopens on the saved game), and the debounced autosave writes without a `Save` press.
    Left over: multiple save slots, cloud sync and share codes — folded into P2 item 12.
-10. **Sound** — tiny embedded blips for attack/build/age-up.
+10. **Sound.** Shipped 2026-11-12 by the sound plan (`docs/plans/2026-11-12-sound.md`):
+    `SFX` (`index.html:417-424`) authors six rows — hit, arrow, build, age, victory, defeat —
+    and `playSfx(Game, name)` (`index.html:2101`) renders each one as an oscillator plus gain
+    envelope through the Web Audio API, so no audio file enters the repo; the header
+    `Sound on/off` button mutes it and the preference survives a reload through
+    `aoe2mini:muted`. Nothing cut — the plan's six rows are the shipped set.
 11. **Touch controls** for phones (tap-select, long-press command), plus a responsive layout.
 12. **Replay / seeded challenge** — the `mulberry32` seed is already a shareable handle on a
     map, and the save payload is the raw material for a replay; carries save/load's leftovers
