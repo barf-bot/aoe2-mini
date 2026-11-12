@@ -3288,8 +3288,11 @@ const SFX_FIELDS = ['wave', 'freq', 'dur', 'gain', 'fire'];
    a stray call cannot hide in a third one (T5 widens this list, it does not
    restate it). */
 const SFX_CALL_SITES = [
+  "setResult:playSfx(Game, Game.result)",
   "hitUnit:playSfx(Game, 'hit')",
   "spawnArrow:playSfx(Game, 'arrow')",
+  "updateUnit:playSfx(Game, 'build')",
+  "upgradeAge:playSfx(Game, 'age')",
 ];
 const callSites = () => {
   const sites = [];
@@ -3503,6 +3506,95 @@ soundCheck("sound: an arrow leaving plays the arrow row's note", () => {
       g.projectiles.length === 3,
       'sameFrame=' + JSON.stringify(oneFrame) + ' nextFrameVoices=' + twoFrames.length +
       ' arrows=' + g.projectiles.length];
+  });
+});
+
+soundCheck("sound: every row's firing function holds its call and no others do", () => {
+  const sites = callSites();
+  const owners = Array.from(new Set(sites.map((s) => s.split(':')[0]))).sort().join(',');
+  const named = Array.from(new Set(Object.keys(AoE2.SFX).map((n) => AoE2.SFX[n].fire))).sort().join(',');
+  return [sites.join(' ') === SFX_CALL_SITES.join(' ') && owners === named,
+    'sites=' + (sites.join(' ') || 'none') + ' owners=' + owners + ' namedByRows=' + named];
+});
+
+soundCheck("sound: a finished building plays the build row's note once", () => {
+  return withAudio((Ctor) => {
+    const row = AoE2.SFX.build;
+    const want = { type: row.wave, freq: row.freq, dur: row.dur, gain: row.gain };
+    const g = AoE2.createState();
+    g.units = [];                                        // nobody on the board but the builders
+    /* a house at `built` progress with its own builder standing on the site, so
+       one stepSim call completes it (the branch updateUnit's build order takes) */
+    const siteUp = (ty, built) => {
+      const b = siteAt(g, 'house', ty);
+      b.built = built;
+      b.hp = Math.max(1, Math.round(b.maxHp * built));
+      const spot = AoE2.workPos(g, b);
+      AoE2.makeUnit(g, 'villager', 0, spot.x, spot.y).order = { kind: 'build', b: b.id };
+      return b;
+    };
+    g.frame = 1;
+    const bA = siteUp(40, 1 - 1e-6);                   // one step of work short of done
+    const bB = siteUp(44, 1 - 1e-6);
+    AoE2.stepSim(g, DT);                                 // one step: both houses complete
+    const first = voicesOf(Ctor);
+    const other = AoE2.createState();                    // cancel and demolish make no sound
+    const cancelled = (other.frame = 1, AoE2.cancelConstruction(other, siteAt(other, 'house', 40)));
+    const demolished = (other.frame = 2, AoE2.demolish(other, builtAt(other, 'house', 44)));
+    const quiet = voicesOf(Ctor);
+    return [bA.built === 1 && bB.built === 1 && first.length === 1 &&
+      JSON.stringify(first[0]) === JSON.stringify(want) && cancelled === true &&
+      demolished === true && quiet.length === 1,
+      'built=' + bA.built + '/' + bB.built + ' voices=' + JSON.stringify(first) +
+      ' cancelled=' + cancelled + ' demolished=' + demolished +
+      ' voicesAfterCancelAndDemolish=' + quiet.length];
+  });
+});
+
+soundCheck("sound: reaching the next age plays the age row's note, a refusal does not", () => {
+  return withAudio((Ctor) => {
+    const g = fundedGame();                          // every cost payable, Feudal reached
+    const row = AoE2.SFX.age;
+    const want = { type: row.wave, freq: row.freq, dur: row.dur, gain: row.gain };
+    g.frame = 1;
+    AoE2.upgradeAge(g);
+    const paid = voicesOf(Ctor);
+    const stuck = AoE2.createState();
+    stuck.age = AoE2.AGES.length - 1;                // Imperial: nothing to research or pay
+    stuck.frame = 1;
+    AoE2.upgradeAge(stuck);
+    const refused = voicesOf(Ctor);
+    return [paid.length === 1 && JSON.stringify(paid[0]) === JSON.stringify(want) &&
+      stuck.age === AoE2.AGES.length - 1 && stuck.toastMsg === 'Imperial Age reached' &&
+      refused.length === 1,
+      'upgrade=' + JSON.stringify(paid) + ' refusal toast=' + JSON.stringify(stuck.toastMsg) +
+      ' voicesAfterRefusal=' + refused.length];
+  });
+});
+
+soundCheck('sound: the result plays its own chord once', () => {
+  return withAudio((Ctor) => {
+    const g = AoE2.createState();
+    const foe = g.buildings.find((b) => b.team === 1 && b.kind === 'town_center');
+    const won = { type: AoE2.SFX.victory.wave, freq: AoE2.SFX.victory.freq,
+      dur: AoE2.SFX.victory.dur, gain: AoE2.SFX.victory.gain };
+    const lost = { type: AoE2.SFX.defeat.wave, freq: AoE2.SFX.defeat.freq,
+      dur: AoE2.SFX.defeat.dur, gain: AoE2.SFX.defeat.gain };
+    g.frame = 1;
+    AoE2.removeBuilding(g, foe);                         // the shared raze door (§3)
+    const first = voicesOf(Ctor);
+    const again = (g.frame = 2, AoE2.demolish(g, builtAt(g, 'house', 46)));
+    const afterSecond = voicesOf(Ctor);                  // setResult's guard: one chord per game
+    const other = AoE2.createState();
+    other.frame = 1;
+    AoE2.removeBuilding(other, other.buildings.find((b) => b.team === 0 && b.kind === 'town_center'));
+    const all = voicesOf(Ctor);
+    return [g.result === 'victory' && first.length === 1 &&
+      JSON.stringify(first[0]) === JSON.stringify(won) && afterSecond.length === 1 &&
+      other.result === 'defeat' && all.length === 2 && JSON.stringify(all[1]) === JSON.stringify(lost),
+      'result=' + g.result + ' voices=' + JSON.stringify(first) +
+      ' secondSetResult=' + afterSecond.length + ' otherResult=' + other.result +
+      ' allVoices=' + all.length];
   });
 });
 

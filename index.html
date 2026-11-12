@@ -766,6 +766,7 @@ function setResult(Game) {
   const alive = (team) => Game.buildings.some((b) => b.kind === 'town_center' && b.team === team);
   if (!alive(1)) Game.result = 'victory';
   else if (!alive(0)) Game.result = 'defeat';
+  playSfx(Game, Game.result);          // one statement serves both result rows
 }
 
 /** Free tile next to a building for a unit to spawn / stand on. */
@@ -1054,6 +1055,7 @@ function updateUnit(Game, u, dt) {
     b.hp = Math.max(1, Math.round(b.maxHp * b.built));
     if (b.built >= 1) {
       b.built = 1;
+      playSfx(Game, 'build');
       if (u.team === 0) toast(Game, BLD[b.kind].label + ' complete');
       u.order = { kind: 'idle' };
     }
@@ -1719,6 +1721,7 @@ function upgradeAge(Game) {
   spend(Game, 0, cost);
   Game.age++;
   Game.ageBonus = Game.age;
+  playSfx(Game, 'age');
   markDirty(Game);                         // the age up is a change
   toast(Game, AGES[Game.age] + ' reached');
 }
