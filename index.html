@@ -324,6 +324,19 @@ const BLD = {
     trains: [],
     attack: 0, meleeArmor: 0, pierceArmor: 7, lineOfSight: 6, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 0, age: 1, noSprite: true,
   },
+  market: {
+    label: 'Market', hp: 1800, w: 2, h: 2,
+    cost: { wood: 175 }, time: 60, pop: 0,
+    trains: [],
+    attack: 0, meleeArmor: 1, pierceArmor: 8, lineOfSight: 6, range: 0, reload: 0, accuracy: 100, garrisonCapacity: 10, age: 1, noSprite: true,
+    trade: { sell: 33, buy: 67 },
+  },
+  watch_tower: {
+    label: 'Watch Tower', hp: 850, w: 1, h: 1,
+    cost: { wood: 35, stone: 125 }, time: 80, pop: 0,
+    trains: [],
+    attack: 5, meleeArmor: 1, pierceArmor: 7, lineOfSight: 10, range: 8, reload: 2, accuracy: 100, garrisonCapacity: 5, age: 1, noSprite: true,
+  },
 };
 
 // GENERATED FROM data/techs.json -- edit the data or run `node tools/check-stats.mjs --write`.
@@ -2303,6 +2316,8 @@ function attachInput(Game, d) {
     if (k === 'm') { Game.placing = Game.placing === 'mill' ? null : 'mill'; return; }
     if (k === 'r') { Game.placing = Game.placing === 'archery_range' ? null : 'archery_range'; return; }
     if (k === 'k') { Game.placing = Game.placing === 'blacksmith' ? null : 'blacksmith'; return; }
+    if (k === 'e') { Game.placing = Game.placing === 'market' ? null : 'market'; return; }
+    if (k === 'c') { Game.placing = Game.placing === 'watch_tower' ? null : 'watch_tower'; return; }
     if (k === 't') { upgradeAge(Game); return; }
     setKey(k, true);
   });

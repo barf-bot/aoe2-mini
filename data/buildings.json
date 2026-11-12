@@ -10,7 +10,7 @@
     "authored": [
       "buildings.*.label", "buildings.*.w", "buildings.*.h", "buildings.*.pop",
       "buildings.*.field", "buildings.*.trains",
-      "buildings.*.age", "buildings.*.noSprite"
+      "buildings.*.age", "buildings.*.noSprite", "buildings.market.trade"
     ]
   },
   "buildings": {
@@ -195,6 +195,51 @@
       "reload": 0,
       "accuracy": 0,
       "garrisonCapacity": 0,
+      "age": 1,
+      "noSprite": true
+    },
+    "market": {
+      "id": 84,
+      "internalName": "MRKT",
+      "label": "Market",
+      "hp": 1800,
+      "cost": { "wood": 175 },
+      "time": 60,
+      "w": 2,
+      "h": 2,
+      "pop": 0,
+      "trains": [],
+      "attack": 0,
+      "meleeArmor": 1,
+      "pierceArmor": 8,
+      "lineOfSight": 6,
+      "range": 0,
+      "reload": 0,
+      "accuracy": 100,
+      "garrisonCapacity": 10,
+      "trade": { "sell": 33, "buy": 67 },
+      "age": 1,
+      "noSprite": true
+    },
+    "watch_tower": {
+      "id": 79,
+      "internalName": "WCTW",
+      "label": "Watch Tower",
+      "hp": 850,
+      "cost": { "wood": 35, "stone": 125 },
+      "time": 80,
+      "w": 1,
+      "h": 1,
+      "pop": 0,
+      "trains": [],
+      "attack": 5,
+      "meleeArmor": 1,
+      "pierceArmor": 7,
+      "lineOfSight": 10,
+      "range": 8,
+      "reload": 2,
+      "accuracy": 100,
+      "garrisonCapacity": 5,
       "age": 1,
       "noSprite": true
     }

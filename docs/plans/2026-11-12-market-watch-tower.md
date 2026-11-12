@@ -1,6 +1,6 @@
 # Market and Watch Tower
 
-Status: planned
+Status: in progress
 
 ## Design
 
@@ -38,7 +38,7 @@ proving check and the `Map of this file` banner stays truthful.
 
 ## Tasks
 
-- [ ] T1: The Market and Watch Tower rows — data, generated `BLD`, the `e`/`c` hotkeys
+- [x] T1: The Market and Watch Tower rows — data, generated `BLD`, the `e`/`c` hotkeys
   - files: `data/buildings.json` (`buildings.market`, `buildings.watch_tower`,
     `source.authored`), `tools/check-stats.mjs` (a `tradeValue` helper plus the optional-field
     pattern at `tools/check-stats.mjs:102-105` and the field list in `renderBLD`

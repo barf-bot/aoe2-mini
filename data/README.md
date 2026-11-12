@@ -7,7 +7,7 @@ runtime (the product is still one dependency-free file); it carries what the too
 | File | Contains | Consumed by |
 |---|---|---|
 | `units.json` | the unit stat rows the game ships (`villager`, `militia`, `archer`) plus the `CFG` block — hp, attack, attack type (melee/ranged), armours, attack delay, speed in **tiles/s**, costs, train times | `tools/check-stats.mjs` (renders section 1's `CFG`/`KINDS`) |
-| `buildings.json` | the nine building rows — hp, costs, build times, footprints, armours, the Town Center's attack/range, and the Blacksmith's authored `age` gate + `noSprite` mark | `tools/check-stats.mjs` (renders section 1's `BLD`) |
+| `buildings.json` | the eleven building rows — hp, costs, build times, footprints, armours, the Town Center's and Watch Tower's attack/range, the three Feudal rows' authored `age` gate + `noSprite` mark, and the Market's authored `trade` rates (sell 100 food/wood/stone for 33 gold, buy 100 back for 67) | `tools/check-stats.mjs` (renders section 1's `BLD`) |
 | `techs.json` | the four Blacksmith tech rows (`forge` 67, `scale_mail` 74, `fletching` 199, `bracer` 201) — upstream costs, research times and the `atk`/`armor` effect halves the engine reads (`data.Tech[<id>]`) | `tools/check-stats.mjs` (renders section 1's `TECHS`) |
 | `sprites/` + `sprites.json` | the ripped PNG frames the atlas is composed from (the farm frame is the old procedural cell vendored as a PNG — the building rip ships no farm bitmap) and the manifest mapping kind → anim → file | `tools/gen-atlas.js` |
 

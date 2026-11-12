@@ -1271,6 +1271,79 @@ check(!!bsF.spot && !bsF.threw && !!bsF.b && Math.round(bsF.spent) === 150 &&
     : bsF.threw ? 'threw: ' + bsF.threw.message
       : 'spent=' + bsF.spent + ' built in ' + bsF.seconds + 's (table ' + bsF.time + 's + walk)');
 
+/* T1 market + watch tower (2026-11-12 market plan): the MRKT (84) and WCTW (79)
+   rows join BLD behind the same authored `age: 1` gate the Blacksmith proved, and
+   each is priced from its own row -- the Market's 175 wood / 60 s, the Watch
+   Tower's 35 wood + 125 stone / 80 s. Both rows are `noSprite: true`, so the pair
+   rides §5b3's null-sprite rule without a new assertion there. */
+const darkAgeRefusal = (kind) => {
+  const st = AoE2.createState();
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const res0 = JSON.stringify(st.res[0]);
+  let built, threw = null;
+  try { built = AoE2.build(st, kind); } catch (e) { threw = e; }
+  return { built, threw, toast: st.toastMsg, res0, res: JSON.stringify(st.res[0]), order: v && v.order.kind };
+};
+const mkGate = darkAgeRefusal('market');
+check(!mkGate.threw && mkGate.built === undefined &&
+      mkGate.toast === 'Market requires Feudal Age' && mkGate.res === mkGate.res0,
+  'build: a Dark Age settlement cannot raise a Market (Feudal only)',
+  mkGate.threw ? 'threw: ' + mkGate.threw.message
+    : 'built=' + String(mkGate.built) + ' toast=' + JSON.stringify(mkGate.toast) +
+      ' res=' + mkGate.res + ' (was ' + mkGate.res0 + ')');
+const wtGate = darkAgeRefusal('watch_tower');
+check(!wtGate.threw && wtGate.built === undefined &&
+      wtGate.toast === 'Watch Tower requires Feudal Age' && wtGate.res === wtGate.res0,
+  'build: a Dark Age settlement cannot raise a Watch Tower (Feudal only)',
+  wtGate.threw ? 'threw: ' + wtGate.threw.message
+    : 'built=' + String(wtGate.built) + ' toast=' + JSON.stringify(wtGate.toast) +
+      ' res=' + wtGate.res + ' (was ' + wtGate.res0 + ')');
+
+/* The Feudal fixture funds exactly the data row's cost and nothing else, so
+   `spent` also proves the generated BLD carries that cost (a cheaper BLD row
+   would leave gold/wood behind); the site is a free pad of the row's own
+   footprint within 8 tiles, and the walk is capped the way §7b's is. */
+const feudalSite = (kind) => {
+  const st = AoE2.createState();
+  st.age = 1;
+  const row = dataBuildings.buildings[kind];
+  const def = AoE2.BLD[kind];
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const cost = (row && row.cost) || (def && def.cost) || {};
+  if (!row || !def || !v) {                             // either side absent: report, never throw
+    return { row, def, cost, spot: null, threw: null, b: null, spent: {},
+             time: (def || row || {}).time, seconds: 0, built: 0 };
+  }
+  for (const k in cost) st.res[0][k] = cost[k];
+  const spot = freeSpotAround(st.world, st, tOf(v.x), tOf(v.y), def.w, def.h, 8);
+  st.selection = [v.id];                                // pin the builder, as §7 does
+  const before = Object.assign({}, st.res[0]);
+  let b, threw = null;
+  try { b = AoE2.build(st, kind, spot.tx * AoE2.CFG.TILE + 4, spot.ty * AoE2.CFG.TILE + 4); }
+  catch (e) { threw = e; }
+  const spent = Object.keys(before).reduce((o, k) => Object.assign(o, { [k]: before[k] - st.res[0][k] }), {});
+  let steps = 0;
+  if (b) while (b.built < 1 && steps < Math.ceil((def.time + 8) / DT)) { AoE2.stepGame(st, DT); steps++; }
+  return { row, def, cost, spot, threw, b, spent, time: def.time, seconds: +(steps * DT).toFixed(2),
+           built: b ? b.built : 0 };
+};
+const exactSpend = (f) => Object.keys(f.spent).every((k) => f.spent[k] === (f.cost[k] || 0));
+const siteDetail = (f) =>
+  !f.row || !f.def ? [!f.row && 'data row', !f.def && 'BLD row'].filter(Boolean).join(' + ') + ' missing'
+    : !f.spot ? 'no free ' + f.def.w + 'x' + f.def.h + ' pad near a villager'
+      : f.threw ? 'threw: ' + f.threw.message
+        : 'spent=' + JSON.stringify(f.spent) + ' (row ' + JSON.stringify(f.cost) + ') built in '
+          + f.seconds + 's (table ' + f.time + 's + walk)';
+const mkF = feudalSite('market');
+check(!!mkF.row && !!mkF.def && !!mkF.spot && !mkF.threw && !!mkF.b && exactSpend(mkF) &&
+      mkF.built >= 1 && mkF.seconds >= mkF.time - DT && mkF.seconds <= mkF.time + 8,
+  "build: a Feudal Market costs the table's 175 wood and completes in 60s", siteDetail(mkF));
+const wtF = feudalSite('watch_tower');
+check(!!wtF.row && !!wtF.def && !!wtF.spot && !wtF.threw && !!wtF.b && exactSpend(wtF) &&
+      wtF.built >= 1 && wtF.seconds >= wtF.time - DT && wtF.seconds <= wtF.time + 8,
+  "build: a Feudal Watch Tower costs the table's 35 wood + 125 stone and completes in 80s",
+  siteDetail(wtF));
+
 /* ---- 7b. camps + drop-off routing (v2 task 3) ----------------------- */
 // Lumber/Mining camps and the Mill join BLD at their AoE2 costs and sizes, and
 // a carrying villager must walk to the DEDICATED building for what they carry
@@ -1803,6 +1876,14 @@ const kPlacing = Game.placing;
 doc.fire('keydown', { key: 'Escape', target: view });
 check(kPlacing === 'blacksmith' && Game.placing === null,
   'input: k arms Blacksmith placement', 'k=' + String(kPlacing) + ' esc=' + String(Game.placing));
+[['e', 'market', 'Market'], ['c', 'watch_tower', 'Watch Tower']].forEach(([k, kind, label]) => {
+  doc.fire('keydown', { key: k, target: view });
+  const armed = Game.placing;
+  doc.fire('keydown', { key: 'Escape', target: view });
+  check(armed === kind && Game.placing === null,
+    'input: ' + k + ' arms ' + label + ' placement',
+    k + '=' + String(armed) + ' esc=' + String(Game.placing));
+});
 const mmBefore = Game.cam.x;
 doc.getElementById('minimap').fire('mousedown', { clientX: 84, clientY: 84, target: doc.getElementById('minimap') });
 check(Game.cam.x !== mmBefore, 'input: minimap click moves the camera', mmBefore + ' -> ' + Math.round(Game.cam.x));

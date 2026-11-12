@@ -78,6 +78,12 @@ function kindValue(u) {
   };
 }
 
+/** `{ sell: 33, buy: 67 }` -- the Market's gold rates, authored in data/
+ *  (no upstream table column carries them); printed as `trade: { ... }`. */
+function tradeValue(t, where) {
+  return { sell: mustNum(t.sell, `${where}.sell`), buy: mustNum(t.buy, `${where}.buy`) };
+}
+
 /** The value `BLD.<kind>` must hold. */
 function bldValue(b) {
   const where = `data/buildings.json buildings.${b.internalName || b.label}`;
@@ -103,6 +109,7 @@ function bldValue(b) {
   if (b.age !== undefined) v.age = mustNum(b.age, `${where}.age`);
   if (b.noSprite !== undefined) v.noSprite = typeof b.noSprite === 'boolean'
     ? b.noSprite : fail(`${where}.noSprite must be true/false`);
+  if (b.trade !== undefined) v.trade = tradeValue(b.trade, `${where}.trade`);
   return v;
 }
 
@@ -157,14 +164,16 @@ function renderBLD() {
     const v = bldValue(bldsDoc.buildings[name]);
     const extras = ['attack', 'meleeArmor', 'pierceArmor', 'lineOfSight', 'range', 'reload',
                     'accuracy', 'garrisonCapacity', 'field', 'age', 'noSprite'].filter((k) => v[k] !== undefined);
-    return [
+    const lines = [
       `  ${name}: {`,
       `    label: '${v.label}', hp: ${v.hp}, w: ${v.w}, h: ${v.h},`,
       `    cost: ${inline(v.cost, `buildings.${name}.cost`)}, time: ${v.time}, pop: ${v.pop},`,
       `    trains: ${v.trains.length ? quoted(v.trains) : '[]'},`,
       `    ${extras.map((k) => `${k}: ${v[k]}`).join(', ')},`,
-      `  },`,
-    ].join('\n');
+    ];
+    if (v.trade) lines.push(`    trade: { sell: ${v.trade.sell}, buy: ${v.trade.buy} },`);
+    lines.push('  },');
+    return lines.join('\n');
   }).join('\n');
   return `${BANNER('data/buildings.json')}\nconst BLD = {\n${body}\n};`;
 }
