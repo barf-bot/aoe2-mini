@@ -884,6 +884,7 @@ function unitArmor(Game, u, type = 'melee') {
  * below 1 - clamped at 0; returns true if it died. The damage type defaults
  * to the 'melee' a plain swing deals. */
 function hitUnit(Game, u, dmg, type = 'melee') {
+  playSfx(Game, 'hit');
   u.hp -= Math.max(1, dmg - unitArmor(Game, u, type));
   if (u.hp > 0) return false;
   u.hp = 0;
@@ -899,6 +900,7 @@ function hitUnit(Game, u, dmg, type = 'melee') {
  *  only ever hit once, so a kill mid-flight cannot splash onto the next body.
  *  Pure logic, no DOM. */
 function spawnArrow(Game, from, target) {
+  playSfx(Game, 'arrow');
   const accuracy = from.atk === undefined ? BLD[from.kind].accuracy : from.accuracy;
   const dx = target.x - from.x, dy = target.y - from.y, d = Math.hypot(dx, dy) || 1;
   const p = { x: from.x, y: from.y, team: from.team, t: target, dx: dx / d, dy: dy / d,

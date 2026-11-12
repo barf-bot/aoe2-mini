@@ -3282,6 +3282,26 @@ const scriptFnNames = () => {
 };
 const SFX_WAVES = ['sine', 'square', 'sawtooth', 'triangle', 'custom'];
 const SFX_FIELDS = ['wave', 'freq', 'dur', 'gain', 'fire'];
+/* The call-site contract: every `playSfx(` in the script and the top-level
+   function that owns it. The expectation is the table's own `fire` column
+   written out, so a row cannot be played from a function it does not name and
+   a stray call cannot hide in a third one (T5 widens this list, it does not
+   restate it). */
+const SFX_CALL_SITES = [
+  "hitUnit:playSfx(Game, 'hit')",
+  "spawnArrow:playSfx(Game, 'arrow')",
+];
+const callSites = () => {
+  const sites = [];
+  let owner = null;
+  for (const line of m[1].split('\n')) {
+    const fn = /^function ([A-Za-z0-9_]+)/.exec(line);
+    if (fn) owner = fn[1];
+    if (!owner || owner === 'playSfx') continue;
+    for (const call of line.match(/playSfx\([^)]*\)/g) || []) sites.push(owner + ':' + call);
+  }
+  return sites;
+};
 
 soundCheck('sound: the SFX table names every sound once and completely', () => {
   const sfx = AoE2.SFX;
@@ -3436,6 +3456,53 @@ soundCheck('sound: the booted muted game plays nothing for any row', () => {
       r[1] === '[true,true,true,true,true,true]' && r[2] === '0/6/1',
       'whileMuted=' + r[0] + ' afterUnmute=' + r[1] +
       ' nodes(muted/after/contexts)=' + r[2]];
+  });
+});
+
+soundCheck('sound: the hit and arrow rows fire from exactly the functions they name', () => {
+  const sites = callSites();
+  return [sites.join(' ') === SFX_CALL_SITES.join(' '),
+    'sites=' + (sites.join(' ') || 'none') + ' expected=' + SFX_CALL_SITES.join(' ')];
+});
+
+soundCheck("sound: a melee swing plays the hit row's note, once per frame", () => {
+  return withAudio((Ctor) => {
+    const g = AoE2.createState();                        // seeded squad: one militia per side
+    const mine = g.units.find((u) => u.team === 0 && u.kind === 'militia');
+    const foe = g.units.find((u) => u.team === 1 && u.kind === 'militia');
+    const row = AoE2.SFX.hit;
+    const want = { type: row.wave, freq: row.freq, dur: row.dur, gain: row.gain };
+    g.frame = 4;
+    const hitFoe = AoE2.hitUnit(g, foe, 1);              // my swing
+    const hitMine = AoE2.hitUnit(g, mine, 1);            // his answer, same frame
+    const v = voicesOf(Ctor);
+    return [hitFoe === false && hitMine === false && v.length === 1 &&
+      JSON.stringify(v[0]) === JSON.stringify(want),
+      'swings=2 in frame=' + g.frame + ' bothSurvived=' + (hitFoe === false && hitMine === false) +
+      ' voices=' + JSON.stringify(v)];
+  });
+});
+
+soundCheck("sound: an arrow leaving plays the arrow row's note", () => {
+  return withAudio((Ctor) => {
+    const g = AoE2.createState();
+    const tc = g.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+    const archer = AoE2.makeUnit(g, 'archer', 0, tc.x + 200, tc.y);
+    const foe = g.units.find((u) => u.team === 1 && u.kind === 'militia');
+    const row = AoE2.SFX.arrow;
+    const want = { type: row.wave, freq: row.freq, dur: row.dur, gain: row.gain };
+    g.frame = 1;
+    AoE2.spawnArrow(g, archer, foe);                      // a unit's shot
+    AoE2.spawnArrow(g, tc, foe);                          // the town center's, same frame
+    const oneFrame = voicesOf(Ctor);
+    g.frame = 2;
+    AoE2.spawnArrow(g, archer, foe);
+    const twoFrames = voicesOf(Ctor);
+    return [oneFrame.length === 1 && JSON.stringify(oneFrame[0]) === JSON.stringify(want) &&
+      twoFrames.length === 2 && JSON.stringify(twoFrames[1]) === JSON.stringify(want) &&
+      g.projectiles.length === 3,
+      'sameFrame=' + JSON.stringify(oneFrame) + ' nextFrameVoices=' + twoFrames.length +
+      ' arrows=' + g.projectiles.length];
   });
 });
 
