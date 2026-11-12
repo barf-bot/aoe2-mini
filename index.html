@@ -24,6 +24,7 @@
   .res span{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
   #r_food b{color:#e7b16a} #r_wood b{color:#9ec96f} #r_gold b{color:#f0d264} #r_stone b{color:#c6c8cf}
   #r_pop b{color:#9dc4f0} #r_age b{color:var(--gold)}
+  header .save{align-self:center;margin-left:auto;padding:4px 14px}
   #stage{position:relative;flex:1 1 auto;min-height:0;background:#0d0f13}
   #view{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
   #minimap{position:absolute;right:8px;bottom:8px;width:168px;height:168px;
@@ -75,6 +76,7 @@
     <div class="res" id="r_stone"><span>stone</span><b>0</b></div>
     <div class="res" id="r_pop"><span>pop</span><b>0/0</b></div>
     <div class="res" id="r_age"><span>age</span><b>Dark Age</b></div>
+    <button id="save" class="save" type="button">Save</button>
   </header>
 
   <div id="stage">
@@ -2656,6 +2658,7 @@ function attachInput(Game, d) {
     if (k === 'c') { Game.placing = Game.placing === 'watch_tower' ? null : 'watch_tower'; return; }
     if (k === 'w') { Game.placing = Game.placing === 'barricade' ? null : 'barricade'; return; }
     if (k === 't') { upgradeAge(Game); return; }
+    if (k === 'n') { storageSet(SAVE_PATH, null); resetGame(Game); return; }
     setKey(k, true);
   });
   d.addEventListener('keyup', (e) => setKey((e.key || '').toLowerCase(), false));
@@ -2679,7 +2682,7 @@ function attachInput(Game, d) {
       else if (act === 'cancel' && Game.selectedBuilding) cancelConstruction(Game, Game.selectedBuilding);
       else if (act === 'demolish' && Game.selectedBuilding) demolish(Game, Game.selectedBuilding);
       else if (act === 'age') upgradeAge(Game);
-      else if (act === 'restart') resetGame(Game);
+      else if (act === 'restart') { storageSet(SAVE_PATH, null); resetGame(Game); }
     });
   }
 
@@ -2843,6 +2846,11 @@ function loadAtlas(Game) {
 
 function boot(doc) {
   const Game = createState();
+  /* the session continues from the slot: a tab reopened lands on the saved game,
+     and an empty or unreadable slot is the fresh settlement createState just built.
+     Ahead of the `!d` guard so a doc-less boot restores like a browser one. */
+  const raw = storageGet(SAVE_PATH);
+  if (raw !== null) loadGame(SAVE_PATH, Game, raw);
   const d = doc || (typeof document !== 'undefined' ? document : null);
   if (!d) return Game;
   const viewEl = d.getElementById('view');
@@ -2857,6 +2865,7 @@ function boot(doc) {
     commands: d.getElementById('commands'),
     toast: d.getElementById('toast'),
     result: d.getElementById('result'),
+    save: d.getElementById('save'),
   };
   for (const k of ['food', 'wood', 'gold', 'stone', 'pop', 'age']) {
     const box = d.getElementById('r_' + k);
@@ -2876,8 +2885,11 @@ function boot(doc) {
   if (Game.dom.result && Game.dom.result.addEventListener) {
     Game.dom.result.addEventListener('click', (e) => {
       const b = buttonAt(e);
-      if (b && b.getAttribute('data-act') === 'restart') resetGame(Game);
+      if (b && b.getAttribute('data-act') === 'restart') { storageSet(SAVE_PATH, null); resetGame(Game); }
     });
+  }
+  if (Game.dom.save && Game.dom.save.addEventListener) {
+    Game.dom.save.addEventListener('click', () => { saveGame(SAVE_PATH, Game); toast(Game, 'Saved'); });
   }
   Game.started = true;
   renderFrame(Game);

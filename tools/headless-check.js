@@ -2068,6 +2068,7 @@ check(!hR.err && hR.dmg === hR.want, 'math: armour softens a hit but never below
  * blue's loses, a set result freezes the simulation, and the overlay's button
  * restarts through the same resetGame the command bar's "New map" uses. */
 const overlayHtml = (g) => (g.dom && g.dom.result ? g.dom.result.innerHTML : '<no #result element>');
+AoE2.storageSet(AoE2.SAVE_PATH, null);   // boot restores the slot (T4): this fixture asks for an empty one
 const go = AoE2.boot(makeDoc());
 const winTc = go.buildings.find((b) => b.team === 1 && b.kind === 'town_center');
 AoE2.hitBuilding(go, winTc, 99999);
@@ -3069,6 +3070,112 @@ autoCheck('autosave: a training that completes marks the game again', () => {
       afterTrain.toFixed(3) + ' -> ' + (bornSchedule === null ? 'n/a' : bornSchedule.toFixed(3)) +
       ' writes=' + s.sets];
   });
+});
+
+/* The page surface: every check boots its own doc with the slot set up first, so
+   the boot path and the button paths are proven on the real markup. */
+const uiCheck = (name, fn) => {
+  let out;
+  try { out = fn(); } catch (e) { bad(name, 'threw ' + e.message); return; }
+  check(out[0], name, out[1]);
+};
+const bootFixture = (raw, fn) => {
+  const keep = global.localStorage;
+  global.localStorage = fakeStorage();
+  if (raw !== undefined) AoE2.storageSet(AoE2.SAVE_PATH, raw);
+  const doc = makeDoc();
+  const Game = AoE2.boot(doc);
+  try { return fn(doc, Game); } finally { global.localStorage = keep; }
+};
+const savedFixture = (at = 1000) => {
+  const g = AoE2.createState();
+  g.started = true;                                     // a save always comes from a booted game
+  g.age = 1;
+  g.res[0] = { food: 100, wood: 100, gold: 999, stone: 50 };
+  const p = AoE2.workPos(g, g.buildings.find((b) => b.team === 0 && b.kind === 'town_center'));
+  AoE2.makeUnit(g, 'archer', 0, p.x, p.y);
+  return [g, AoE2.saveGame(AoE2.SAVE_PATH, g, at)];
+};
+
+uiCheck('ui: the header Save button writes the slot and toasts', () => {
+  const [, raw] = savedFixture();
+  return bootFixture(raw, (doc, Game) => {
+    Game.dom.save.fire('click');
+    const slot = AoE2.storageGet(AoE2.SAVE_PATH);
+    const env = slot === null ? {} : JSON.parse(slot);
+    return [slot !== null && env.version === AoE2.CFG.VERSION &&
+      JSON.stringify(env.state) === JSON.stringify(JSON.parse(raw).state) &&
+      env.state.nextId === Game.nextId && Game.toastMsg === 'Saved',
+      'slotHoldsLoadedGame=' + (slot !== null &&
+        JSON.stringify(env.state) === JSON.stringify(JSON.parse(raw).state)) +
+      ' version=' + env.version + ' state.nextId=' + env.state.nextId + '/' + Game.nextId +
+      ' toast=' + JSON.stringify(Game.toastMsg)];
+  });
+});
+
+uiCheck('ui: N starts a new game, clears the slot and writes the new game back', () => {
+  const [src, raw] = savedFixture();
+  return bootFixture(raw, (doc, Game) => {
+    const loaded = Game.units.length === src.units.length && Game.age === 1 && Game.res[0].gold === 999;
+    doc.fire('keydown', { key: 'n' });
+    const cleared = AoE2.storageGet(AoE2.SAVE_PATH) === null;
+    const after = [Game.units.length, Game.time, Game.age].join('/');
+    AoE2.stepGame(Game, DT);
+    const slot = AoE2.storageGet(AoE2.SAVE_PATH);
+    const env = slot === null ? {} : JSON.parse(slot);
+    return [loaded && cleared && after === '10/0/0' && slot !== null && env.state.units.length === 10,
+      'loaded=' + loaded + ' clearedSlot=' + cleared + ' units/time/age=' + after +
+      ' rewrittenUnits=' + (slot === null ? 'none' : env.state.units.length)];
+  });
+});
+
+uiCheck('ui: the footer’s New map button clears the slot too', () => {
+  const [src, raw] = savedFixture();
+  return bootFixture(raw, (doc, Game) => {
+    const btn = stubEl('button', 'btnRestart', 80, 24);
+    btn.setAttribute('data-act', 'restart');
+    Game.dom.commands.listeners.click.forEach((fn) => fn({ target: btn }));
+    return [Game.units.length === 10 && Game.age === 0 && Game.res[0].gold === AoE2.CFG.START.gold &&
+      AoE2.storageGet(AoE2.SAVE_PATH) === null,
+      'was=' + src.units.length + ' units, now=' + Game.units.length + ' age=' + Game.age +
+      ' gold=' + Game.res[0].gold + ' slot=' + (AoE2.storageGet(AoE2.SAVE_PATH) === null ? 'cleared' : 'filled')];
+  });
+});
+
+uiCheck('ui: the result overlay’s New game button clears the slot too', () => {
+  const [src, raw] = savedFixture();
+  return bootFixture(raw, (doc, Game) => {
+    const btn = stubEl('button', 'btnNew', 80, 24);
+    btn.setAttribute('data-act', 'restart');
+    Game.dom.result.listeners.click.forEach((fn) => fn({ target: btn }));
+    return [Game.units.length === 10 && Game.result === null &&
+      AoE2.storageGet(AoE2.SAVE_PATH) === null,
+      'was=' + src.units.length + ' units, now=' + Game.units.length +
+      ' result=' + String(Game.result) +
+      ' slot=' + (AoE2.storageGet(AoE2.SAVE_PATH) === null ? 'cleared' : 'filled')];
+  });
+});
+
+uiCheck('boot: opening the page with a slot restores that game', () => {
+  const [src, raw] = savedFixture();
+  return bootFixture(raw, (doc, Game) => [
+    AoE2.saveGame(AoE2.SAVE_PATH, Game, 1000) === raw &&
+    Game.units.length === src.units.length && Game.age === 1 && Game.res[0].gold === 999 &&
+    Game.units.some((u) => u.kind === 'archer' && u.team === 0),
+    'units=' + Game.units.length + '/' + src.units.length + ' age=' + Game.age +
+    ' gold=' + Game.res[0].gold +
+    ' resavedIdentical=' + (AoE2.saveGame(AoE2.SAVE_PATH, Game, 1000) === raw),
+  ]);
+});
+
+uiCheck('boot: opening the page with an empty slot gives the standard settlement', () => {
+  const std = AoE2.createState();
+  return bootFixture(null, (doc, Game) => [
+    Game.units.length === std.units.length && Game.units.length === 10 && Game.age === std.age &&
+    Game.time === std.time && JSON.stringify(Game.res[0]) === JSON.stringify(AoE2.CFG.START),
+    'units=' + Game.units.length + '/' + std.units.length + ' age=' + Game.age +
+    ' res0=' + JSON.stringify(Game.res[0]),
+  ]);
 });
 
 report();
