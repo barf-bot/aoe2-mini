@@ -119,7 +119,7 @@ a bug.
 | Mining Camp | 600 | 1×1 | 100 wood | 35 s | — | — |
 | Mill | 600 | 2×2 | 100 wood | 35 s | — | (food field 170) |
 | Archery Range | 1500 | 2×2 | 175 wood | 50 s | — | Archer |
-| Blacksmith | 1400 | 1×1 | 150 wood | 40 s | — | — |
+| Blacksmith | 1800 | 1×1 | 150 wood | 40 s | — | — |
 
 - The Blacksmith row carries an `age` gate: `build` refuses it before picking a builder
   whenever `Game.age < 1` (`Blacksmith requires Feudal Age`), and its button only shows

@@ -11,7 +11,7 @@ The first real upgrade path (a0be85c → d93d017); the harness went 156 → 175 
 across the plan.
 
 - **T1 — the Blacksmith row, the age gate, `k` (a0be85c):** `data/buildings.json` gains
-  `blacksmith` (the `BLAC` row: 1400 hp, 150 wood, 40 s, 1×1, **age 1**) and `BLD`
+  `blacksmith` (the `BLAC` row: 1800 hp, 150 wood, 40 s, 1×1, **age 1**) and `BLD`
   follows; `build` refuses an age-locked kind before drafting a builder
   (`Blacksmith requires Feudal Age`), the button and the `k` hotkey only appear once
   the age is reached, and `check-stats.mjs` learned the row's `age` field
