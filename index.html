@@ -1906,6 +1906,121 @@ function saveGame(path, Game, at = now()) {
   return raw;
 }
 
+/* The version hook: a v1 reader takes v1 and nothing else. When CFG.VERSION moves
+   to 2, the conversion of an old payload happens here instead of the save being
+   thrown away. */
+function migrate(payload) {
+  return payload && payload.version === CFG.VERSION ? payload : null;
+}
+
+/* Everything decodeState needs, checked before a single field is assigned: the
+   envelope's seed has to agree with the state's world, the containers have to be
+   the containers the decode walks, and the numbers have to be numbers. A payload
+   that fails here is a corrupt save, not a partial one. */
+function validState(payload) {
+  const s = payload && typeof payload === 'object' ? payload.state : null;
+  if (!s || typeof s !== 'object' || Array.isArray(s)) return false;
+  const w = s.world;
+  if (!w || typeof w !== 'object' || w.w !== CFG.MAP_W || w.h !== CFG.MAP_H ||
+      w.seed !== payload.seed || !Array.isArray(w.type) || !Array.isArray(w.shade) ||
+      !Array.isArray(w.amount)) return false;
+  if (!Array.isArray(s.units) || !Array.isArray(s.buildings) ||
+      !Array.isArray(s.projectiles) || !Array.isArray(s.techs)) return false;
+  if (!Array.isArray(s.res) || s.res.length !== 2 ||
+      s.res.some((r) => !r || typeof r !== 'object' || Array.isArray(r))) return false;
+  if (!s.blocks || typeof s.blocks !== 'object' || Array.isArray(s.blocks)) return false;
+  return typeof s.time === 'number' && typeof s.nextId === 'number';
+}
+
+/* A stored order back into a live one: `src` becomes the source object the engine
+   works from (the payload only names the tile or farm). A source that is no longer
+   there retires the order, the same call resumeGather makes for an emptied tile. */
+function decodeOrder(Game, u, o, buildingById) {
+  if (!o || typeof o !== 'object') return { kind: 'idle' };
+  const e = Object.assign({}, o);
+  if (!e.src || typeof e.src !== 'object') return e;
+  let src = null;
+  if (e.src.kind === 'farm') {
+    const b = buildingById(e.src.b);
+    if (b && b.built) src = sourceFromFarm(b);
+  } else {
+    src = sourceFromTile(Game, u, e.src.tx, e.src.ty);
+  }
+  return src ? Object.assign(e, { src }) : { kind: 'idle' };
+}
+
+/* A stored arrow back into a live one: `t` is relinked through the id index (the
+   one the units and buildings were decoded into). A mark that no longer exists is
+   dropped here, exactly as updateProjectiles drops an arrow whose mark just died. */
+function decodeProjectile(p, byId) {
+  const t = p && typeof p === 'object' ? byId.get(p.tid) : undefined;
+  if (!t) return null;
+  return { x: p.x, y: p.y, team: p.team, dx: p.dx, dy: p.dy, dmg: p.dmg,
+           accuracy: p.accuracy, t };
+}
+
+/* Write a validated state onto Game, in the order the pieces depend on each other:
+   the world first (the source getters read it), then the buildings and the
+   occupancy derived from them, then the units (whose orders read both) and only
+   then anything that points at an id. mapEpoch is bumped because the walkable set
+   moved under the loaded buildings, which is what makes every cached route — the
+   ones just restored and the ones the old Game had — rebuild on its first step. */
+function decodeState(Game, state, seed) {
+  const w = state.world;
+  Game.world = { w: w.w, h: w.h, seed: w.seed, type: new Uint8Array(w.type),
+                 shade: new Uint8Array(w.shade), amount: new Int32Array(w.amount) };
+  Game.buildings = state.buildings.map((b) => Object.assign({}, b));
+  Game.blocks = new Map(Object.entries(state.blocks).map(([k, v]) => [Number(k), v]));
+  rebuildBlocks(Game);
+  Game.mapEpoch++;
+  const byId = new Map(Game.buildings.map((b) => [b.id, b]));
+  Game.units = [];
+  for (const u of state.units) {
+    const e = Object.assign({}, u);
+    e.order = decodeOrder(Game, e, u.order, byId);
+    Game.units.push(e);
+    byId.set(e.id, e);
+  }
+  Game.projectiles = state.projectiles.map((p) => decodeProjectile(p, byId)).filter(Boolean);
+  Game.selectedBuilding = typeof state.selectedBuilding === 'number'
+    ? (byId.get(state.selectedBuilding) || null) : null;
+  Game.res = state.res;
+  Game.selection = state.selection;
+  Game.groups = state.groups;
+  Game.keys = state.keys;
+  Game.cam = state.cam;
+  Game.cursor = state.cursor;
+  Game.mouse = state.mouse;
+  Game.drag = state.drag;
+  Game.placing = state.placing;
+  Game.time = state.time;
+  Game.wave = state.wave;
+  Game.age = state.age;
+  Game.ageBonus = state.ageBonus;
+  Game.nextId = state.nextId;
+  Game.started = state.started;
+  Game.result = state.result;
+  Game.techs = new Set(state.techs);
+  Game.rnd = mulberry32(seed);            // the envelope's seed is the only way back to the closure
+}
+
+/* read the slot and put that game on the board: true when the payload was taken,
+   false (and the standard settlement in `Game`) for every way a payload can be
+   unusable — no slot, empty slot, unparseable text, a version this build cannot
+   read, a state whose shape the decode cannot walk. It never throws: a save is a
+   convenience, and the game must start either way. */
+function loadGame(path, Game, raw = storageGet(path)) {
+  const refuse = () => { resetGame(Game); return false; };
+  let payload;
+  try {
+    if (typeof raw !== 'string' || raw === '') return refuse();
+    payload = migrate(JSON.parse(raw));
+    if (!payload || !validState(payload)) return refuse();
+    decodeState(Game, payload.state, payload.seed);
+    return true;
+  } catch (e) { return refuse(); }
+}
+
 /* ------------------------------ 5. render ------------------------------ */
 
 function beginCanvas(canvas, w, h) {
@@ -2796,7 +2911,7 @@ const AoE2 = {
   build, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
-  SAVE_PATH, saveGame, storageGet, storageSet,
+  SAVE_PATH, saveGame, loadGame, storageGet, storageSet,
   infoHtml, hudState, hudHtml, commandsHtml, queueHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };

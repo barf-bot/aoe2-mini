@@ -2718,4 +2718,212 @@ saveCheck('save: re-saving an untouched game is byte-identical', () => {
     ' identical=' + (a === b)];
 });
 
+const loadCheck = (name, fn) => {
+  let out;
+  try { out = fn(); } catch (e) { bad(name, 'threw ' + e.message); return; }
+  check(out[0], name, out[1]);
+};
+
+/* The fixture the load checks share: one game 60 DTs into a real session — a tech
+   researched, a player villager wounded and still on his berry, an arrow parked
+   4px short of its mark, the militia 3 tiles into a straight move order, the
+   barracks raised and selected, a squad bound to ctrl-1, the camera panned. Saved
+   at a pinned writtenAt so the string it produces is reproducible. */
+const LOAD_AT = 1000;
+const playFixture = () => {
+  const g = AoE2.createState();
+  for (let i = 0; i < 60; i++) AoE2.stepSim(g, DT);
+  const TS = AoE2.CFG.TILE;
+  const site = AoE2.findSite(g.world, 40, 40, 2);
+  const bar = AoE2.makeBuilding(g, 'barracks', 0, site.tx, site.ty);
+  bar.built = 1;
+  g.age = 1;
+  g.techs.add('forge');
+  const v = g.units.find((u) => u.team === 0 && u.kind === 'villager' &&
+    u.order.src && u.order.src.kind === 'tile');
+  AoE2.hitUnit(g, v, 5);                                   // one unit wounded
+  const foe = g.units.find((u) => u.team === 1 && u.kind === 'villager');
+  const shot = AoE2.spawnArrow(g, v, foe);                 // one arrow in flight
+  shot.x = foe.x - 4; shot.y = foe.y;                      // 4px short: the next step resolves it
+  const mil = g.units.find((u) => u.team === 0 && u.kind === 'militia');
+  const mt = { tx: Math.floor(mil.x / TS), ty: Math.floor(mil.y / TS) };
+  const run = (dx, dy) => {                                // the longest walkable ray from his tile
+    let k = 0;
+    while (k < 6 && AoE2.walkable(g, (mt.tx + dx * (k + 1)) * TS + TS / 2, (mt.ty + dy * (k + 1)) * TS + TS / 2)) k++;
+    return k;
+  };
+  const best = DIRS8H.map(([dx, dy]) => ({ dx, dy, k: run(dx, dy) })).sort((a, b) => b.k - a.k)[0];
+  const half = Math.max(1, Math.ceil(best.k / 2));
+  if (best.k > 0) {                                        // the mover 3 tiles into a 6-tile route
+    mil.x = (mt.tx + best.dx * half) * TS + TS / 2;
+    mil.y = (mt.ty + best.dy * half) * TS + TS / 2;
+    mil.order = { kind: 'move', x: (mt.tx + best.dx * best.k) * TS + TS / 2,
+                  y: (mt.ty + best.dy * best.k) * TS + TS / 2 };
+    mil.path = null; mil.pathFor = null; mil.pathAt = 0; mil.pathEpoch = -1;
+  }
+  g.groups = { 1: g.units.filter((u) => u.team === 0).map((u) => u.id) };
+  g.selection = [];
+  g.selectedBuilding = bar;                                // so hudState is `building`
+  g.cam = { x: 120, y: 60 };
+  return g;
+};
+const fixtureSave = () => {
+  const g = playFixture();
+  return { g, raw: AoE2.saveGame(AoE2.SAVE_PATH, g, LOAD_AT) };
+};
+const unitTuples = (g) => g.units.map((u) => [u.id, u.x, u.y, u.hp, u.order.kind].join(':')).join('|');
+const bldTuples = (g) => g.buildings.map((b) => [b.id, b.kind, b.team, b.tx, b.ty, b.hp, b.built].join(':')).join('|');
+const standardSettlement = (g) => {
+  const std = AoE2.createState();
+  return g.units.length === std.units.length && g.time === std.time && g.age === std.age &&
+    g.ageBonus === std.ageBonus && g.nextId === std.nextId && g.wave === std.wave &&
+    g.result === std.result && JSON.stringify(g.res) === JSON.stringify(std.res) &&
+    JSON.stringify(g.buildings.map((b) => b.id)) === JSON.stringify(std.buildings.map((b) => b.id));
+};
+
+loadCheck('load: save -> load -> save is byte-identical', () => {
+  const { raw } = fixtureSave();
+  const g2 = AoE2.createState();
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
+  const again = AoE2.saveGame(AoE2.SAVE_PATH + ':rt', g2, LOAD_AT);
+  return [okLoad === true && again === raw,
+    'loaded=' + okLoad + ' reSavedIsByteIdentical=' + (again === raw) +
+    ' bytes=' + raw.length + '/' + again.length];
+});
+
+loadCheck('load: every observable field equals its pre-save value', () => {
+  const { g, raw } = fixtureSave();
+  const g2 = AoE2.createState();
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
+  return [okLoad === true && unitTuples(g2) === unitTuples(g) && bldTuples(g2) === bldTuples(g) &&
+    JSON.stringify(g2.res) === JSON.stringify(g.res) && g2.age === g.age &&
+    g2.ageBonus === g.ageBonus && g2.result === g.result && JSON.stringify(g2.cam) === JSON.stringify(g.cam) &&
+    g2.nextId === g.nextId && g2.time === g.time,
+    'units=' + (unitTuples(g2) === unitTuples(g)) + ' buildings=' + (bldTuples(g2) === bldTuples(g)) +
+    ' res=' + (JSON.stringify(g2.res) === JSON.stringify(g.res)) + ' age=' + g2.age + '/' + g.age +
+    ' time=' + g2.time + '/' + g.time + ' nextId=' + g2.nextId + '/' + g.nextId];
+});
+
+loadCheck('load: a wrong version resets the game instead of throwing', () => {
+  const { raw } = fixtureSave();
+  const body = JSON.parse(raw).state;
+  const foreign = JSON.stringify({ version: 999, seed: AoE2.CFG.SEED, writtenAt: LOAD_AT, state: body });
+  const g = playFixture();
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g, foreign);
+  return [okLoad === false && standardSettlement(g),
+    'loaded=' + okLoad + ' backToStandard=' + standardSettlement(g)];
+});
+
+loadCheck('load: a missing slot resets instead of throwing', () => {
+  const g = playFixture();
+  const okLoad = AoE2.loadGame('aoe2mini:no-such-slot', g);
+  return [okLoad === false && standardSettlement(g),
+    'loaded=' + okLoad + ' backToStandard=' + standardSettlement(g)];
+});
+
+loadCheck('load: a corrupt string resets instead of throwing', () => {
+  const a = playFixture();
+  const ra = AoE2.loadGame(AoE2.SAVE_PATH, a, 'not json');
+  const b = playFixture();
+  const rb = AoE2.loadGame(AoE2.SAVE_PATH, b, '{"version":1');
+  return [ra === false && standardSettlement(a) && rb === false && standardSettlement(b),
+    "'not json'=" + ra + '/' + standardSettlement(a) + " truncated=" + rb + '/' + standardSettlement(b)];
+});
+
+loadCheck('load: a state of the wrong shape is refused', () => {
+  const { g, raw } = fixtureSave();
+  const state = JSON.parse(raw).state;
+  const notArray = JSON.stringify({ version: AoE2.CFG.VERSION, seed: AoE2.CFG.SEED, writtenAt: LOAD_AT,
+    state: Object.assign({}, state, { units: 'many' }) });
+  const r1 = AoE2.loadGame(AoE2.SAVE_PATH, playFixture(), notArray);
+  const partial = Object.assign({}, state);
+  delete partial.buildings;
+  const r2 = AoE2.loadGame(AoE2.SAVE_PATH, playFixture(),
+    JSON.stringify({ version: AoE2.CFG.VERSION, seed: g.world.seed, writtenAt: LOAD_AT, state: partial }));
+  return [r1 === false && r2 === false, 'units:"many"=' + r1 + ' missingBuildings=' + r2];
+});
+
+loadCheck('load: techs and blocks come back as Set and Map', () => {
+  const { raw } = fixtureSave();
+  const state = JSON.parse(raw).state;
+  const g2 = AoE2.createState();
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
+  return [okLoad === true && g2.techs instanceof Set && [...g2.techs].join(',') === state.techs.join(',') &&
+    g2.blocks instanceof Map && JSON.stringify(Object.fromEntries(g2.blocks)) === JSON.stringify(state.blocks),
+    'techs=' + Object.prototype.toString.call(g2.techs) + '[' + [...g2.techs].join(',') + ']' +
+    ' blocks=' + Object.prototype.toString.call(g2.blocks) + ' keys=' + [...g2.blocks.keys()].join(',')];
+});
+
+loadCheck('load: decode rebuilds the blocks and bumps mapEpoch', () => {
+  const { raw } = fixtureSave();
+  const state = JSON.parse(raw).state;
+  const g2 = AoE2.createState();
+  g2.mapEpoch = 42;
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
+  return [okLoad === true && g2.mapEpoch === 43 &&
+    JSON.stringify(Object.fromEntries(g2.blocks)) === JSON.stringify(state.blocks),
+    'mapEpoch=' + g2.mapEpoch + ' (was 42) blocksMatch=' +
+    (JSON.stringify(Object.fromEntries(g2.blocks)) === JSON.stringify(state.blocks))];
+});
+
+loadCheck('load: a harvest order still reads the loaded world', () => {
+  const { g, raw } = fixtureSave();
+  const v = g.units.find((u) => u.team === 0 && u.kind === 'villager' &&
+    u.order.src && u.order.src.kind === 'tile');
+  const k = v.order.src.ty * g.world.w + v.order.src.tx;
+  const saved = g.world.amount[k];
+  const g2 = AoE2.createState();
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
+  const v2 = g2.units.find((u) => u.id === v.id);
+  const readBack = v2 && v2.order.kind === 'harvest' ? v2.order.src.amount : null;
+  for (let i = 0; i < 25; i++) AoE2.stepSim(g2, DT);       // he keeps working off the rebuilt getter
+  return [okLoad === true && readBack === saved && g2.world.amount[k] < saved,
+    'src.amount=' + String(readBack) + ' saved=' + saved +
+    ' afterStepping=' + g2.world.amount[k] + ' order=' + (v2 && v2.order.kind)];
+});
+
+loadCheck('load: an arrow in flight still hits the loaded unit', () => {
+  const { g, raw } = fixtureSave();
+  const foe = g.units.find((u) => u.team === 1 && u.kind === 'villager');
+  const g2 = AoE2.createState();
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
+  const mark = g2.units.find((u) => u.id === foe.id);
+  const arrow = g2.projectiles[0];
+  const linked = !!arrow && arrow.t === mark;
+  const hp0 = mark.hp;
+  AoE2.stepSim(g2, DT);
+  return [okLoad === true && linked && g2.units.find((u) => u.id === foe.id).hp < hp0,
+    'arrowRelinked=' + linked + ' hp=' + hp0 + ' -> ' + g2.units.find((u) => u.id === foe.id).hp +
+    ' airborne=' + g2.projectiles.length];
+});
+
+loadCheck('load: a loaded unit mid-order finishes his route', () => {
+  const { g, raw } = fixtureSave();
+  const mover = g.units.find((u) => u.team === 0 && u.kind === 'militia');
+  const aim = { x: mover.order.x, y: mover.order.y };
+  const g2 = AoE2.createState();
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
+  const u2 = g2.units.find((u) => u.id === mover.id);
+  const start = Math.hypot(u2.x - aim.x, u2.y - aim.y);
+  let best = start;
+  for (let i = 0; i < 300 && u2.order.kind === 'move'; i++) {
+    AoE2.stepSim(g2, DT);
+    best = Math.min(best, Math.hypot(u2.x - aim.x, u2.y - aim.y));
+  }
+  return [okLoad === true && u2.order.kind === 'idle' && best <= 1,
+    'start=' + start.toFixed(1) + 'px closest=' + best.toFixed(2) + 'px order=' + u2.order.kind];
+});
+
+loadCheck('load: the loaded HUD renders the same data-state', () => {
+  const { g, raw } = fixtureSave();
+  const before = [AoE2.hudState(g), AoE2.hudHtml(g)];
+  const g2 = AoE2.createState();
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
+  return [okLoad === true && before[0] === 'building' && AoE2.hudState(g2) === before[0] &&
+    AoE2.hudHtml(g2) === before[1] && g2.buildings.indexOf(g2.selectedBuilding) >= 0 &&
+    g2.selectedBuilding === g2.buildings.find((b) => b.id === g.selectedBuilding.id),
+    'state=' + before[0] + '/' + AoE2.hudState(g2) + ' htmlEqual=' + (AoE2.hudHtml(g2) === before[1]) +
+    ' selectedIsOwnBuilding=' + (g2.buildings.indexOf(g2.selectedBuilding) >= 0)];
+});
+
 report();
