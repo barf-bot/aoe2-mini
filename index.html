@@ -1850,7 +1850,7 @@ function storageSet(path, raw) {
 /* The save schema, owned by these lines: exactly what saveGame writes and loadGame
    reads back. Everything else on Game is a per-runtime cache and stays out of the
    payload — the nine DOM-only fields (dom, view, mm, mmBase, toastMsg, toastAt,
-   pingAt, frame), pathQueries (a run counter), sprites (the live atlas Image),
+   pingAt, frame, sound), pathQueries (a run counter), sprites (the live atlas Image),
    rnd (a closure, rebuilt from the envelope's seed), mapEpoch (loadGame recomputes
    it) and autosaveAt (the save schedule). */
 

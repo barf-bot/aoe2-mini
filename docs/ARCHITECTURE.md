@@ -27,7 +27,7 @@ Game = { world, units[], buildings[], projectiles[], blocks(Map buildingId -> ti
          res[2], age, ageBonus, techs(Set of researched tech ids), rnd(mulberry32(CFG.SEED)), cam{x,y}, keys, mouse, drag, selection[],
          selectedBuilding, groups{}, placing, started, wave, time, frame, autosaveAt(next autosave write),
          mapEpoch(route cache epoch), pathQueries(findPath calls),
-         result('victory' | 'defeat' | null), dom{...}, view, minimapCache }
+         result('victory' | 'defeat' | null), dom{...}, view, minimapCache, sound }
 ```
 
 `Game.sprites.atlas` is the one place the atlas is attached (`setAtlas`,
@@ -37,7 +37,7 @@ there, so the renderer never has to wonder where the sheet came from.
 Persistence: the plain half of that object is the save payload — `encodeState`
 (`index.html:1899`) picks exactly the fields `saveGame` writes, the per-runtime caches (`dom`,
 `view`, `mm`, `mmBase`, `toastMsg`, `toastAt`, `pingAt`, `frame`, `pathQueries`, `sprites`, `rnd`,
-`mapEpoch`, `autosaveAt`) stay out of it and are rebuilt on load — so one object shape can be
+`mapEpoch`, `autosaveAt`, `sound`) stay out of it and are rebuilt on load — so one object shape can be
 written to `localStorage` and read back into a fresh `createState` (`index.html:2831`). The
 ruleset itself is `docs/GAME_RULES.md` §Save / load; the parts are below in
 `### Save / load` (`saveGame`, `index.html:1945`).
