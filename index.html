@@ -66,6 +66,18 @@
   .queue .bar{height:6px;background:#0d0f13;border-radius:3px;overflow:hidden;margin-top:4px}
   .queue .bar i{display:block;height:100%;background:var(--blue)}
   .hint{color:#6c7181;font-size:11px;padding:8px 12px}
+  /* ≤720px (phone): trim the header padding, stack the footer's three panels inside
+     the same 74px the desktop rule declares, and let the flexible #stage keep the
+     freed rows for the map. Written last so it wins the cascade; the desktop rules
+     above are untouched and nothing is hidden there. */
+  @media (max-width:720px){
+    header{padding:2px 6px;gap:6px}
+    footer{flex:0 0 74px;height:74px;flex-direction:column}
+    .info{flex:0 0 22px;height:22px;padding:2px 8px;display:block}
+    .info .body,.info .hp{display:none}
+    .commands{flex:1 1 auto;height:auto;padding:2px 8px;grid-auto-rows:20px}
+    .queue{flex:0 0 18px;height:18px;padding:1px 8px}
+  }
 </style>
 </head>
 <body>

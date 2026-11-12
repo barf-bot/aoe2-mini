@@ -2740,6 +2740,38 @@ const painted = [
 ];
 check(painted.join(' ') === 'units|html=hudHtml group|html=hudHtml building|html=hudHtml none|html=hudHtml',
   'hud: renderHud stamps #hud and writes exactly hudHtml for every state', painted.join(' '));
+/* ---- 11c. responsive layout (this plan, T3) ---- */
+/* The phone layout is one media block written last so it wins the cascade, and the
+   checks read it as text naming the desktop rules it overrides: drift on either
+   side shows up in the failure. §11b's `hud: the CSS declares one fixed footer
+   height` keeps proving the desktop footer itself never moved. */
+const mediaAt = html.indexOf('@media (max-width:720px){');
+check(mediaAt > html.indexOf('<style>') && mediaAt > html.indexOf('footer{') &&
+      mediaAt < html.indexOf('</style>'),
+  'ui: the CSS ships a max-width:720px block after the desktop rules',
+  'style@' + html.indexOf('<style>') + ' footer{@' + html.indexOf('footer{') +
+  ' media@' + mediaAt + ' </style>@' + html.indexOf('</style>'));
+
+const mediaIn = styleCss.indexOf('@media (max-width:720px){');
+const baseCss = mediaIn < 0 ? styleCss : styleCss.slice(0, mediaIn);
+const mediaCss = mediaIn < 0 ? '' : ((styleCss.slice(mediaIn).match(/\{([\s\S]*)\}/) || [])[1] || '');
+const ruleOf = (css, sel) => (css.match(new RegExp('(?:^|[\\s};])' + sel + '\\s*\\{([^}]*)\\}')) || [])[1];
+const propOf = (rule, name) => ((rule || '').match(new RegExp('(?:^|;)\\s*' + name + ':\\s*([^;]+)')) || [])[1];
+
+const mFooter = ruleOf(mediaCss, 'footer'), bFooter = ruleOf(baseCss, 'footer');
+check(/(^|;)\s*flex-direction:\s*column/.test(mFooter || '') &&
+      /(^|;)\s*height:\s*74px/.test(mFooter || '') &&
+      propOf(mFooter, 'height') === propOf(bFooter, 'height') &&
+      /\B\.info\s*\{/.test(mediaCss) + /\B\.commands\s*\{/.test(mediaCss) + /\B\.queue\s*\{/.test(mediaCss) === 3,
+  'ui: the responsive footer stacks the three panels and keeps the 74px height',
+  'media footer{' + String(mFooter) + '} vs base footer{' + String(bFooter) + '} panels=' +
+  ['.info', '.commands', '.queue'].filter((s) => /\S/.test(ruleOf(mediaCss, s) || '')).join(','));
+
+const mHeader = ruleOf(mediaCss, 'header'), bHeader = ruleOf(baseCss, 'header');
+check(propOf(mHeader, 'padding') === '2px 6px' && propOf(bHeader, 'padding') === '6px 10px' &&
+      propOf(mHeader, 'gap') === '6px' && propOf(bHeader, 'gap') === '14px',
+  'ui: the responsive block trims the header padding the desktop rule declares',
+  'media header{' + String(mHeader) + '} vs base header{' + String(bHeader) + '}');
 
 /* ---- 12. reset ------------------------------------------------------ */
 const unitsBeforeReset = Game.units.length;

@@ -174,7 +174,7 @@ to re-decide):
     selection contains him, his `order` is unchanged, `Game.drag === null` — the design's
     "move-then-release → no command").
 
-- [ ] T3: the 720 px responsive layout — stacked footer, trimmed header, same fixed height
+- [x] T3: the 720 px responsive layout — stacked footer, trimmed header, same fixed height
   - files: `index.html` — the `<style>` block (`index.html:7-69`, insert the media block after the
     `.hint` rule at `index.html:68`, immediately before `</style>` at `index.html:69`);
     `tools/headless-check.js` — a new `/* ---- 11c. responsive layout (this plan, T3) ---- */`
