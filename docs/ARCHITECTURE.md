@@ -15,7 +15,7 @@ names the sources) is what section 1's generated tables and `assets/sprites.png`
 | 5 | render | 2071-2621 | `beginCanvas`, world/building/unit drawing (`drawBuildings`, `unitAnim`, `drawUnits`, `drawProjectiles`), ghost, drag box, minimap, the uniform HUD frame (`renderHud`/`hudState`/`hudHtml` with `infoHtml`/`commandsHtml`/`queueHtml`), the result-overlay HTML and the audio door (`playSfx`/`isMuted`/`setMuted`) |
 | 6 | input | 2622-2794 | picking, mouse, keyboard, the mute listener and delegated command-bar clicks |
 | 7 | boot | 2795-3031 | canvas sizing, `createState`, `resetGame`, `loadAtlas`, `boot` (mute-button sync first), the rAF loop |
-| — | public surface | 3032-3054 | the `AoE2` export banner + object (this plan added `SFX`, `MUTE_PATH`, `applyMuteButton`; the save/load plan added `SAVE_PATH`, `saveGame`, `loadGame`, `markDirty`, `storageGet`, `storageSet`), `module.exports` / `window.Game` wiring |
+| — | public surface | 3032-3054 | the `AoE2` export banner + object (this plan added `SFX`, `MUTE_PATH`, `playSfx`, `isMuted`, `applyMuteButton`, `setMuted`; the save/load plan added `SAVE_PATH`, `saveGame`, `loadGame`, `markDirty`, `storageGet`, `storageSet`), `module.exports` / `window.Game` wiring |
 
 ## The `Game` object
 

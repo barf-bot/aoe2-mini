@@ -238,9 +238,9 @@ and `assets/sprites.png` / `preview.png` stayed byte-identical (no render path c
 - **T5 — the remaining rows wired (1e5e342):** the `b.built >= 1` branch of `updateUnit` plays
   `build`, `upgradeAge` plays `age` only when the age actually goes up, and `setResult` ends
   with `playSfx(Game, Game.result)` — one statement serving the `victory` and `defeat` rows and
-  the `if (Game.result) return` guard keeping it to one chord per game; `updateUnit`,
-  `upgradeAge` and `setResult` join the exports so the checks drive the real paths
-  (262 → 266 checks, the call-site expectation now all five owners).
+  the `if (Game.result) return` guard keeping it to one chord per game; T5 adds no exports —
+  the checks reach the three paths through the exported `stepSim`, `upgradeAge`, `demolish`
+  and `removeBuilding` (262 → 266 checks, the call-site expectation now all five owners).
 - **T6 — docs sync:** this entry plus `docs/GAME_RULES.md` (the `## Sound (SFX)` section and
   the `sound` field added to the save section's excluded list), `docs/ARCHITECTURE.md` (the §1
   row gaining `SFX`/`MUTE_PATH`, the §5 row naming the audio door, §6/§7 wording, the
