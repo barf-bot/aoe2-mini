@@ -107,6 +107,42 @@ checks across the plan.
   `Map of this file` span) re-pointed at the final file — every `index.html:NNN` reference
   and section range re-measured through `tools/audit-line-refs.js`.
 
+### Wooden barricade and gated choke points (T1–T6) — plan `docs/plans/2026-11-12-wooden-barricade.md`
+
+A Feudal-gated wall segment (d88ecae → 03ccb2e); the harness went 198 → 216 checks
+across the plan.
+
+- **T1 — the `barricade` row, the `w` hotkey (d88ecae):** `data/buildings.json` gains
+  `barricade` — the vendored `WALL` row (150 hp, 3 wood, 7 s, melee armour 2, pierce
+  armour 5) with the authored `Barricade` label, 1×1 footprint and **age 1** gate
+  recorded in its `source.rule` — `check-stats.mjs --write` renders the `BLD` row (12
+  buildings), `w` joins the §6 keydown (pan-up and placement arming share the key), and
+  the §7 gated-row and §10 hotkey checks cover it (198 → 201 checks).
+- **T2 — the build contract (ac6af15):** six §7d checks pin what the row alone gives the
+  game — `siteFree`/`near`/`findSite` placement including the shared-corner case, the
+  exact 3-wood spend and 7 s site detail, the `floor(3 × CFG.CANCEL_REFUND)` = 2 cancel
+  refund, and a free demolish of a finished segment (201 → 207 checks).
+- **T3 — routing around, through and after (baaace0):** five §6d checks walk the gate
+  story — a standing segment reroutes a villager's cached path, the raze path makes the
+  tile walkable again and the same route comes back, and a segment built under a
+  standing unit moves the unit off it (207 → 212 checks).
+- **T4 — the raze path (50a59fb):** four §9g checks put the row inside the existing
+  combat fixture — an idle enemy militia acquires the adjacent barricade, the swing
+  costs it the table's damage (`atk` − the row's melee armour), the toast names the
+  row's own label and the raze never decides a game without a Town Center; the
+  expected-toast wording was corrected to the row-derived string (212 → 216 checks).
+- **T5 — the committed frame (03ccb2e):** `tools/render-preview.js` places the
+  barricade in the `simulateAndRender` fixture — two tiles east and one north of the
+  squad, clear of the blacksmith's and Market's pads — and `preview.png` regenerates
+  with the fourth flat team-coloured footprint.
+- **T6 — docs sync:** this entry plus `docs/GAME_RULES.md` (the table row, the four-row
+  age-gate bullet, the new barricade rule, the rewritten controls line naming `W` and
+  `ArrowUp`), `docs/ARCHITECTURE.md` (the File map spans, the render/input prose) and
+  `docs/ROADMAP.md` (P1.6 shipped, the wall leftovers folded into P2.8) and `AGENTS.md`
+  (the file-length claim, the export line) re-pointed at the final file — every
+  `index.html:NNN` reference and section range re-measured through
+  `tools/audit-line-refs.js`.
+
 ## [Unreleased] — 2026-11-11
 
 ### Board rules pass (T1–T5) — plan `docs/plans/2026-11-04-board-rules.md`

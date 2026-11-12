@@ -236,7 +236,7 @@ current `tools/headless-check.js` (2292 lines, 198 checks passing). T1 shifts `i
     assertion belongs here; `node tools/headless-check.js` still prints `216/216` and
     `assets/sprites.png` stays byte-identical.
 
-- [ ] T6: Docs sync and the full verification pass
+- [x] T6: Docs sync and the full verification pass
   - files: `docs/GAME_RULES.md` (the `## Buildings (BLD)` table gains
     `| Barricade | 150 | 1×1 | 3 wood | 7 s | — | — |`; the age-gate bullet at
     `docs/GAME_RULES.md:127-130` names four rows and the hotkeys `k`, `e`, `c`, `w`; a
