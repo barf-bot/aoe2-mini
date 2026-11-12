@@ -2256,6 +2256,31 @@ check(!!footerRule && footerRule.includes('height:74px') && !/min-height:74px/.t
     : 'footer{' + footerRule.replace(/\s+/g, ' ').trim().slice(0, 90) + '} | min-height:74px=' +
       /min-height:74px/.test(html));
 
+/* renderHud's half of the contract: the checks above read the pure builders, so a
+   footer that never gets written (or never gets stamped) still passes them. Render
+   the live Game and read #hud back — the same read-back the §9 result overlay uses
+   (overlayHtml) — for every selection state. */
+const paintedHud = (sel, bld) => {
+  const had = [Game.selection.slice(), Game.selectedBuilding];
+  try {
+    Game.selection = sel; Game.selectedBuilding = bld;
+    AoE2.renderFrame(Game);
+    const hud = Game.dom.hud || {};
+    return (hud.attrs ? String(hud.attrs['data-state']) : '<no #hud>') + '|' +
+      (typeof hud.innerHTML === 'string' && hud.innerHTML === AoE2.hudHtml(Game)
+        ? 'html=hudHtml' : 'html=MISMATCH');
+  } catch (e) { return 'ERR ' + e.message; }
+  finally { Game.selection = had[0]; Game.selectedBuilding = had[1]; }
+};
+const painted = [
+  paintedHud([blueVill()[0].id], null),
+  paintedHud(blueVill().slice(0, 2).map((u) => u.id), null),
+  paintedHud([], Game.buildings.find((b) => b.team === 0)),
+  paintedHud([], null),
+];
+check(painted.join(' ') === 'units|html=hudHtml group|html=hudHtml building|html=hudHtml none|html=hudHtml',
+  'hud: renderHud stamps #hud and writes exactly hudHtml for every state', painted.join(' '));
+
 /* ---- 12. reset ------------------------------------------------------ */
 const unitsBeforeReset = Game.units.length;
 AoE2.resetGame(Game);

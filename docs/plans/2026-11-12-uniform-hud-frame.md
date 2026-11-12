@@ -80,13 +80,13 @@ proving check and the `Map of this file` banner stays truthful.
     `.queue{flex:0 0 210px;height:100%;overflow:hidden;padding:8px;…}` keeping today's
     `#queue` visuals; `commandsHtml`, `queueHtml` and `resultHtml` are untouched. The export
     row gains `infoHtml, hudState, hudHtml` beside `commandsHtml, queueHtml, resultHtml`.
-  - done when: `node tools/headless-check.js` prints `197/197 checks passed` exit 0 (194 +
-    the 3 new); `node tools/render-preview.js --out /tmp/hud.png` writes a PNG whose sha256
+  - done when: `node tools/headless-check.js` prints `198/198 checks passed` exit 0 (194 +
+    the 4 new); `node tools/render-preview.js --out /tmp/hud.png` writes a PNG whose sha256
     equals the committed `preview.png` (the tool paints only `#view`; a footer change that
     also moved pixels would differ); `assets/sprites.png` byte-identical (untouched);
     `wc -l index.html` grows by roughly 20 lines from 2637 — the exact count is restamped in
     T2, the market plan's precedent.
-  - test: the 3 new §11b checks are written first and go red (`AoE2.hudHtml is not a
+  - test: the 4 new §11b checks are written first and go red (`AoE2.hudHtml is not a
     function`), then green — `hud: every selection state renders the same footer structure`
     (four fixtures off `createState()` — one villager selected; three selected via
     `makeUnit`; a `makeBuilding` house selected with empty `selection`; a bare fresh state —
@@ -95,7 +95,10 @@ proving check and the `Map of this file` banner stays truthful.
     `hud: a group selection renders one summary element for any squad size` (a 3-unit and a
     12-unit `group` fixture each contain exactly one `class="sum"` element naming the counts);
     `hud: the CSS declares one fixed footer height, not a min-height` (the `footer{…}` rule in
-    `<style>` contains `height:74px` and the file contains no `min-height:74px`). Every
+    `<style>` contains `height:74px` and the file contains no `min-height:74px`); review added
+    `hud: renderHud stamps #hud and writes exactly hudHtml for every state` — the four states
+    rendered through the live `Game` and read back off `#hud`, so the single write itself (the
+    `data-state` stamp and the markup it is given) is proven, not only the pure builders. Every
     existing §11 check re-runs unmodified — that is the design's contract for the command
     buttons (the grid is CSS-only; the §11 string checks cover it) — as do §10/§10b/§12.
     Visual: `node tools/render-preview.js` + look at `preview.png` — expected unchanged
@@ -111,7 +114,7 @@ proving check and the `Map of this file` banner stays truthful.
     index.html:2101`, `buttonAt index.html:2256`, `boot index.html:2532` refs, the §5
     render cell and the HUD prose at `docs/ARCHITECTURE.md:134-136` rewritten to name
     `hudHtml` as the single owner with the `data-state` stamp), `docs/CHANGELOG.md` (a dated
-    2026-11-12 section for this plan, 194 → 197 checks), `docs/ROADMAP.md` (the Phase-2
+    2026-11-12 section for this plan, 194 → 198 checks), `docs/ROADMAP.md` (the Phase-2
     "Uniform HUD frame" entry marked shipped 2026-11-12 with this plan's link, like the
     cancel-demolish entry above it), `AGENTS.md` (the `` `index.html` is 2637 lines `` claim
     and the `// index.html:2630` export comment restamped to the real numbers), this plan's
@@ -119,6 +122,6 @@ proving check and the `Map of this file` banner stays truthful.
   - change: docs only, one commit, no code edits — it closes the line-ref drift T1 leaves.
   - test: `node tools/audit-line-refs.js` green (section spans, cited symbols, tools
     inventory, the file-length claim), then the full `AGENTS.md` set: `node
-    tools/headless-check.js` (`197/197 checks passed`, exit 0), `node tools/render-preview.js`
+    tools/headless-check.js` (`198/198 checks passed`, exit 0), `node tools/render-preview.js`
     + look at `preview.png`, `node tools/gen-atlas.js` (`assets/sprites.png` byte-identical),
     `node tools/check-stats.mjs` (exit 0 — the generated tables are untouched by this round).

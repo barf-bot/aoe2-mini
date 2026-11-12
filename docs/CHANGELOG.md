@@ -84,7 +84,7 @@ plan.
 
 ### Uniform HUD frame (T1–T2) — plan `docs/plans/2026-11-12-uniform-hud-frame.md`
 
-One fixed-height footer for every selection state (c2a2472); the harness went 194 → 197
+One fixed-height footer for every selection state (c2a2472); the harness went 194 → 198
 checks across the plan.
 
 - **T1 — one owner, one frame (c2a2472):** `hudState(Game)` answers the one selection word
@@ -98,8 +98,9 @@ checks across the plan.
   a group to a `N units` title plus one per-kind `.sum` line (3 kinds max, `+K more` beyond)
   and gives every state the same title/body/hp shell; §6 delegates command clicks off
   `Game.dom.commands || Game.dom.hud` so the handler survives the footer rebuild in a browser,
-  and `infoHtml`/`hudState`/`hudHtml` join the `AoE2` export (the 3 new §11b checks pin the
-  per-state frame shape and the fixed footer height); `preview.png` regenerates byte-identical.
+  and `infoHtml`/`hudState`/`hudHtml` join the `AoE2` export (the 4 new §11b checks pin the
+  per-state frame shape, the `renderHud` write into `#hud` and the fixed footer height);
+  `preview.png` regenerates byte-identical.
 - **T2 — docs sync:** this entry plus `docs/GAME_RULES.md` (a `## Interface` section),
   `docs/ARCHITECTURE.md` (the §5 render cell and the HUD paragraph), `docs/ROADMAP.md` (the
   Phase-2 item marked shipped) and `AGENTS.md` (the file-length claim, the export line, the
