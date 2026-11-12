@@ -189,7 +189,7 @@ proving check and the `Map of this file` banner stays truthful.
     `ui: clicking a research button starts that research and spends the cost` — plus §11's
     existing button checks; visual = `node tools/render-preview.js` and look at `preview.png`.
 
-- [ ] T6: Docs sync and the full verification pass
+- [x] T6: Docs sync and the full verification pass
   - files: `docs/GAME_RULES.md` (a new `## Technologies (TECHS)` section; the `## Buildings
     (BLD)` block gains the blacksmith and the age gate; the `Age bonus multiplies damage`
     bullet at `docs/GAME_RULES.md:97` rewritten to name `unitAttack`/`unitArmor` and the

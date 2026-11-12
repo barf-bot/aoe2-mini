@@ -3,6 +3,46 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions are the git
 commits on `main`.
 
+## [Unreleased] — 2026-11-12
+
+### Blacksmith tech tree (T1–T6) — plan `docs/plans/2026-11-12-blacksmith-tech-tree.md`
+
+The first real upgrade path (a0be85c → d93d017); the harness went 156 → 175 checks
+across the plan.
+
+- **T1 — the Blacksmith row, the age gate, `k` (a0be85c):** `data/buildings.json` gains
+  `blacksmith` (the `BLAC` row: 1400 hp, 150 wood, 40 s, 1×1, **age 1**) and `BLD`
+  follows; `build` refuses an age-locked kind before drafting a builder
+  (`Blacksmith requires Feudal Age`), the button and the `k` hotkey only appear once
+  the age is reached, and `check-stats.mjs` learned the row's `age` field
+  (156 → 160 checks).
+- **T2 — vendored techs (25b331a):** `data/techs.json` vendors Forge, Scale Mail,
+  Fletching and Bracer (costs, times and effects copied from the vendored sources,
+  never retuned) and `check-stats.mjs --write` renders the `TECHS` table beside the
+  other section-1 blocks; the check now proves 265 fields.
+- **T3 — one combat math (9708a20):** `unitAttack`/`unitArmor` replace the duplicated
+  age-scaling expressions in §4 — attack is the row's number × the age multiplier ×
+  every researched tech of the attacker's damage class, armour is the row's plus the
+  techs' flat armour, and `hitUnit` lands `max(1, attack − armour)` — while
+  `Game.techs` (the researched-id set) joins `createState`/`resetGame`
+  (166 checks, the new §9d pins the stack on the melee and pierce paths).
+- **T4 — `researchTech` (56d6ade):** a finished blacksmith researches one tech at a
+  time; every refusal goes through `toast` before a cost is spent (age, duplicate,
+  busy slot, cost, building mismatch — `Barracks cannot research Forge`) and the
+  finish adds the id to `Game.techs` (166 → 172 checks).
+- **T5 — the research surface (d93d017):** `commandsHtml` offers a `data-act="research"`
+  button per unresearched tech (disabled when unaffordable or in flight), `queueHtml`
+  grows the `Researching Forge` bar beside the training branch, `drawBuildings` picks
+  the on-map bar's total from the research slot or the queue, `infoHtml` lists
+  `Upgrades:`, the click handler dispatches `research`, and `preview.png` regenerates
+  with the blacksmith beside the squad (172 → 175 checks).
+- **T6 — docs sync:** this entry plus `docs/GAME_RULES.md` (a `## Technologies
+  (TECHS)` section, the Blacksmith row and the rewritten damage bullet),
+  `docs/ARCHITECTURE.md`, `docs/ROADMAP.md` (P1.4 shipped) and `AGENTS.md`
+  (`data/techs.json` in the truth table) re-pointed at the final file — every
+  `index.html:NNN` reference and section range re-measured through
+  `tools/audit-line-refs.js`.
+
 ## [Unreleased] — 2026-11-11
 
 ### Board rules pass (T1–T5) — plan `docs/plans/2026-11-04-board-rules.md`

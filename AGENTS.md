@@ -36,8 +36,8 @@ the game and asserts economy/construction/training/combat/input/UI/sprite invari
 is proven too — commit the regenerated `preview.png` when visuals change, and look at it
 before committing (a blank sprite sheet once passed every assertion).
 
-`tools/check-stats.mjs` renders the `CFG` / `KINDS` / `BLD` tables of section 1 from
-`data/units.json` + `data/buildings.json` — the vendored AoE2 stat tables those numbers come
+`tools/check-stats.mjs` renders the `CFG` / `KINDS` / `BLD` / `TECHS` tables of section 1 from
+`data/units.json` + `data/buildings.json` + `data/techs.json` — the vendored AoE2 stat tables those numbers come
 from (see `data/README.md`) — so the game cannot drift from them: run it to verify, run it
 with `--write` to regenerate the blocks. The art follows the same rule one layer down:
 `tools/gen-atlas.js` composes the sheet from `data/sprites.json` + `data/sprites/` and
@@ -48,7 +48,7 @@ reads the JSON at runtime, it carries the rendered result.
 The game exports its internals for exactly this reason:
 
 ```js
-if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;  // index.html:2469
+if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;  // index.html:2582
 ```
 
 If you add a new mechanic, add the check that proves it. Fix the test *and* the code with
@@ -60,7 +60,7 @@ stubbed `Image` that reports the right dimensions can still paint nothing (see
 
 - **Files over ~300 lines: write section-by-section (or via a terminal heredoc); use
   `patch` for edits.** A single 1400-line `write_file` has truncated mid-write before and
-  cost a full debugging cycle. `index.html` is 2476 lines — patch it, don't rewrite it.
+  cost a full debugging cycle. `index.html` is 2589 lines — patch it, don't rewrite it.
 - Keep the `Map of this file` banner (`index.html:89-105`) truthful when functions move.
 - Section 4 (`commands`) must stay DOM-free: pure functions taking `(Game, …)`. Anything
   that touches `document`/`window` belongs in sections 5-7, guarded with
@@ -73,9 +73,9 @@ stubbed `Image` that reports the right dimensions can still paint nothing (see
 
 | File | Contains |
 |---|---|
-| `index.html` | the game — its `CFG`/`KINDS`/`BLD` numbers come from `data/`, the rest of them live here |
+| `index.html` | the game — its `CFG`/`KINDS`/`BLD`/`TECHS` numbers come from `data/`, the rest of them live here |
 | `assets/sprites.png` | the sprite atlas, composed by `tools/gen-atlas.js` from `data/sprites/` — never hand-edited |
-| `data/units.json`, `data/buildings.json` | the vendored AoE2 stat tables section 1 is generated from; `data/README.md` names the sources and the swap path |
+| `data/units.json`, `data/buildings.json`, `data/techs.json` | the vendored AoE2 stat tables section 1 is generated from; `data/README.md` names the sources and the swap path |
 | `docs/GAME_RULES.md` | the ruleset as implemented, with line refs — update with the code |
 | `docs/ARCHITECTURE.md` | file map, data shapes, render/input model, test harness design |
 | `docs/CONVENTIONS.md` | code style and the rules above in full |

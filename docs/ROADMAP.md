@@ -25,8 +25,12 @@ prototypes stall.
 
 ## P1 — content depth
 
-4. **Tech tree / blacksmith upgrades.** Attack/defence/speed upgrades per age; the
-   `ageBonus` hook already exists as a multiplier.
+4. **Tech tree / blacksmith upgrades.** Shipped 2026-11-12 by the blacksmith tech-tree
+   plan (`docs/plans/2026-11-12-blacksmith-tech-tree.md`): a buildable Blacksmith (`k`,
+   Feudal-gated) researches Forge, Scale Mail, Fletching and Bracer from `data/techs.json`
+   and the effects apply through `unitAttack`/`unitArmor` to every unit damage path.
+   Left over: Fletching's and Bracer's +1 range is not modelled, and the other
+   buildings' real ages are still ungated (the blacksmith's `age` is the first gated row).
 5. **More buildings**: lumber camp, mining camp and mill shipped 2026-11-04 (`BLD`,
    hotkeys `L`/`G`/`M`, resource-based drop-off routing); market and watch tower remain —
    the camp pattern (work-radius + drop-off) is now proven by the shipped camps.
