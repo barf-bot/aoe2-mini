@@ -2516,6 +2516,30 @@ check(!!lift.hover && lift.mouseUp === lift.hover && lift.touchUp === null,
   'input: a released finger clears the hover the edge-scroll band reads, a released mouse keeps it',
   JSON.stringify(lift));
 
+/* The two slops answer different questions, and the hold's is only real if both sides
+   of its boundary are tested: 7 px of drift is still the same press (so it orders),
+   8 px is already a drag (so it selects). Reusing the tap's own `4` keeps every other
+   check green — this is the one that pins `LONG_PRESS_SLOP`. */
+const slopEdge = (() => {
+  const s = { before: orderOf(hv) };
+  doc.fire('pointerdown', pt(0, 0, 0));
+  doc.fire('pointerup', pt(7, 0, 700));                  // one pixel inside the slop
+  s.afterHold = orderOf(hv);
+  s.kind = hv.order && hv.order.kind;
+  doc.fire('pointerdown', pt(0, 0, 0));
+  doc.fire('pointerup', pt(8, 0, 700));                  // exactly the slop: a drag now
+  s.afterBox = orderOf(hv);
+  s.sel = Game.selection.slice();
+  s.drag = Game.drag;
+  return s;
+})();
+check(slopEdge.afterHold !== slopEdge.before &&        // only the hold branch can rewrite an order
+      ['move', 'harvest', 'attack'].indexOf(slopEdge.kind) >= 0 &&
+      slopEdge.afterBox === slopEdge.afterHold &&
+      slopEdge.sel.indexOf(hv.id) >= 0 && slopEdge.drag === null,
+  'input: 7 px of drift still commands and 8 px already selects (LONG_PRESS_SLOP)',
+  JSON.stringify(slopEdge));
+
 /* ---- 11. command bar buttons ---------------------------------------- */
 Game.selection = [];
 Game.dom.commands.innerHTML = '';
