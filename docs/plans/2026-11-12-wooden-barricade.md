@@ -149,7 +149,7 @@ current `tools/headless-check.js` (2292 lines, 198 checks passing). T1 shifts `i
     `demolish: a finished barricade is removed with zero change to the stockpile` (the
     `dOk` pattern at `tools/headless-check.js:1427-1431`).
 
-- [ ] T3: routing around, through and after a barricade — `§6d`
+- [x] T3: routing around, through and after a barricade — `§6d`
   - files: `tools/headless-check.js` only (a new `/* ---- 6d. barricade routing (this plan, T3) ---- */`
     between §6c, whose last check ends at `tools/headless-check.js:1164`, and the §7 banner at
     `tools/headless-check.js:1167`); `index.html` untouched. Reuses §6c's own fixtures and

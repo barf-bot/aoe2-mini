@@ -1164,6 +1164,130 @@ check(!!sq4w && sq4w.length === 4 &&
   fsqNote(sq4w) || `${sq4w.length} slots: ${sq4w.map((p) => p.u.id + '@' + tileKey(p.slot)).join(' ')} ` +
     `(71,60 and 70,61 are water, so the 2x2 there cannot hold 4)`);
 
+/* ---- 6d. barricade routing (this plan, T3) -------------------------- */
+// Routing around, through and after a wooden segment. Every expected length
+// comes from the harness's own Dijkstra (refSteps / fp), never from the code
+// under test -- the §6c rule, on the §6c fixtures rebuilt with barricades.
+
+// 19. a flatWithOrder(4) walk whose cached route gets a 1x1 barricade dropped
+// on it -- neither the walker's own tile nor the goal (the §6c 8-check
+// exclusion rule) -- stepped once, then demolished; each stage's route is
+// graded against refSteps for the board of that stage.
+const barRoute = (() => {
+  const f = flatWithOrder(4);
+  if (!f) return null;
+  const { st, v, V, goal, at } = f;
+  orderTo(f);
+  const preRoute = fp(st, { tx: V.x, ty: V.y }, goal);  // the route on the clean board
+  if (preRoute === null || preRoute.length < 3) return null;
+  const pad = preRoute[1];                              // a route tile, never own tile or goal
+  const b = AoE2.makeBuilding(st, 'barricade', 0, pad.tx, pad.ty);
+  b.built = 1;
+  const centre = tileCentre(st, pad.tx, pad.ty);
+  const walkAt = AoE2.walkable(st, centre.x, centre.y);
+  const blocksLen = (st.blocks.get(b.id) || []).length;
+  const refWith = fp(st, { tx: V.x, ty: V.y }, goal);   // Dijkstra with the segment up
+  AoE2.stepGame(st, DT);                                // the very next step
+  const during = routeOf(v);
+  const proDuring = v.path === null ? ['no cached route'] : routeProblems(st, v.path);
+  const dOk = AoE2.demolish(st, b);
+  AoE2.stepGame(st, DT);                                // the first step on the cleared board
+  const refGone = fp(st, { tx: tOf(v.x), ty: tOf(v.y) }, goal);
+  const after = routeOf(v);
+  const w = walkOrder(st, v, 400);
+  return { f, V, goal, at, preRoute, pad, b, walkAt, blocksLen, refWith, during, proDuring, dOk, refGone, after, w };
+})();
+const barTiles = (p) => p.map((t) => t.tx + ',' + t.ty).join(' ');
+check(!!barRoute && barRoute.walkAt === false && barRoute.blocksLen === 1,
+  'path: a built barricade makes its own tile unwalkable',
+  !barRoute ? 'no flatWithOrder(4) fixture'
+    : `barricade at ${barRoute.pad.tx},${barRoute.pad.ty}: walkable=${barRoute.walkAt} ` +
+      `blocks=${barRoute.blocksLen} tile(s)`);
+check(!!barRoute && barRoute.during.join(' ') !== barTiles(barRoute.preRoute) &&
+      barRoute.during.length === barRoute.refWith.length && barRoute.proDuring.length === 0,
+  'path: a barricade dropped on a cached route reroutes the walker on the next step',
+  !barRoute ? 'no flatWithOrder(4) fixture'
+    : `before ${barTiles(barRoute.preRoute)} -> during ${barRoute.during.join(' ')} ` +
+      `(refSteps+1 ${barRoute.refWith.length})` +
+      (barRoute.proDuring.length ? '; ' + barRoute.proDuring.join('; ') : ''));
+check(!!barRoute && barRoute.dOk === true &&
+      barRoute.after.join(' ') === barTiles(barRoute.preRoute) &&
+      barRoute.after.length === barRoute.refGone.length,
+  'path: demolishing that segment restores a route of the pre-build length',
+  !barRoute ? 'no flatWithOrder(4) fixture'
+    : `demolish ${barRoute.dOk}; route ${barRoute.after.join(' ')} vs pre-build ` +
+      `${barTiles(barRoute.preRoute)} (refSteps+1 ${barRoute.refGone.length}), walk finished in ${barRoute.w.n} steps`);
+
+// 20. §6c's check-10 unreachable-order fixture rebuilt with wood: the same
+// flatState villager, his eight neighbour tiles ringed with 1x1 barricades
+// instead of water, ordered two tiles off.
+const barStuck = (() => {
+  const st = flatState();
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const V = { x: tOf(v.x), y: tOf(v.y) };
+  const d = DIRS8H.find((o) => !st.occupied.has(tIdx(st, V.x + o[0] * 2, V.y + o[1] * 2)));
+  if (!d) return null;
+  const ring = DIRS8H.map((o) => {
+    const b = AoE2.makeBuilding(st, 'barricade', 0, V.x + o[0], V.y + o[1]);
+    b.built = 1;
+    return b;
+  });
+  const at = tileCentre(st, V.x + d[0] * 2, V.y + d[1] * 2);
+  const r = fp(st, { tx: V.x, ty: V.y }, { tx: V.x + d[0] * 2, ty: V.y + d[1] * 2 });
+  v.order = { kind: 'move', x: at.x, y: at.y };
+  const w = walkOrder(st, v, 5);
+  return { v, V, ring, at, r, w };
+})();
+check(!!barStuck && barStuck.r === null && barStuck.v.order.kind === 'idle' &&
+      barStuck.v.x === barStuck.w.from.x && barStuck.v.y === barStuck.w.from.y,
+  'path: a barricade between a villager and his order leaves him idle without a route',
+  !barStuck ? 'no villager with a free tile two steps away'
+    : `route=${String(barStuck.r)} order ${barStuck.v.order.kind} after ${barStuck.w.n} steps, ` +
+      `at ${barStuck.v.x.toFixed(1)},${barStuck.v.y.toFixed(1)} (ordered ${barStuck.at.x},${barStuck.at.y})`);
+
+// 21. the pocket -- the §6c free() scan finds a grass tile whose 8 neighbours
+// are all free, the villager is moved onto it, the ring of eight 1x1
+// barricades closes, and one ring segment is demolished.
+const barPocket = (() => {
+  const st = flatState();
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const free = (x, y) => x >= 0 && y >= 0 && x < st.world.w && y < st.world.h && !st.occupied.has(tIdx(st, x, y));
+  let Vp = null;
+  for (let y = 1; y < st.world.h - 1 && !Vp; y++) {
+    for (let x = 1; x < st.world.w - 1 && !Vp; x++) {
+      if (free(x, y) && DIRS8H.every((o) => free(x + o[0], y + o[1]))) Vp = { x, y };
+    }
+  }
+  if (!Vp) return null;
+  const d = DIRS8H.find((o) => free(Vp.x + o[0] * 2, Vp.y + o[1] * 2));
+  if (!d) return null;
+  const here = tileCentre(st, Vp.x, Vp.y);
+  v.x = here.x; v.y = here.y;
+  const goalP = { tx: Vp.x + d[0] * 2, ty: Vp.y + d[1] * 2 };
+  const ring = DIRS8H.map((o) => {
+    const b = AoE2.makeBuilding(st, 'barricade', 0, Vp.x + o[0], Vp.y + o[1]);
+    b.built = 1;
+    return b;
+  });
+  const atP = tileCentre(st, goalP.tx, goalP.ty);
+  const r1 = fp(st, { tx: Vp.x, ty: Vp.y }, goalP);
+  v.order = { kind: 'move', x: atP.x, y: atP.y };
+  const w1 = walkOrder(st, v, 5);
+  const pop = ring.find((b) => b.tx === Vp.x + d[0] && b.ty === Vp.y + d[1]);
+  const pOk = pop && AoE2.demolish(st, pop);
+  const r2 = fp(st, { tx: Vp.x, ty: Vp.y }, goalP);
+  const ref = refSteps(st, { tx: Vp.x, ty: Vp.y }, goalP);
+  return { Vp, v, atP, d, ring, r1, w1, pOk, r2, ref };
+})();
+check(!!barPocket && barPocket.r1 === null && barPocket.v.order.kind === 'idle' &&
+      barPocket.pOk === true && barPocket.r2 !== null && barPocket.ref !== null &&
+      barPocket.r2.length === barPocket.ref + 1,
+  'path: a villager ringed by eight barricades has no route, and demolishing one ring segment gives him one back',
+  !barPocket ? 'no grass tile with eight free neighbours'
+    : `ringed: route ${String(barPocket.r1)}, order ${barPocket.v.order.kind} after ${barPocket.w1.n} steps; ` +
+      `popped ${barPocket.Vp.x + barPocket.d[0]},${barPocket.Vp.y + barPocket.d[1]}: ` +
+      `route ${String(barPocket.r2 && barPocket.r2.length)}, refSteps ${String(barPocket.ref)} + 1`);
+
 /* ---- 7. construction ------------------------------------------------ */
 function freeSpotAround(world, Game, tx, ty, w, h, maxR) {
   for (let r = 1; r <= maxR; r++) {
