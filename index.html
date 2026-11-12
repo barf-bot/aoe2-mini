@@ -1841,7 +1841,7 @@ function storageSet(path, raw) {
 
 /* The save schema, owned by these lines: exactly what saveGame writes and loadGame
    reads back. Everything else on Game is a per-runtime cache and stays out of the
-   payload — the eight DOM-only fields (dom, view, mm, mmBase, toastMsg, toastAt,
+   payload — the nine DOM-only fields (dom, view, mm, mmBase, toastMsg, toastAt,
    pingAt, frame), pathQueries (a run counter), sprites (the live atlas Image),
    rnd (a closure, rebuilt from the envelope's seed), mapEpoch (loadGame recomputes
    it) and autosaveAt (the save schedule). */
@@ -2061,6 +2061,52 @@ function loadGame(path, Game, raw = storageGet(path)) {
 }
 
 /* ------------------------------ 5. render ------------------------------ */
+/* Sound: one entry point, one SFX row per call (section 1's table is the
+   contract). Three silences, all of them silent and none of them thrown: a
+   name the table does not know, a platform with no AudioContext (node: the
+   harness and render-preview.js, or a browser that blocked audio), and a muted
+   game. Then the per-frame gate — a name may fire once per Game.frame, so a
+   twenty-unit brawl makes one thud instead of twenty. Mute itself is the header
+   button plus MUTE_PATH, never Game state: sound is presentation, not
+   simulation, so it stays out of encodeState and out of the save slot. */
+function isMuted(Game) {
+  if (Game.dom && Game.dom.mute) return Game.dom.mute.getAttribute('aria-pressed') === 'true';
+  return storageGet(MUTE_PATH) === '1';
+}
+
+function playSfx(Game, name) {
+  const spec = SFX[name];
+  if (!spec) return false;
+  try {
+    if (!Game.sound) {
+      const Ctor = typeof AudioContext !== 'undefined' ? AudioContext
+        : (typeof window !== 'undefined' && window.webkitAudioContext) || null;
+      if (!Ctor) return false;                            // node, or audio blocked
+      Game.sound = { ctx: new Ctor(), at: -1, fired: [] };  // one context per game, reused
+    }
+    if (isMuted(Game)) return false;
+    if (Game.sound.at !== Game.frame) {
+      Game.sound.at = Game.frame;
+      Game.sound.fired.length = 0;
+    } else if (Game.sound.fired.indexOf(name) >= 0) {
+      return false;
+    }
+    Game.sound.fired.push(name);
+    const ctx = Game.sound.ctx, t0 = ctx.currentTime, dur = spec.dur;
+    const osc = ctx.createOscillator(), env = ctx.createGain();
+    osc.type = spec.wave;
+    osc.frequency.setValueAtTime(spec.freq[0], t0);
+    for (let i = 1; i < spec.freq.length; i++)
+      osc.frequency.linearRampToValueAtTime(spec.freq[i], t0 + dur * (i / (spec.freq.length - 1)));
+    env.gain.setValueAtTime(spec.gain, t0);
+    env.gain.linearRampToValueAtTime(0, t0 + dur);
+    osc.connect(env);
+    env.connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur);
+    return true;
+  } catch (e) { return false; }        // a broken context must never break the sim
+}
 
 function beginCanvas(canvas, w, h) {
   let ctx = null;
@@ -2767,7 +2813,7 @@ function createState() {
     cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, placing: null,
     time: 0, wave: 0, age: 0, ageBonus: 0, techs: new Set(), nextId: 1, started: false, result: null, rnd: mulberry32(CFG.SEED),
     mapEpoch: 0, pathQueries: 0, // walkable-set epoch + findPath budget, both section-4 path state
-    dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0, autosaveAt: 0,
+    dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0, autosaveAt: 0, sound: null,
   };
   Game.toast = (m) => toast(Game, m);
   resetGame(Game);
@@ -2962,7 +3008,7 @@ const AoE2 = {
   makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,
   tileOf, findPath, formationSlots, separate,
-  setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
+  setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame, playSfx, isMuted,
   unitAnim,
   build, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,

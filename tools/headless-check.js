@@ -163,6 +163,65 @@ if (napiImage) {
   };
 }
 
+/* ---- 2c. AudioContext stub (this plan, T2) -------------------- */
+/* Browsers have AudioContext, node does not -- and that absence is itself a
+   covered case (playSfx answers false instead of throwing, §14). A test that
+   wants the audio path swaps this class in for global.AudioContext: it records
+   every node playSfx builds (oscillator type, the frequency values it was
+   scheduled through, its start/stop window, the gain it ramped from and what it
+   connected to), so a check can read back *which* sound was synthesised. */
+function stubVoices(ctx) {
+  if (!ctx) return [];
+  return ctx.nodes.filter((n) => n.kind === 'oscillator').map((n) => ({
+    type: n.type,
+    freq: n.freq.map((f) => f.v),
+    dur: n.stop === null || n.start === null ? null : n.stop - n.start,
+    gain: n.dest && n.dest.values.length
+      ? Math.max.apply(null, n.dest.values.map((g) => g.v)) : null,
+  }));
+}
+function makeAudioStub() {
+  const param = (sink) => ({
+    setValueAtTime: (v, t) => sink.push({ v: v, t: t }),
+    linearRampToValueAtTime: (v, t) => sink.push({ v: v, t: t }),
+    setTargetAtTime: (v, t) => sink.push({ v: v, t: t }),
+  });
+  class AudioContext {
+    constructor() {
+      this.currentTime = 0;
+      this.nodes = [];
+      this.destination = { kind: 'destination' };
+      AudioContext.instances.push(this);
+    }
+    createOscillator() {
+      const osc = { kind: 'oscillator', type: 'sine', freq: [], start: null, stop: null, dest: null };
+      osc.frequency = param(osc.freq);
+      osc.connect = (d) => { osc.dest = d; };
+      osc.start = (t) => { osc.start = t; };
+      osc.stop = (t) => { osc.stop = t; };
+      this.nodes.push(osc);
+      return osc;
+    }
+    createGain() {
+      const g = { kind: 'gain', values: [], dest: null };
+      g.gain = param(g.values);
+      g.connect = (d) => { g.dest = d; };
+      this.nodes.push(g);
+      return g;
+    }
+    close() { this.closed = true; }
+  }
+  AudioContext.instances = [];
+  return AudioContext;
+}
+const withAudio = (fn) => {
+  const keep = global.AudioContext;
+  const Ctor = makeAudioStub();
+  global.AudioContext = Ctor;
+  try { return fn(Ctor); } finally { global.AudioContext = keep; }
+};
+const voicesOf = (Ctor) => Ctor.instances.reduce((all, c) => all.concat(stubVoices(c)), []);
+
 /* ---- 3. load + boot -------------------------------------------------- */
 const AoE2 = require(jsPath);
 check(!!AoE2 && !!AoE2.CFG, 'module: exports the game surface', Object.keys(AoE2 || {}).length + ' exports');
@@ -2646,7 +2705,7 @@ saveCheck('save: the DOM-only fields never enter the payload', () => {
   g.mapEpoch = 12; g.pathQueries = 9;
   const st = stateOf(g, 1000);
   const leaked = ['dom', 'view', 'mm', 'mmBase', 'toastMsg', 'toastAt', 'pingAt', 'frame',
-    'pathQueries', 'sprites', 'rnd', 'mapEpoch'].filter((k) => Object.prototype.hasOwnProperty.call(st, k));
+    'pathQueries', 'sprites', 'rnd', 'mapEpoch', 'sound'].filter((k) => Object.prototype.hasOwnProperty.call(st, k));
   return [leaked.length === 0 && g.sprites.atlas === atlas,
     'leaked=' + JSON.stringify(leaked) + ' atlasStillLive=' + (g.sprites.atlas === atlas)];
 });
@@ -3251,6 +3310,83 @@ soundCheck('sound: the SFX table names every sound once and completely', () => {
     '[' + (Array.isArray(sfx[n].freq) ? sfx[n].freq.join(',') : JSON.stringify(sfx[n].freq)) + ']' +
     sfx[n].dur + '/' + sfx[n].gain + '@' + sfx[n].fire).join(' ');
   return [problems.length === 0, (problems.length ? 'problems: ' + problems.join(' ') : 'ok ') + shape];
+});
+
+soundCheck('sound: playSfx returns false with no AudioContext and builds nothing', () => {
+  const g = AoE2.createState();
+  const r = AoE2.playSfx(g, 'hit');
+  return [r === false && g.sound === null,
+    'return=' + String(r) + ' sound=' + String(g.sound) + ' (harness default: no AudioContext)'];
+});
+
+soundCheck('sound: playSfx returns false for a name the table does not know', () => {
+  return withAudio((Ctor) => {
+    const g = AoE2.createState();
+    const r = AoE2.playSfx(g, 'nope');
+    return [r === false && Ctor.instances.length === 0 &&
+      (!g.sound || voicesOf(Ctor).length === 0),
+      'SFX.nope=' + String(AoE2.SFX.nope) + ' return=' + String(r) +
+      ' contexts=' + Ctor.instances.length];
+  });
+});
+
+soundCheck('sound: a sound fires once per frame and again on the next', () => {
+  return withAudio((Ctor) => {
+    const g = AoE2.createState();
+    g.frame = 1;
+    const first = AoE2.playSfx(g, 'hit');
+    const again = AoE2.playSfx(g, 'hit');
+    const frame1 = voicesOf(Ctor).length;
+    g.frame = 2;
+    const nextFrame = AoE2.playSfx(g, 'hit');
+    const frame2 = voicesOf(Ctor).length;
+    g.frame = 3;
+    const hit = AoE2.playSfx(g, 'hit');
+    const arrow = AoE2.playSfx(g, 'arrow');
+    return [first === true && again === false && frame1 === 1 && nextFrame === true &&
+      frame2 === 2 && hit === true && arrow === true && voicesOf(Ctor).length === 4 &&
+      Ctor.instances.length === 1,
+      'frame1=' + first + '/' + again + ' voices=' + frame1 +
+      ' frame2=' + nextFrame + ' voices=' + frame2 +
+      ' frame3 hit=' + hit + ' arrow=' + arrow + ' totalVoices=' + voicesOf(Ctor).length +
+      ' contexts=' + Ctor.instances.length + ' (one per game, reused)'];
+  });
+});
+
+soundCheck("sound: each row's spec is what the oscillator gets", () => {
+  return withAudio((Ctor) => {
+    const problems = [];
+    const names = Object.keys(AoE2.SFX);
+    for (const name of names) {
+      const row = AoE2.SFX[name];
+      const g = AoE2.createState();
+      const fired = AoE2.playSfx(g, name);
+      const v = stubVoices(g.sound && g.sound.ctx);
+      const got = v.length === 1 ? v[0] : null;
+      const want = { type: row.wave, freq: row.freq, dur: row.dur, gain: row.gain };
+      if (fired !== true || JSON.stringify(got) !== JSON.stringify(want))
+        problems.push(name + '=' + JSON.stringify(got));
+    }
+    return [problems.length === 0,
+      (problems.length ? 'problems: ' + problems.join(' ')
+        : 'all ' + names.length + ' rows synthesised as authored') +
+      ' contexts=' + Ctor.instances.length];
+  });
+});
+
+soundCheck('sound: a muted game plays nothing', () => {
+  return withStorage((s) => {
+    AoE2.storageSet(AoE2.MUTE_PATH, '1');
+    return withAudio((Ctor) => {
+      const g = AoE2.createState();
+      const muted = AoE2.isMuted(g);
+      const returns = Object.keys(AoE2.SFX).map((n) => AoE2.playSfx(g, n));
+      return [muted === true && returns.every((r) => r === false) && voicesOf(Ctor).length === 0,
+        'isMuted=' + muted + ' returns=' + JSON.stringify(returns) +
+        ' voices=' + voicesOf(Ctor).length + ' (storage ' + AoE2.MUTE_PATH + '=' +
+        AoE2.storageGet(AoE2.MUTE_PATH) + ')'];
+    });
+  });
 });
 
 report();
