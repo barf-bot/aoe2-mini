@@ -130,6 +130,7 @@ const CFG = {
   PROJ_SPEED: 176,                // px/s an arrow flies (8 tiles/s - the table carries no projectile speed)
   ASTAR_MAX_NODES: 4000,          // expansion cap for one A* query (the table carries no pathfinding budget)
   RES: { tree: 60, gold: 800, stone: 450, berry: 150 },
+  VERSION: 1,                     // save payload schema stamp - loadGame accepts only this version, migrate() converts older ones
 };
 
 // GENERATED FROM data/units.json -- edit the data or run `node tools/check-stats.mjs --write`.
@@ -373,6 +374,7 @@ const TECHS = {
 };
 
 const AGES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
+const SAVE_PATH = 'aoe2mini:save';
 
 const T = { GRASS:0, WATER:1, FOREST:2, GOLD:3, STONE:4, BERRY:5 };
 
@@ -1782,6 +1784,128 @@ function toast(Game, msg) {
   }
 }
 
+/* ------------------------------- save / load -------------------------------- */
+
+/* The one door to localStorage. storageGet answers null and storageSet answers
+   false when the platform has none (node: the harness and render-preview.js) or
+   refuses the write (private mode, quota) — a save is a convenience, so losing
+   one must never break the game. storageSet(path, null) clears a slot, which is
+   how a new game forgets the old one. */
+function storageGet(path) {
+  try {
+    const s = typeof globalThis === 'undefined' ? undefined : globalThis.localStorage;
+    if (s === undefined || s === null) return null;
+    const v = s.getItem(path);
+    return v === undefined ? null : v;
+  } catch (e) { return null; }
+}
+
+function storageSet(path, raw) {
+  try {
+    const s = typeof globalThis === 'undefined' ? undefined : globalThis.localStorage;
+    if (s === undefined || s === null) return false;
+    if (raw === null) s.removeItem(path);
+    else s.setItem(path, raw);
+    return true;
+  } catch (e) { return false; }
+}
+
+/* The save schema, owned by these lines: exactly what saveGame writes and loadGame
+   reads back. Everything else on Game is a per-runtime cache and stays out of the
+   payload — the eight DOM-only fields (dom, view, mm, mmBase, toastMsg, toastAt,
+   pingAt, frame), pathQueries (a run counter), sprites (the live atlas Image),
+   rnd (a closure, rebuilt from the envelope's seed), mapEpoch (loadGame recomputes
+   it) and autosaveAt (the save schedule). */
+
+/* A source reference minus its live part: `amount` is a getter onto world.amount or
+   a farm's field, so the payload keeps the tile / farm it names and loadGame hands
+   back a fresh getter (the same one sourceFromTile / sourceFromFarm build). */
+function encodeSource(src) {
+  if (!src) return null;
+  return src.kind === 'farm'
+    ? { kind: 'farm', b: src.b, res: src.res }
+    : { kind: 'tile', tx: src.tx, ty: src.ty, res: src.res };
+}
+
+/* An order as stored: every field is already a plain value (move x/y, target and
+   building ids) except `src`, which becomes the source it names. */
+function encodeOrder(o) {
+  if (!o) return { kind: 'idle' };
+  const e = {};
+  for (const k of Object.keys(o)) e[k] = o[k];
+  if ('src' in e) e.src = encodeSource(o.src);
+  return e;
+}
+
+function encodeUnit(u) {
+  const e = {};
+  for (const k of Object.keys(u)) e[k] = u[k];
+  e.order = encodeOrder(u.order);
+  return e;
+}
+
+function encodeBuilding(b) {
+  const e = {};
+  for (const k of Object.keys(b)) e[k] = b[k];
+  return e;
+}
+
+/* An arrow points at a unit OR a building, and both ids come out of the same
+   Game.nextId, so the id alone cannot say which: tk carries the kind (the same
+   `r` test updateProjectiles uses to tell them apart). */
+function encodeProjectile(p) {
+  const tk = p.t && p.t.r !== undefined ? 'unit' : 'building';
+  return { x: p.x, y: p.y, team: p.team, dx: p.dx, dy: p.dy, dmg: p.dmg,
+           accuracy: p.accuracy, tk: p.t ? tk : null, tid: p.t ? p.t.id : null };
+}
+
+function encodeState(Game) {
+  const w = Game.world;
+  return {
+    world: w ? { w: w.w, h: w.h, seed: w.seed, type: Array.from(w.type),
+                 shade: Array.from(w.shade), amount: Array.from(w.amount) } : null,
+    units: Game.units.map(encodeUnit),
+    buildings: Game.buildings.map(encodeBuilding),
+    projectiles: Game.projectiles.map(encodeProjectile),
+    blocks: Object.fromEntries(Game.blocks),
+    occupied: Array.from(Game.occupied),
+    res: Game.res,
+    selection: Game.selection,
+    selectedBuilding: Game.selectedBuilding ? Game.selectedBuilding.id : null,
+    groups: Game.groups,
+    keys: Game.keys,
+    cam: Game.cam,
+    cursor: Game.cursor,
+    mouse: Game.mouse,
+    drag: Game.drag,
+    placing: Game.placing,
+    time: Game.time,
+    wave: Game.wave,
+    age: Game.age,
+    ageBonus: Game.ageBonus,
+    techs: Array.from(Game.techs),
+    nextId: Game.nextId,
+    started: Game.started,
+    result: Game.result,
+  };
+}
+
+/* The envelope: { version, seed, writtenAt, state }. `at` pins writtenAt so the
+   same Game written twice gives the same bytes (the round-trip check compares
+   strings); it defaults to the frame clock. The seed is the world's own, which is
+   how loadGame rebuilds the rng closure. Returns the JSON whether or not the
+   platform accepted the write, so a caller can still hash or show it. */
+function saveGame(path, Game, at = now()) {
+  const raw = JSON.stringify({
+    version: CFG.VERSION,
+    seed: Game.world ? Game.world.seed : CFG.SEED,
+    writtenAt: at,
+    state: encodeState(Game),
+  });
+  storageSet(path, raw);
+  return raw;
+}
+
 /* ------------------------------ 5. render ------------------------------ */
 
 function beginCanvas(canvas, w, h) {
@@ -2672,6 +2796,7 @@ const AoE2 = {
   build, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
+  SAVE_PATH, saveGame, storageGet, storageSet,
   infoHtml, hudState, hudHtml, commandsHtml, queueHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };

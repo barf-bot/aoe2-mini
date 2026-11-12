@@ -12,7 +12,7 @@
     "cfg.MAP_W", "cfg.MAP_H", "cfg.TILE", "cfg.SEED", "cfg.START", "cfg.WORKERS_PER_TILE",
     "cfg.GATHER_RATE", "cfg.CANCEL_REFUND", "cfg.AGE_FOOD", "cfg.WAVE_EVERY", "cfg.ACQUIRE",
     "cfg.BUILDING_ACQUIRE", "cfg.UNIT_SEP", "cfg.PAN_SPEED", "cfg.EDGE", "cfg.RES",
-    "cfg.PROJ_SPEED", "cfg.ASTAR_MAX_NODES",
+    "cfg.PROJ_SPEED", "cfg.ASTAR_MAX_NODES", "cfg.VERSION",
     "units.*.label", "units.*.r", "units.*.buildable", "units.*.atkType"
   ],
   "design": {
@@ -39,7 +39,8 @@
     "EDGE": 14,
     "PROJ_SPEED": 176,
     "ASTAR_MAX_NODES": 4000,
-    "RES": { "tree": 60, "gold": 800, "stone": 450, "berry": 150 }
+    "RES": { "tree": 60, "gold": 800, "stone": 450, "berry": 150 },
+    "VERSION": 1
   },
   "cfgNotes": {
     "TILE": "px per tile (single zoom level for now)",
@@ -56,7 +57,8 @@
     "PAN_SPEED": "px/s camera pan",
     "EDGE": "px edge-scroll band",
     "PROJ_SPEED": "px/s an arrow flies (8 tiles/s - the table carries no projectile speed)",
-    "ASTAR_MAX_NODES": "expansion cap for one A* query (the table carries no pathfinding budget)"
+    "ASTAR_MAX_NODES": "expansion cap for one A* query (the table carries no pathfinding budget)",
+    "VERSION": "save payload schema stamp - loadGame accepts only this version, migrate() converts older ones"
   },
   "units": {
     "villager": {

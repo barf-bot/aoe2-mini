@@ -109,9 +109,24 @@ function makeDoc() {
   return doc;
 }
 
+/* localStorage stand-in: storageGet/storageSet are the game's only storage door, and
+   this is the one the harness hands it. `sets` counts setItem calls so the autosave
+   schedule (T3) can prove it writes once per window instead of once per frame. */
+function fakeStorage() {
+  const store = new Map();
+  const s = { sets: 0, removes: 0 };
+  s.getItem = (k) => (store.has(k) ? store.get(k) : null);
+  s.setItem = (k, v) => { store.set(k, String(v)); s.sets++; };
+  s.removeItem = (k) => { store.delete(k); s.removes++; };
+  s.key = (i) => { const k = Array.from(store.keys())[i]; return k === undefined ? null : k; };
+  Object.defineProperty(s, 'length', { get: () => store.size });
+  return s;
+}
+
 const doc = makeDoc();
 const rafQueue = [];
 global.document = doc;
+global.localStorage = fakeStorage();
 global.window = {
   innerWidth: 1200, innerHeight: 700,
   addEventListener() {},
@@ -2578,5 +2593,129 @@ check(Game.units.length === 10 && Game.res[0].wood === 100, 'reset: fresh state 
   unitsBeforeReset + ' -> ' + Game.units.length + ' units');
 stepRender(60);
 check(true, 'reset: simulation runs on the reset state', '60 steps clean');
+
+/* ---- 13. save/load (this plan, T1) -------------------------------- */
+/* The save contract. SAVE_FIELDS IS the schema: encodeState returns exactly these
+   keys in this order, and every check below reads the JSON string saveGame hands
+   back (plus what the fake storage in §2 ended up holding). */
+const SAVE_FIELDS = ['world', 'units', 'buildings', 'projectiles', 'blocks', 'occupied', 'res',
+  'selection', 'selectedBuilding', 'groups', 'keys', 'cam', 'cursor', 'mouse', 'drag', 'placing',
+  'time', 'wave', 'age', 'ageBonus', 'techs', 'nextId', 'started', 'result'];
+const saveOf = (g, at) => {
+  const raw = AoE2.saveGame(AoE2.SAVE_PATH, g, at);
+  return [raw, JSON.parse(raw)];
+};
+const stateOf = (g, at) => saveOf(g, at)[1].state;
+const saveCheck = (name, fn) => {
+  let out;
+  try { out = fn(); } catch (e) { bad(name, 'threw ' + e.message); return; }
+  check(out[0], name, out[1]);
+};
+
+saveCheck('save: saveGame returns the v1 envelope', () => {
+  const g = AoE2.createState();
+  const [raw, env] = saveOf(g, 1000);
+  return [AoE2.CFG.VERSION === dataUnits.cfg.VERSION && env.version === AoE2.CFG.VERSION &&
+    env.seed === AoE2.CFG.SEED && env.writtenAt === 1000 &&
+    Object.keys(env.state).join(',') === SAVE_FIELDS.join(','),
+    'version=' + env.version + ' seed=' + env.seed + ' writtenAt=' + env.writtenAt +
+    ' stateKeys=' + Object.keys(env.state).length + ' bytes=' + raw.length];
+});
+
+saveCheck('save: Game.techs and Game.blocks encode as array and object', () => {
+  const g = AoE2.createState();
+  g.age = 1;
+  g.techs.add('forge');
+  const site = AoE2.findSite(g.world, 40, 40, 2);
+  const b = AoE2.makeBuilding(g, 'barracks', 0, site.tx, site.ty);
+  const st = stateOf(g, 1000);
+  return [JSON.stringify(st.techs) === '["forge"]' &&
+    JSON.stringify(st.blocks[String(b.id)]) === JSON.stringify(g.blocks.get(b.id)) &&
+    st.occupied.length === g.occupied.size,
+    'techs=' + JSON.stringify(st.techs) + ' blocks[' + b.id + ']=' +
+    JSON.stringify(st.blocks[String(b.id)]) + ' live=' + JSON.stringify(g.blocks.get(b.id)) +
+    ' occupied=' + st.occupied.length + '/' + g.occupied.size];
+});
+
+saveCheck('save: the DOM-only fields never enter the payload', () => {
+  const g = AoE2.createState();
+  const atlas = { stub: 'atlas' };
+  AoE2.setAtlas(g, atlas);
+  g.frame = 7; g.pingAt = 3.5; g.toastMsg = 'hi'; g.toastAt = 2;
+  g.mapEpoch = 12; g.pathQueries = 9;
+  const st = stateOf(g, 1000);
+  const leaked = ['dom', 'view', 'mm', 'mmBase', 'toastMsg', 'toastAt', 'pingAt', 'frame',
+    'pathQueries', 'sprites', 'rnd', 'mapEpoch'].filter((k) => Object.prototype.hasOwnProperty.call(st, k));
+  return [leaked.length === 0 && g.sprites.atlas === atlas,
+    'leaked=' + JSON.stringify(leaked) + ' atlasStillLive=' + (g.sprites.atlas === atlas)];
+});
+
+saveCheck('save: world arrays mirror live tile amounts', () => {
+  const g = AoE2.createState();
+  const v = g.units.find((u) => u.team === 0 && u.kind === 'villager' &&
+    u.order.src && u.order.src.kind === 'tile');
+  const k = v.order.src.ty * g.world.w + v.order.src.tx;
+  const was = g.world.amount[k];
+  g.world.amount[k] = was - 7;
+  const st = stateOf(g, 1000);
+  return [st.world.amount[k] === was - 7 &&
+    st.world.type.length === AoE2.CFG.MAP_W * AoE2.CFG.MAP_H &&
+    st.world.shade.length === AoE2.CFG.MAP_W * AoE2.CFG.MAP_H &&
+    st.world.w === AoE2.CFG.MAP_W && st.world.h === AoE2.CFG.MAP_H &&
+    st.world.seed === AoE2.CFG.SEED,
+    'amount[' + k + ']=' + st.world.amount[k] + ' (was ' + was + ') type.length=' +
+    st.world.type.length + ' expected=' + (AoE2.CFG.MAP_W * AoE2.CFG.MAP_H)];
+});
+
+saveCheck("save: an order's harvest source is stored by tile, not as a frozen copy", () => {
+  const g = AoE2.createState();
+  const v = g.units.find((u) => u.team === 0 && u.kind === 'villager' &&
+    u.order.src && u.order.src.kind === 'tile');
+  const live = v.order.src;
+  const foe = g.units.find((u) => u.team === 1 && u.kind === 'militia') ||
+    g.units.find((u) => u.team === 1);
+  v.order = AoE2.orderForUnit(g, v, live.tx * AoE2.CFG.TILE + AoE2.CFG.TILE / 2,
+    live.ty * AoE2.CFG.TILE + AoE2.CFG.TILE / 2);
+  const arrow = AoE2.spawnArrow(g, v, foe);
+  const st = stateOf(g, 1000);
+  const saved = st.units.find((u) => u.id === v.id);
+  const p = (st.projectiles || [])[0];
+  return [saved.order.kind === 'harvest' && saved.order.src.tx === live.tx &&
+    saved.order.src.ty === live.ty && saved.order.src.res === live.res &&
+    !!p && p.tk === 'unit' && p.tid === foe.id && p.x === v.x && p.y === v.y &&
+    p.dmg === arrow.dmg && p.accuracy === v.accuracy && p.team === v.team,
+    'order=' + JSON.stringify(saved.order) + ' arrow=' + JSON.stringify(p)];
+});
+
+saveCheck('save: the slot holds exactly the string saveGame returned', () => {
+  const g = AoE2.createState();
+  const [raw] = saveOf(g, 1000);
+  const stored = AoE2.storageGet(AoE2.SAVE_PATH);
+  AoE2.storageSet(AoE2.SAVE_PATH, null);
+  return [stored === raw && AoE2.storageGet(AoE2.SAVE_PATH) === null,
+    'storedIsRaw=' + (stored === raw) + ' afterClear=' + String(AoE2.storageGet(AoE2.SAVE_PATH))];
+});
+
+saveCheck('save: saveGame still returns the payload with no storage', () => {
+  const g = AoE2.createState();
+  const keep = global.localStorage;
+  let raw = null, err = null;
+  global.localStorage = undefined;
+  try { raw = AoE2.saveGame(AoE2.SAVE_PATH + ':temp', g, 1000); } catch (e) { err = e; }
+  global.localStorage = keep;
+  return [err === null && typeof raw === 'string' && JSON.parse(raw).version === AoE2.CFG.VERSION &&
+    global.localStorage === keep,
+    err ? 'threw ' + err.message : 'bytes=' + String(raw && raw.length) +
+      ' storageRestored=' + (global.localStorage === keep)];
+});
+
+saveCheck('save: re-saving an untouched game is byte-identical', () => {
+  const g = AoE2.createState();
+  const p = AoE2.SAVE_PATH + ':twice';
+  const a = AoE2.saveGame(p, g, 1000);
+  const b = AoE2.saveGame(p, g, 1000);
+  return [a === b && a.length > 100, 'bytes ' + a.length + ' vs ' + b.length +
+    ' identical=' + (a === b)];
+});
 
 report();
