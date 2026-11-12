@@ -183,7 +183,7 @@ current `tools/headless-check.js` (2292 lines, 198 checks passing). T1 shifts `i
     demolishing one ring segment gives him one back` (before: `findPath` null and the order
     retired; after: a route whose length is `refSteps(...) + 1`).
 
-- [ ] T4: the raze path — `§9g` (the row inside the existing combat math)
+- [x] T4: the raze path — `§9g` (the row inside the existing combat math)
   - files: `tools/headless-check.js` only (a new `/* ---- 9g. barricade razed (this plan, T4) ---- */`
     between §9f, which ends at `tools/headless-check.js:1924`, and §10 at
     `tools/headless-check.js:1926`); `index.html` untouched — acquisition is

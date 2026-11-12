@@ -2129,6 +2129,73 @@ check(!!mkFoe && mkShot.st.projectiles.length === 0 && mkShot.tw.cd === 0,
     : 'projectiles=' + mkShot.st.projectiles.length + ' cd=' + mkShot.tw.cd +
       ' (row attack ' + AoE2.BLD.market.attack + ')');
 
+/* ---- 9g. barricade razed (this plan, T4) ------------------------------- */
+/* The row inside the existing combat math: autoAcquire's building branch
+ * acquires it, updateUnit's attack order swings with the table's numbers and
+ * hitBuilding razes it — no new combat code, so a red check here means the
+ * row's own numbers (hp 150, meleeArmor 2, pierceArmor 5) failed to reach
+ * that path. Own state with units cleared: the militia's is the only swing
+ * that can move the numbers and the Town Center can never be the body that
+ * dies. The first segment is selected, so the raze must also clear
+ * selectedBuilding (the §9b precedent). */
+const rb = (() => {
+  const st = AoE2.createState();
+  st.units = [];
+  const tc = st.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+  const site = freeSpotAround(st.world, st, tc.tx + 3, tc.ty + 1, 1, 1, 1);
+  if (!site || !AoE2.siteFree(st, site.tx + 2, site.ty, 1, 1)) return null;
+  const b = AoE2.makeBuilding(st, 'barricade', 0, site.tx, site.ty);
+  b.built = 1;
+  b.hp = AoE2.BLD.barricade.hp;
+  const b2 = AoE2.makeBuilding(st, 'barricade', 0, site.tx + 2, site.ty);
+  b2.built = 1;
+  b2.hp = AoE2.BLD.barricade.hp;
+  const m = AoE2.makeUnit(st, 'militia', 1, b.x - 8, b.y);   // inside reachOf(b) -> instant swing
+  st.selectedBuilding = b;
+  return { st, tc, b, b2, m };
+})();
+const rbAcq = rb && (() => {
+  AoE2.stepSim(rb.st, DT);                                    // idle -> BUILDING_ACQUIRE
+  return rb.m.order.kind === 'attack' && rb.m.order.b === rb.b.id;
+})();
+check(!!rb && rbAcq === true,
+  'ai: an idle enemy militia acquires the adjacent barricade',
+  !rb ? 'no free pair of tiles east of the Town Center'
+    : `order ${rb.m.order.kind}${rb.m.order.b !== undefined ? ' b=' + rb.m.order.b : ''} ` +
+      `want b=${rb.b.id}`);
+const rbSwing = rb && (() => {
+  const atk = mCall(AoE2.unitAttack, rb.st, rb.m);
+  const hp0 = rb.b.hp;
+  AoE2.stepSim(rb.st, DT);                                    // in reach -> the swing lands
+  return { atk, hp0, hp: rb.b.hp };
+})();
+check(!!rbSwing && !rbSwing.atk.err && rbSwing.atk.v === AoE2.KINDS.militia.atk &&
+      rbSwing.hp === rbSwing.hp0 - Math.max(1, rbSwing.atk.v - AoE2.BLD.barricade.meleeArmor) &&
+      rbSwing.hp > 0,
+  'combat: a militia\'s swing costs the barricade 2 hp',
+  !rbSwing ? 'no free pair of tiles east of the Town Center'
+    : rbSwing.atk.err ? 'unitAttack threw ' + rbSwing.atk.err
+      : `${rbSwing.atk.v} - armour ${AoE2.BLD.barricade.meleeArmor}: ${rbSwing.hp0} -> ` +
+        `${rbSwing.hp} (row hp ${AoE2.BLD.barricade.hp}, want 4 - 2 = 2 hp off)`);
+const rbPierce = rb && mCall(AoE2.hitBuilding, rb.st, rb.b2, AoE2.KINDS.archer.atk, 'pierce');
+check(!!rbPierce && !rbPierce.err && rb.b2.hp > 0 &&
+      rb.b2.hp === AoE2.BLD.barricade.hp - Math.max(1, AoE2.KINDS.archer.atk - AoE2.BLD.barricade.pierceArmor),
+  'combat: an archer\'s 4 pierce damage floors at 1 hp against pierce armour 5',
+  !rbPierce ? 'no free pair of tiles east of the Town Center'
+    : rbPierce.err ? 'hitBuilding threw ' + rbPierce.err
+      : `archer ${AoE2.KINDS.archer.atk} - pierce armour ` +
+        `${AoE2.BLD.barricade.pierceArmor} -> max(1, -1): ${AoE2.BLD.barricade.hp} -> ${rb.b2.hp} (want 149)`);
+const rbRaze = rb && mCall(AoE2.hitBuilding, rb.st, rb.b, 99999);
+check(!!rbRaze && !rbRaze.err && rbRaze.v === true && !rb.st.buildings.includes(rb.b) &&
+      rb.st.selectedBuilding === null && rb.st.toastMsg === AoE2.BLD.barricade.label + ' destroyed' &&
+      AoE2.walkable(rb.st, rb.b.x, rb.b.y) === true && rb.st.result === null,
+  'combat: razing the barricade removes it, frees its tile and never decides the game',
+  !rbRaze ? 'no free pair of tiles east of the Town Center'
+    : rbRaze.err ? 'hitBuilding threw ' + rbRaze.err
+      : `removed=${String(rbRaze.v)} selection=${String(rb.st.selectedBuilding)} ` +
+        `toast=${rb.st.toastMsg} walkable=${String(AoE2.walkable(rb.st, rb.b.x, rb.b.y))} ` +
+        `result=${String(rb.st.result)}`);
+
 /* ---- 10. input ------------------------------------------------------ */
 const view = doc.getElementById('view');
 const mine = blueVill();
