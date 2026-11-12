@@ -2054,7 +2054,12 @@ function decodeState(Game, state, seed) {
   Game.cam = state.cam;
   Game.cursor = state.cursor;
   Game.mouse = state.mouse;
-  Game.drag = state.drag;
+  /* A live drag names the pointer that owns it (`id`, since the pointer refactor),
+     and the listeners only ever finish the drag they are named in — so a save from
+     before that shape came back as a drag no release could ever clear, freezing
+     selection, the cursor and edge-scroll for the rest of the session. A press that
+     ended with the previous session is no press to resume: drag without owner, load none. */
+  Game.drag = state.drag && state.drag.id !== undefined ? state.drag : null;
   Game.placing = state.placing;
   Game.time = state.time;
   Game.wave = state.wave;

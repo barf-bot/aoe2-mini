@@ -2991,6 +2991,31 @@ loadCheck('load: every observable field equals its pre-save value', () => {
     ' time=' + g2.time + '/' + g.time + ' nextId=' + g2.nextId + '/' + g.nextId];
 });
 
+loadCheck('load: a drag that names no owning pointer is dropped, an owned one is kept', () => {
+  /* The pointer listeners only ever finish the drag whose `id` matches the pointer
+     they came from, so `id` is a required field of a live drag — but a save written
+     before that shape carries `{ x0, y0, x1, y1 }` and used to come back as a drag no
+     release could ever clear, which wedged selection, the cursor and edge-scroll for
+     the rest of the session. A press that died with the previous session is no press
+     to resume, so the decode drops it and keeps an owned drag whole. */
+  const { raw } = fixtureSave();
+  const withDrag = (drag) => {
+    const e = JSON.parse(raw);
+    e.state.drag = drag;
+    return JSON.stringify(e);
+  };
+  const owned = { x0: 10, y0: 20, x1: 30, y1: 40, t0: 500, id: 1 };
+  const gLegacy = AoE2.createState();
+  const gOwned = AoE2.createState();
+  const okLegacy = AoE2.loadGame(AoE2.SAVE_PATH, gLegacy,
+    withDrag({ x0: 10, y0: 20, x1: 30, y1: 40 }));          // the pre-pointer shape
+  const okOwned = AoE2.loadGame(AoE2.SAVE_PATH, gOwned, withDrag(owned));
+  return [okLegacy === true && gLegacy.drag === null && okOwned === true &&
+      JSON.stringify(gOwned.drag) === JSON.stringify(owned),
+    'legacyLoad=' + okLegacy + ' legacyDrag=' + JSON.stringify(gLegacy.drag) +
+    ' ownedLoad=' + okOwned + ' ownedDrag=' + JSON.stringify(gOwned.drag)];
+});
+
 loadCheck('load: a wrong version resets the game instead of throwing', () => {
   const { raw } = fixtureSave();
   const body = JSON.parse(raw).state;
