@@ -81,7 +81,7 @@ function stubEl(tag, id, w, h) {
     e.getContext = (kind) => (kind === '2d' ? (ctx = ctx || stubCtx(e)) : null);
   }
   e.fire = (type, ev) => (e.listeners[type] || []).forEach((fn) => fn(Object.assign({
-    button: 0, pointerId: 1, timeStamp: 0, clientX: 0, clientY: 0, key: '', ctrlKey: false, target: e,
+    button: 0, pointerId: 1, timeStamp: 0, pointerType: 'mouse', clientX: 0, clientY: 0, key: '', ctrlKey: false, target: e,
     preventDefault() {}, stopPropagation() {},
   }, ev)));
   return e;
@@ -101,7 +101,7 @@ function makeDoc() {
   doc.createElement = (t) => stubEl(t, 'created', 96, 96);
   doc.addEventListener = (t, fn) => { (doc.listeners[t] = doc.listeners[t] || []).push(fn); };
   doc.fire = (type, ev) => (doc.listeners[type] || []).forEach((fn) => fn(Object.assign({
-    button: 0, pointerId: 1, timeStamp: 0, clientX: 0, clientY: 0, key: '', ctrlKey: false, target: null,
+    button: 0, pointerId: 1, timeStamp: 0, pointerType: 'mouse', clientX: 0, clientY: 0, key: '', ctrlKey: false, target: null,
     preventDefault() {}, stopPropagation() {},
   }, ev)));
   doc.body = forId('body');
@@ -2496,6 +2496,25 @@ const moveHold = (() => {
 })();
 check(moveHold.drag === null && moveHold.ordNow === moveHold.ord && moveHold.sel.indexOf(hv.id) >= 0,
   'input: moving then releasing commands nobody, whatever the hold', JSON.stringify(moveHold));
+
+/* The other half of a release, which no decision can hide: `Game.mouse` — the point
+   `stepGame` reads for the 14 px edge-scroll band — belongs to the pointer. A mouse
+   release keeps it, because the cursor really is still there; a finger that lifts
+   points at nothing, and its last canvas coordinate used to keep the camera panning
+   from an edge nobody touches until the next tap. */
+const lift = (() => {
+  const s = {};
+  doc.fire('pointermove', pt(40, 0, 0));
+  s.hover = Game.mouse && Game.mouse.x;
+  doc.fire('pointerup', pt(40, 0, 0));                   // mouse, no drag live: nothing to select
+  s.mouseUp = Game.mouse && Game.mouse.x;
+  doc.fire('pointerup', Object.assign(pt(40, 0, 0), { pointerId: 6, pointerType: 'touch' }));
+  s.touchUp = Game.mouse;
+  return s;
+})();
+check(!!lift.hover && lift.mouseUp === lift.hover && lift.touchUp === null,
+  'input: a released finger clears the hover the edge-scroll band reads, a released mouse keeps it',
+  JSON.stringify(lift));
 
 /* ---- 11. command bar buttons ---------------------------------------- */
 Game.selection = [];

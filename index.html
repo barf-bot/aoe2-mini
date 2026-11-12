@@ -2751,16 +2751,22 @@ function attachInput(Game, d) {
     pointerDown(Game, toWorld(e));
   });
 
+  /* `Game.mouse` (the point stepGame reads for the edge-scroll band) is written by
+     `pointermove` and belongs to the pointer that is hovering: a mouse release keeps
+     it, a finger that lifts takes it away — leaving the last touch coordinate behind
+     panned the camera from an edge nobody was touching any more. `pointercancel` is
+     the browser taking the pointer back (system gesture, device lost): drop the drag,
+     select nobody, order nobody, and the same rule applies to the hover. */
   d.addEventListener('pointerup', (e) => {
     if (e.button !== 0) return;
     pointerUp(Game, toWorld(e));
+    if (e.pointerType !== 'mouse') Game.mouse = null;
   });
 
-  /* the browser took the pointer back (system gesture, device lost): drop the drag,
-     select nobody, order nobody */
   d.addEventListener('pointercancel', (e) => {
     if (Game.drag && e.pointerId !== Game.drag.id) return;
     Game.drag = null;
+    if (e.pointerType !== 'mouse') Game.mouse = null;
   });
 
   d.addEventListener('contextmenu', (e) => {
