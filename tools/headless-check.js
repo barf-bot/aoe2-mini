@@ -3163,10 +3163,11 @@ const uiCheck = (name, fn) => {
   try { out = fn(); } catch (e) { bad(name, 'threw ' + e.message); return; }
   check(out[0], name, out[1]);
 };
-const bootFixture = (raw, fn) => {
+const bootFixture = (raw, fn, extra) => {
   const keep = global.localStorage;
   global.localStorage = fakeStorage();
   if (raw !== undefined) AoE2.storageSet(AoE2.SAVE_PATH, raw);
+  for (const k of Object.keys(extra || {})) AoE2.storageSet(k, extra[k]);   // e.g. MUTE_PATH
   const doc = makeDoc();
   const Game = AoE2.boot(doc);
   try { return fn(doc, Game); } finally { global.localStorage = keep; }
@@ -3386,6 +3387,55 @@ soundCheck('sound: a muted game plays nothing', () => {
         ' voices=' + voicesOf(Ctor).length + ' (storage ' + AoE2.MUTE_PATH + '=' +
         AoE2.storageGet(AoE2.MUTE_PATH) + ')'];
     });
+  });
+});
+
+uiCheck('ui: the header carries a mute button beside Save', () => {
+  const saveAt = html.indexOf('<button id="save" class="save" type="button">Save</button>');
+  const muteAt = html.indexOf('<button id="mute" class="mute" type="button">Sound on</button>');
+  const endAt = html.indexOf('</header>');
+  return [saveAt >= 0 && muteAt > saveAt && muteAt < endAt && html.indexOf('header .mute{') >= 0,
+    'save@' + saveAt + ' mute@' + muteAt + ' </header>@' + endAt +
+    ' cssRule=' + (html.indexOf('header .mute{') >= 0)];
+});
+
+uiCheck('ui: the mute button toggles both stores and the label', () => {
+  return bootFixture(null, (doc, Game) => {
+    Game.dom.mute.fire('click');
+    const on = Game.dom.mute.getAttribute('aria-pressed') + '/' + Game.dom.mute.textContent +
+      '/' + AoE2.storageGet(AoE2.MUTE_PATH);
+    Game.dom.mute.fire('click');
+    const off = Game.dom.mute.getAttribute('aria-pressed') + '/' + Game.dom.mute.textContent +
+      '/' + AoE2.storageGet(AoE2.MUTE_PATH);
+    return [on === 'true/Sound off/1' && off === 'false/Sound on/0',
+      'afterFirstClick=' + on + ' afterSecondClick=' + off];
+  });
+});
+
+uiCheck('ui: booting on a muted slot opens muted and an empty slot opens unmuted', () => {
+  const seeded = (extra) => bootFixture(null, (doc, Game) =>
+    Game.dom.mute.getAttribute('aria-pressed') + '/' + Game.dom.mute.textContent + '/' +
+    AoE2.storageGet(AoE2.MUTE_PATH), extra);
+  const muted = seeded({ [AoE2.MUTE_PATH]: '1' });
+  const open = seeded(null);
+  return [muted === 'true/Sound off/1' && open === 'false/Sound on/null',
+    'mutedSlot=' + muted + ' emptySlot=' + open];
+});
+
+soundCheck('sound: the booted muted game plays nothing for any row', () => {
+  return withAudio((Ctor) => {
+    const r = bootFixture(null, (doc, Game) => {
+      const nodesMuted = voicesOf(Ctor).length;
+      const muted = Object.keys(AoE2.SFX).map((n) => AoE2.playSfx(Game, n));
+      Game.dom.mute.fire('click');                              // unmute through the header
+      const unmuted = Object.keys(AoE2.SFX).map((n) => AoE2.playSfx(Game, n));
+      return [JSON.stringify(muted), JSON.stringify(unmuted),
+        nodesMuted + '/' + voicesOf(Ctor).length + '/' + Ctor.instances.length];
+    }, { [AoE2.MUTE_PATH]: '1' });
+    return [r[0] === '[false,false,false,false,false,false]' &&
+      r[1] === '[true,true,true,true,true,true]' && r[2] === '0/6/1',
+      'whileMuted=' + r[0] + ' afterUnmute=' + r[1] +
+      ' nodes(muted/after/contexts)=' + r[2]];
   });
 });
 

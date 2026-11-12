@@ -25,6 +25,8 @@
   #r_food b{color:#e7b16a} #r_wood b{color:#9ec96f} #r_gold b{color:#f0d264} #r_stone b{color:#c6c8cf}
   #r_pop b{color:#9dc4f0} #r_age b{color:var(--gold)}
   header .save{align-self:center;margin-left:auto;padding:4px 14px}
+  header .mute{align-self:center;padding:4px 10px}
+  header .mute[aria-pressed="true"]{color:var(--dim);border-color:var(--line);opacity:.7}
   #stage{position:relative;flex:1 1 auto;min-height:0;background:#0d0f13}
   #view{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
   #minimap{position:absolute;right:8px;bottom:8px;width:168px;height:168px;
@@ -77,6 +79,7 @@
     <div class="res" id="r_pop"><span>pop</span><b>0/0</b></div>
     <div class="res" id="r_age"><span>age</span><b>Dark Age</b></div>
     <button id="save" class="save" type="button">Save</button>
+    <button id="mute" class="mute" type="button">Sound on</button>
   </header>
 
   <div id="stage">
@@ -2074,6 +2077,22 @@ function isMuted(Game) {
   return storageGet(MUTE_PATH) === '1';
 }
 
+/* Two mute writers, one setter: applyMuteButton stamps only the button, so boot
+   can honour a saved preference without writing the key back; setMuted is the
+   click path — stamp the button and persist it (sound state never enters Game,
+   see isMuted). The button is addressed by id/attribute because that is what
+   both the DOM and the harness stub really store. */
+function applyMuteButton(Game, on) {
+  if (!Game.dom || !Game.dom.mute) return;
+  Game.dom.mute.setAttribute('aria-pressed', on ? 'true' : 'false');
+  Game.dom.mute.textContent = on ? 'Sound off' : 'Sound on';
+}
+
+function setMuted(Game, on) {
+  applyMuteButton(Game, on);
+  storageSet(MUTE_PATH, on ? '1' : '0');
+}
+
 function playSfx(Game, name) {
   const spec = SFX[name];
   if (!spec) return false;
@@ -2926,7 +2945,9 @@ function boot(doc) {
     toast: d.getElementById('toast'),
     result: d.getElementById('result'),
     save: d.getElementById('save'),
+    mute: d.getElementById('mute'),
   };
+  applyMuteButton(Game, storageGet(MUTE_PATH) === '1');   // honour the saved preference once
   for (const k of ['food', 'wood', 'gold', 'stone', 'pop', 'age']) {
     const box = d.getElementById('r_' + k);
     if (box && box.querySelector) {
@@ -2950,6 +2971,9 @@ function boot(doc) {
   }
   if (Game.dom.save && Game.dom.save.addEventListener) {
     Game.dom.save.addEventListener('click', () => { saveGame(SAVE_PATH, Game); toast(Game, 'Saved'); });
+  }
+  if (Game.dom.mute && Game.dom.mute.addEventListener) {
+    Game.dom.mute.addEventListener('click', () => setMuted(Game, !isMuted(Game)));
   }
   Game.started = true;
   renderFrame(Game);
@@ -3013,7 +3037,7 @@ const AoE2 = {
   build, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
-  SAVE_PATH, saveGame, loadGame, markDirty, storageGet, storageSet,
+  SAVE_PATH, saveGame, loadGame, markDirty, storageGet, storageSet, applyMuteButton, setMuted,
   infoHtml, hudState, hudHtml, commandsHtml, queueHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };
