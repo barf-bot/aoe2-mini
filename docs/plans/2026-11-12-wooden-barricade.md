@@ -118,7 +118,7 @@ current `tools/headless-check.js` (2292 lines, 198 checks passing). T1 shifts `i
     §5b3's `noSprite` rule covers the new kind without being edited; §7, §7b, §7c, §10, §11
     re-run unmodified.
 
-- [ ] T2: the barricade's build contract — `§7d` (placement refusals, cancel, demolish)
+- [x] T2: the barricade's build contract — `§7d` (placement refusals, cancel, demolish)
   - files: `tools/headless-check.js` only (a new `/* ---- 7d. wooden barricade (this plan, T2) ---- */`
     between §7c, which ends at `tools/headless-check.js:1441`, and §8 at
     `tools/headless-check.js:1443`); `index.html` untouched — every behaviour asserted here

@@ -1453,6 +1453,75 @@ check(cHouse3 && AoE2.demolish(cs, cHouse3) === undefined &&
   'demolish: an unfinished building refuses with \'Not built yet — cancel instead\'',
   String(cs.toastMsg));
 
+/* ---- 7d. wooden barricade (this plan, T2) --------------------------- */
+// The row's whole life -- place, half-build + cancel, rebuild, finish,
+// demolish -- plus its two placement refusals (occupied tile, far click),
+// every number read off AoE2.BLD.barricade and CFG.CANCEL_REFUND rather
+// than literals, so the fixture re-proves the T1 row on every run.
+const bd = AoE2.createState();
+bd.age = 1;
+const bdv = bd.units.find((u) => u.team === 0 && u.kind === 'villager');
+const bdDef = AoE2.BLD.barricade;
+const bdCost = bdDef.cost.wood;
+const bdRefund = Math.floor(bdCost * AoE2.CFG.CANCEL_REFUND);
+const popCapBd = AoE2.popCap(bd, 0);
+bd.res[0].wood = bdCost + bdRefund;                 // fund the walk's two sites minus A's refund
+bd.selection = [bdv.id];                            // pin the builder, as §7 does
+const bdSpot = freeSpotAround(bd.world, bd, tOf(bdv.x), tOf(bdv.y), bdDef.w, bdDef.h, 8);
+const bb = bdSpot && AoE2.build(bd, 'barricade', bdSpot.tx * AoE2.CFG.TILE + 4, bdSpot.ty * AoE2.CFG.TILE + 4);
+check(!!bb && bb.w === bdDef.w && bb.h === bdDef.h &&
+      (bd.blocks.get(bb.id) || []).length === bdDef.w * bdDef.h && AoE2.popCap(bd, 0) === popCapBd,
+  'build: a barricade registers exactly one tile and never changes the population cap',
+  bb ? bb.w + 'x' + bb.h + ' tiles=' + (bd.blocks.get(bb.id) || []).length +
+     ' popCap=' + popCapBd + '->' + AoE2.popCap(bd, 0) : 'placement failed');
+
+// the two placement refusals, one throwaway state funded for exactly two sites:
+// the far click first (while the selected villager is still free), then the
+// Town Center's own tile -- both must fall back to findSite, never refuse.
+const bpl = AoE2.createState();
+bpl.age = 1;
+const bplv = bpl.units.find((u) => u.team === 0 && u.kind === 'villager');
+bpl.selection = [bplv.id];
+bpl.res[0].wood = bdCost * 2;
+const tc2 = bpl.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+const bFar = AoE2.build(bpl, 'barricade', (tOf(bplv.x) + 12) * AoE2.CFG.TILE + 4, tOf(bplv.y) * AoE2.CFG.TILE + 4);
+check(!!bFar && (bFar.tx !== tOf(bplv.x) + 12 || bFar.ty !== tOf(bplv.y)) && bpl.res[0].wood === bdCost,
+  "build: a click 12 tiles off the selected villagers still builds at findSite's pad",
+  bFar ? 'site=' + bFar.tx + ',' + bFar.ty + ' clicked=' + (tOf(bplv.x) + 12) + ',' + tOf(bplv.y) +
+     ' wood=' + bpl.res[0].wood : 'no building');
+const bOcc = AoE2.build(bpl, 'barricade', tc2.tx * AoE2.CFG.TILE + 4, tc2.ty * AoE2.CFG.TILE + 4);
+check(!!bOcc && (bOcc.tx !== tc2.tx || bOcc.ty !== tc2.ty) &&
+      AoE2.siteFree(bpl, tc2.tx, tc2.ty, bdDef.w, bdDef.h) === false && bpl.res[0].wood === 0,
+  'build: a barricade is never placed on an occupied tile - the click falls back to findSite',
+  bOcc ? 'site=' + bOcc.tx + ',' + bOcc.ty + ' tc=' + tc2.tx + ',' + tc2.ty +
+     ' siteFree(tc)=' + AoE2.siteFree(bpl, tc2.tx, tc2.ty, bdDef.w, bdDef.h) +
+     ' wood=' + bpl.res[0].wood : 'no building');
+
+// back to the walk: a stockpile of 2 wood cannot pay the row's 3.
+const bdWoodA = bd.res[0].wood;
+const bdBuilt0 = bd.buildings.length;
+const bdRef = bdSpot && AoE2.build(bd, 'barricade', bdSpot.tx * AoE2.CFG.TILE + 4, bdSpot.ty * AoE2.CFG.TILE + 4);
+check(bdRef === undefined && bd.toastMsg === 'Not enough wood' &&
+      bd.res[0].wood === bdWoodA && bd.buildings.length === bdBuilt0,
+  "build: 2 wood in the stockpile refuses a Barricade with 'Not enough wood'",
+  String(bd.toastMsg) + ' wood=' + bd.res[0].wood + ' (was ' + bdWoodA + ')');
+if (bb) bb.built = 0.5;                             // the half-built site, as §7c's cHouse
+const bdCancel = bb && AoE2.cancelConstruction(bd, bb);
+check(bdCancel === true && !bd.buildings.includes(bb) &&
+      bd.res[0].wood === bdWoodA + bdRefund && bd.blocks.get(bb.id) === undefined &&
+      bdv.order.kind === 'idle',
+  'cancel: a half-built barricade refunds exactly 2 wood and frees its builder',
+  bb ? bdWoodA + ' -> ' + bd.res[0].wood + ' (row refund ' + bdRefund + ') order=' + bdv.order.kind
+     : 'placement failed');
+const bdB = bdSpot && AoE2.build(bd, 'barricade', bdSpot.tx * AoE2.CFG.TILE + 4, bdSpot.ty * AoE2.CFG.TILE + 4);
+if (bdB) bdB.built = 1;
+const resBd0 = JSON.stringify(bd.res[0]);
+const bdDemo = bdB && AoE2.demolish(bd, bdB);
+check(bdDemo === true && !bd.buildings.includes(bdB) &&
+      JSON.stringify(bd.res[0]) === resBd0 && bd.blocks.get(bdB.id) === undefined,
+  'demolish: a finished barricade is removed with zero change to the stockpile',
+  bdB ? JSON.stringify(bd.res[0]) + ' (was ' + resBd0 + ')' : 'rebuild failed');
+
 /* ---- 8. training ---------------------------------------------------- */
 const foodBt = Game.res[0].food;
 const unitsBt = Game.units.length;
