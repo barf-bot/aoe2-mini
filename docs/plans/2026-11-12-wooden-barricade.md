@@ -1,6 +1,6 @@
 # Wooden barricade and gated choke points
 
-Status: planned
+Status: in progress
 
 ## Design
 
@@ -65,7 +65,7 @@ current `tools/headless-check.js` (2292 lines, 198 checks passing). T1 shifts `i
 6 lines; T6 re-points every doc reference, which is the house precedent
 (`docs/plans/2026-11-12-market-watch-tower.md` T6).
 
-- [ ] T1: the `barricade` row — data, the generated `BLD`, the `w` hotkey
+- [x] T1: the `barricade` row — data, the generated `BLD`, the `w` hotkey
   - files: `data/buildings.json` (`buildings.barricade` appended after `watch_tower`, which
     is the file's arrival order and puts the row at `index.html:343`; `source.rule` at
     `data/buildings.json:9` gains the row's provenance sentence), `index.html` §1 `BLD`

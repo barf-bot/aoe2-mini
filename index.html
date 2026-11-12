@@ -340,6 +340,12 @@ const BLD = {
     trains: [],
     attack: 5, meleeArmor: 1, pierceArmor: 7, lineOfSight: 10, range: 8, reload: 2, accuracy: 100, garrisonCapacity: 5, age: 1, noSprite: true,
   },
+  barricade: {
+    label: 'Barricade', hp: 150, w: 1, h: 1,
+    cost: { wood: 3 }, time: 7, pop: 0,
+    trains: [],
+    attack: 0, meleeArmor: 2, pierceArmor: 5, lineOfSight: 2, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 0, age: 1, noSprite: true,
+  },
 };
 
 // GENERATED FROM data/techs.json -- edit the data or run `node tools/check-stats.mjs --write`.
@@ -2386,6 +2392,7 @@ function attachInput(Game, d) {
     if (k === 'k') { Game.placing = Game.placing === 'blacksmith' ? null : 'blacksmith'; return; }
     if (k === 'e') { Game.placing = Game.placing === 'market' ? null : 'market'; return; }
     if (k === 'c') { Game.placing = Game.placing === 'watch_tower' ? null : 'watch_tower'; return; }
+    if (k === 'w') { Game.placing = Game.placing === 'barricade' ? null : 'barricade'; return; }
     if (k === 't') { upgradeAge(Game); return; }
     setKey(k, true);
   });

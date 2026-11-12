@@ -1298,6 +1298,15 @@ check(!wtGate.threw && wtGate.built === undefined &&
   wtGate.threw ? 'threw: ' + wtGate.threw.message
     : 'built=' + String(wtGate.built) + ' toast=' + JSON.stringify(wtGate.toast) +
       ' res=' + wtGate.res + ' (was ' + wtGate.res0 + ')');
+/* T1 barricade (this plan): the WALL (72) row joins BLD behind the same
+   authored age: 1 gate, priced from its own row -- 3 wood / 7 s, noSprite. */
+const barGate = darkAgeRefusal('barricade');
+check(!barGate.threw && barGate.built === undefined &&
+      barGate.toast === 'Barricade requires Feudal Age' && barGate.res === barGate.res0,
+  'build: a Dark Age settlement cannot raise a Barricade (Feudal only)',
+  barGate.threw ? 'threw: ' + barGate.threw.message
+    : 'built=' + String(barGate.built) + ' toast=' + JSON.stringify(barGate.toast) +
+      ' res=' + barGate.res + ' (was ' + barGate.res0 + ')');
 
 /* The Feudal fixture funds exactly the data row's cost and nothing else, so
    `spent` also proves the generated BLD carries that cost (a cheaper BLD row
@@ -1343,6 +1352,10 @@ check(!!wtF.row && !!wtF.def && !!wtF.spot && !wtF.threw && !!wtF.b && exactSpen
       wtF.built >= 1 && wtF.seconds >= wtF.time - DT && wtF.seconds <= wtF.time + 8,
   "build: a Feudal Watch Tower costs the table's 35 wood + 125 stone and completes in 80s",
   siteDetail(wtF));
+const barF = feudalSite('barricade');
+check(!!barF.row && !!barF.def && !!barF.spot && !barF.threw && !!barF.b && exactSpend(barF) &&
+      barF.built >= 1 && barF.seconds >= barF.time - DT && barF.seconds <= barF.time + 8,
+  "build: a Feudal Barricade costs the table's 3 wood and completes in 7s", siteDetail(barF));
 
 /* ---- 7b. camps + drop-off routing (v2 task 3) ----------------------- */
 // Lumber/Mining camps and the Mill join BLD at their AoE2 costs and sizes, and
@@ -2003,7 +2016,7 @@ const kPlacing = Game.placing;
 doc.fire('keydown', { key: 'Escape', target: view });
 check(kPlacing === 'blacksmith' && Game.placing === null,
   'input: k arms Blacksmith placement', 'k=' + String(kPlacing) + ' esc=' + String(Game.placing));
-[['e', 'market', 'Market'], ['c', 'watch_tower', 'Watch Tower']].forEach(([k, kind, label]) => {
+[['e', 'market', 'Market'], ['c', 'watch_tower', 'Watch Tower'], ['w', 'barricade', 'Barricade']].forEach(([k, kind, label]) => {
   doc.fire('keydown', { key: k, target: view });
   const armed = Game.placing;
   doc.fire('keydown', { key: 'Escape', target: view });

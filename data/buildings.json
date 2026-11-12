@@ -6,7 +6,7 @@
       "https://raw.githubusercontent.com/HSZemi/aoe2dat/master/data/units_buildings_techs.json"
     ],
     "fetched": "2026-11-11",
-    "rule": "Table numbers are copied, never retuned. label/w/h/pop/field/trains are authored here (listed in authored[]) because the table carries no footprint or population-provided column. blacksmith is the building that shared id 103 / internal_name BLAC row actually names; lumber_camp keeps the same numbers it used while borrowing the row.",
+    "rule": "Table numbers are copied, never retuned. label/w/h/pop/field/trains are authored here (listed in authored[]) because the table carries no footprint or population-provided column. blacksmith is the building that shared id 103 / internal_name BLAC row actually names; lumber_camp keeps the same numbers it used while borrowing the row. The id 72 / internal_name WALL row is published as barricade: 'Barricade' is the authored label for the wooden wall segment, and its 1x1 footprint and age: 1 gate are authored, not table columns.",
     "authored": [
       "buildings.*.label", "buildings.*.w", "buildings.*.h", "buildings.*.pop",
       "buildings.*.field", "buildings.*.trains",
@@ -240,6 +240,28 @@
       "reload": 2,
       "accuracy": 100,
       "garrisonCapacity": 5,
+      "age": 1,
+      "noSprite": true
+    },
+    "barricade": {
+      "id": 72,
+      "internalName": "WALL",
+      "label": "Barricade",
+      "hp": 150,
+      "cost": { "wood": 3 },
+      "time": 7,
+      "w": 1,
+      "h": 1,
+      "pop": 0,
+      "trains": [],
+      "attack": 0,
+      "meleeArmor": 2,
+      "pierceArmor": 5,
+      "lineOfSight": 2,
+      "range": 0,
+      "reload": 0,
+      "accuracy": 0,
+      "garrisonCapacity": 0,
       "age": 1,
       "noSprite": true
     }
