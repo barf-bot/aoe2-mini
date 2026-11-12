@@ -215,7 +215,7 @@ current `tools/headless-check.js` (2292 lines, 198 checks passing). T1 shifts `i
     the design's "units route through the gap" — and `rs.result === null`, since `setResult`
     reads Town Centers only).
 
-- [ ] T5: the committed frame — a barricade in `preview.png`
+- [x] T5: the committed frame — a barricade in `preview.png`
   - files: `tools/render-preview.js` (the `simulateAndRender` fixture, beside the blacksmith /
     market / watch tower lines at `tools/render-preview.js:124-136`), `preview.png`
   - change: one more `makeBuilding(...)` line —

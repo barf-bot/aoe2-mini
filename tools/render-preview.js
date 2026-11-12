@@ -134,6 +134,12 @@ function simulateAndRender(G, Game, realView) {
     const mk = G.makeBuilding(Game, 'market', 0, site.tx, site.ty); mk.built = 1; }
   if (villagers[0]) { const site = G.findSite(Game.world, Math.floor(villagers[0].x / G.CFG.TILE) - 3, Math.floor(villagers[0].y / G.CFG.TILE) + 1, 1);
     const wt = G.makeBuilding(Game, 'watch_tower', 0, site.tx, site.ty); wt.built = 1; }
+  // T5 of the wooden barricade plan: the row's first committed frame. Two tiles
+  // east and one north of the squad's tile — clear of the blacksmith's pad
+  // (+1, same row) and the Market's (+4,−1). noSprite, so it joins the three
+  // other flat team-coloured footprints drawn through the shared procedural draw.
+  if (villagers[0]) { const site = G.findSite(Game.world, Math.floor(villagers[0].x / G.CFG.TILE) + 2, Math.floor(villagers[0].y / G.CFG.TILE) + 1, 1);
+    const ba = G.makeBuilding(Game, 'barricade', 0, site.tx, site.ty); ba.built = 1; }
   G.renderFrame(Game);
 
   const png = realView.toBuffer('image/png');
