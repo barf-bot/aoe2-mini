@@ -105,7 +105,7 @@ a bug.
   `index.html:196`), the frames ripped from the AoE2 art and recoloured per team, drawn at
   the size the manifest authors (villager 20×20, militia 22×22, archer 20×20) and mirrored
   when the unit walks left; `tools/gen-atlas.js` regenerates the PNG from
-  `data/sprites.json`, and `unitAnim` (`index.html:2281`) picks the cell from the unit's order.
+  `data/sprites.json`, and `unitAnim` (`index.html:2286`) picks the cell from the unit's order.
 
 ## Buildings (`BLD`)
 
@@ -214,8 +214,8 @@ side to lose one decides the game — a raze in combat, a cancelled site and a d
 `Game.result` set to `'victory'` (enemy keep gone) or `'defeat'` (yours gone), `stepSim`
 (`index.html:827`) stops after the clock tick: units, build sites, training queues, arrows
 in flight and the enemy AI freeze while the camera and rendering keep working. The `#result`
-overlay — markup from `resultHtml` (`index.html:2496`), styled in the head — names the result
-and offers a `New game` button wired to `resetGame` (`index.html:2895`), which rebuilds the
+overlay — markup from `resultHtml` (`index.html:2501`), styled in the head — names the result
+and offers a `New game` button wired to `resetGame` (`index.html:2906`), which rebuilds the
 same seeded start and clears `result` back to `null`. No auto-restart, no countdown.
 
 ## Save / load
@@ -237,7 +237,7 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   before a single field is assigned — the world's `w`/`h`/`seed` against `CFG.MAP_W`/`MAP_H` and
   the envelope, the array and object containers, `time` and `nextId` as numbers. Every refusal
   (missing slot, empty slot, unparseable text, an unreadable version, an unwalkable shape) ends
-  the same way: `loadGame(path, Game, raw = storageGet(path))` (`index.html:2075`) calls
+  the same way: `loadGame(path, Game, raw = storageGet(path))` (`index.html:2080`) calls
   `resetGame` and answers `false` — it never throws.
 - **In and out of `state`** — `Game.techs` (a `Set`) leaves as an array and comes back a `Set`;
   `Game.blocks` (a `Map` of building id → tiles) leaves as an object and comes back a `Map` keyed
@@ -258,21 +258,21 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   every §4 mutator and by `stepSim`'s three completion events (a unit trains, a tech finishes, a
   unit dies), pulls the schedule earlier and never later, so a burst of commands inside the
   window costs ONE write. The write itself sits in `stepGame` after `stepSim(Game, dt)`
-  (`index.html:3074-3076`) so the saved frame is the one just run, and `stepSim` never writes —
+  (`index.html:3085-3087`) so the saved frame is the one just run, and `stepSim` never writes —
   driving the simulation from a test touches no storage. `resetGame` sets `Game.autosaveAt =
-  Game.time` (`index.html:2902`): a new settlement is written by the very next frame, which is
-  what makes `N` (`index.html:2793`) overwrite the slot instead of waiting out the debounce.
+  Game.time` (`index.html:2913`): a new settlement is written by the very next frame, which is
+  what makes `N` (`index.html:2804`) overwrite the slot instead of waiting out the debounce.
 - **The page surface** — the header's `Save` button (`index.html:93`) writes the slot through
-  `saveGame` (`index.html:3026`) and toasts `Saved`; `boot` (`index.html:2979`) calls
-  `storageGet` / `loadGame` (`index.html:2984-2985`) right after `createState` (`index.html:2879`),
+  `saveGame` (`index.html:3037`) and toasts `Saved`; `boot` (`index.html:2990`) calls
+  `storageGet` / `loadGame` (`index.html:2995-2996`) right after `createState` (`index.html:2890`),
   so reopening the page lands on the saved game; the three new-game paths — `N`
-  (`index.html:2793`), the footer's `New map` (`index.html:2817`) and the victory overlay's
-  `New game` (`index.html:3022`) — clear the slot before `resetGame`, which schedules the rewrite.
+  (`index.html:2804`), the footer's `New map` (`index.html:2828`) and the victory overlay's
+  `New game` (`index.html:3033`) — clear the slot before `resetGame`, which schedules the rewrite.
 
 ## Sound (SFX)
 
 Six sounds, one table — `SFX` (`index.html:433-440`) — and one door that plays them.
-`playSfx(Game, name)` (`index.html:2117`) synthesises the row through the Web Audio API (one
+`playSfx(Game, name)` (`index.html:2122`) synthesises the row through the Web Audio API (one
 oscillator ramped through the row's `freq` list into a gain envelope) rather than shipping an
 audio file, so the repo stays one `index.html` with no build step. The `fire` column names the
 function that plays each row and the harness (`tools/headless-check.js` §14) binds to it —
@@ -288,7 +288,7 @@ the table is the contract, the audio path and the checks are its two readers, th
 | `victory` | sawtooth | 523 → 659 → 784 | 0.90 | 0.30 | `setResult` (`index.html:780`) |
 | `defeat` | sawtooth | 392 → 311 → 262 | 1.10 | 0.28 | `setResult` (`index.html:780`) |
 
-- **One voice per name per frame** — `Game.sound` (`createState`, `index.html:2888`) holds the
+- **One voice per name per frame** — `Game.sound` (`createState`, `index.html:2899`) holds the
   `AudioContext` plus the last frame that made a sound and the names it fired, so a twenty-unit
   brawl landing ten hits in one frame makes one `hit`, and the next frame's shots make their
   own; `setResult`'s single `playSfx(Game, Game.result)` covers both result rows.
@@ -297,21 +297,21 @@ the table is the contract, the audio path and the checks are its two readers, th
   game each answer `false` before a node is built; the caller never has to care (section 4
   stays DOM-free: the `typeof AudioContext` read is guarded inside the function).
 - **Mute is presentation, not state** — the header `Sound on/off` button (`index.html:94`)
-  toggles through `setMuted` (`index.html:2112`), which stamps the button
-  (`applyMuteButton`, `index.html:2106`) and writes `MUTE_PATH` = `aoe2mini:muted`
+  toggles through `setMuted` (`index.html:2117`), which stamps the button
+  (`applyMuteButton`, `index.html:2111`) and writes `MUTE_PATH` = `aoe2mini:muted`
   (`index.html:397`) through the same `storageSet` the save slot uses; `isMuted`
-  (`index.html:2096`) reads the button when there is one and the key when there isn't, so a
+  (`index.html:2101`) reads the button when there is one and the key when there isn't, so a
   muted game stays muted after a reload and a fresh tab starts unmuted. `boot` calls
-  `applyMuteButton` once (`index.html:3003`) to honour the saved preference without writing
+  `applyMuteButton` once (`index.html:3014`) to honour the saved preference without writing
   the key back, and the sound handle never enters `encodeState`.
 
 ## Interface
 
-`hudState` (`index.html:2475`) answers the one selection word the footer is in — `group`
+`hudState` (`index.html:2480`) answers the one selection word the footer is in — `group`
 (several units), `units` (exactly one), `building` (a building and nothing else), `none` —
-and `hudHtml` (`index.html:2487`) is the single owner of the footer's markup: the same
+and `hudHtml` (`index.html:2492`) is the single owner of the footer's markup: the same
 three panels (`info` | `commands` | `queue`) in the same order for every state, stamped
-`renderHud` (`index.html:2446`) writes it in one
+`renderHud` (`index.html:2451`) writes it in one
 `innerHTML` write, so the frame the CSS pins (`footer{flex:0 0 74px;height:74px}`, every
 panel a fixed-height `overflow:hidden` box) never changes size when the selection does —
 the info panel is a fixed title/body/bar grid, the command panel a row-based button grid.
@@ -330,7 +330,7 @@ rules above the block are what the §11c checks compare the responsive ones agai
 
 ## Camera & controls
 
-Left click / tap select (`pointerUp`, `index.html:2677` — one pointer per drag, so a second
+Left click / tap select (`pointerUp`, `index.html:2682` — one pointer per drag, so a second
 finger cannot move the anchored box) · drag to box-select (mixed selections collapse to
 villagers) · right click, or a hold of `LONG_PRESS_MS` 600 ms that stays within 8 px of its
 press (`index.html:401`), issues move / attack / gather (context decided by what is under the
@@ -340,6 +340,6 @@ placement hotkey) · 14 px edge-scroll band, active only while the pointer is ov
 canvas (not over header/footer chrome) · `Ctrl+1..9` store group, `1..9` recall · `H`
 house, `F` farm, `B` barracks, `L` lumber camp, `G` mining camp, `M` mill, `R` archery
 range, `K` blacksmith, `E` market, `C` watch tower, `W` barricade, `T` upgrade age,
-`Esc` cancels placement then clears selection · `N` new game (`index.html:2793`) · minimap
+`Esc` cancels placement then clears selection · `N` new game (`index.html:2804`) · minimap
 click/drag moves the camera ·
 "New map" reseeds and resets.

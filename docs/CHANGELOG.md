@@ -252,8 +252,8 @@ and `assets/sprites.png` / `preview.png` stayed byte-identical (no render path c
 ### Touch controls and responsive layout (T1–T4) — plan `docs/plans/2026-11-12-touch-controls-layout.md`
 
 The phone gets an input path and a layout (e6a1f27 → 1968834); the harness went 266 → 275
-checks across the plan and `assets/sprites.png` / `preview.png` stayed byte-identical (no
-render path changed).
+checks across the plan and 278 with its review round, and `assets/sprites.png` /
+`preview.png` stayed byte-identical (no render path changed).
 
 - **T1 — one input path (e6a1f27):** the `#view` canvas gains `touch-action:none` and the
   DOM block's `mousemove`/`mousedown`/`mouseup` listeners become
@@ -286,6 +286,17 @@ render path changed).
   and every restamped span), `docs/ROADMAP.md` (P2.11 shipped) and `AGENTS.md` (the
   file-length claim) re-pointed at the final file — every `index.html:NNN` reference and
   section range re-measured through `tools/audit-line-refs.js`.
+
+- **Review fixes (b0f290a → b142da0):** `applyState` now drops a saved drag that names no
+  owning pointer — every save from before `pointerDown`/`pointerUp` stored
+  `{ x0, y0, x1, y1 }`, and the listeners only ever finish the drag whose `id` matches the
+  pointer they came from, so such a drag could never be cleared and loading one froze
+  selection, the cursor and edge-scroll for the session (276); a finger release clears the
+  `Game.mouse` hover the edge-scroll band reads, a mouse release keeps its cursor (277);
+  §10c pins `LONG_PRESS_SLOP` at its real boundary — 7 px of drift still commands, 8 px is
+  already a drag — and §10 asserts the second finger's own `pointerdown`, the owner-guard
+  branch that used to go unexercised (278); `AGENTS.md`'s §6 label in the
+  `Map of this file` banner says `pointer (mouse + touch), keyboard`.
 
 ## [Unreleased] — 2026-11-11
 

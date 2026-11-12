@@ -11,11 +11,11 @@ names the sources) is what section 1's generated tables and `assets/sprites.png`
 | 1 | config | 127-441 | `CFG`, `KINDS`, `SPRITE_SHEET`/`SPRITES`/`WORK_ANIM`/`spriteFor`, `BLD_SPRITES`/`bldSpriteFor`, `BLD`, `TECHS`, `AGES`, `MUTE_PATH`, `LONG_PRESS_MS`/`LONG_PRESS_SLOP`, `T`, `PAL`, `TEAM`, `RES_OF_TILE`, `CARRY_COLOR`, `SFX` — every tunable number; `CFG`/`KINDS`/`BLD`/`TECHS` are generated from `data/` |
 | 2 | world / map | 442-640 | seeded generation (`mulberry32`, `hash2`, `makeWorld`), site search, `berryCluster`, resource tiles and sources |
 | 3 | entities | 641-823 | `setAtlas`, `sourceFromTile`/`sourceFromFarm`, `workSpot`, `makeUnit`, `makeBuilding`, `rebuildBlocks`, `removeBuilding`/`setResult`, `workPos`, `standingSpots` |
-| 4 | simulation | 824-2086 | `stepSim`/`updateUnit` (the order state machine), `findPath`/`stepToward`/`moveUnit`/`standTarget`/`formationSlots` (the pathfinding block), `unitAttack`/`unitArmor`/`hitUnit`/`hitBuilding`/`autoAcquire`, `spawnArrow`/`updateProjectiles`/`stepBuildingAttacks`, economy, orders, `build`, `cancelConstruction`, `demolish`, `train`, `researchTech`, `trade`, `upgradeAge`, `saveGame`/`loadGame`/`markDirty`/`encodeState` (the save payload); sub-blocks `combat math` (869), `pathfinding` (1124), `economy helpers` (1745), `enemy AI` (1778), `toast` (1828), `save / load` (1840) — **pure logic, no DOM** |
-| 5 | render | 2087-2637 | `beginCanvas`, world/building/unit drawing (`drawBuildings`, `unitAnim`, `drawUnits`, `drawProjectiles`), ghost, drag box, minimap, the uniform HUD frame (`renderHud`/`hudState`/`hudHtml` with `infoHtml`/`commandsHtml`/`queueHtml`), the result-overlay HTML and the audio door (`playSfx`/`isMuted`/`setMuted`) |
-| 6 | input | 2638-2842 | picking (`pickUnit`/`pickBuilding`/`unitsInBox`), the pure `pointerDown`/`pointerUp` both pointer listeners delegate to, `attachInput`'s pointer/keyboard/mute/command-bar/minimap listeners, `buttonAt` |
-| 7 | boot | 2843-3079 | canvas sizing, `createState`, `resetGame`, `loadAtlas`, `boot` (mute-button sync first), the rAF loop |
-| — | public surface | 3080-3102 | the `AoE2` export banner + object (this plan added `SFX`, `MUTE_PATH`, `playSfx`, `isMuted`, `applyMuteButton`, `setMuted`; the save/load plan added `SAVE_PATH`, `saveGame`, `loadGame`, `markDirty`, `storageGet`, `storageSet`), `module.exports` / `window.Game` wiring |
+| 4 | simulation | 824-2091 | `stepSim`/`updateUnit` (the order state machine), `findPath`/`stepToward`/`moveUnit`/`standTarget`/`formationSlots` (the pathfinding block), `unitAttack`/`unitArmor`/`hitUnit`/`hitBuilding`/`autoAcquire`, `spawnArrow`/`updateProjectiles`/`stepBuildingAttacks`, economy, orders, `build`, `cancelConstruction`, `demolish`, `train`, `researchTech`, `trade`, `upgradeAge`, `saveGame`/`loadGame`/`markDirty`/`encodeState` (the save payload); sub-blocks `combat math` (869), `pathfinding` (1124), `economy helpers` (1745), `enemy AI` (1778), `toast` (1828), `save / load` (1840) — **pure logic, no DOM** |
+| 5 | render | 2092-2642 | `beginCanvas`, world/building/unit drawing (`drawBuildings`, `unitAnim`, `drawUnits`, `drawProjectiles`), ghost, drag box, minimap, the uniform HUD frame (`renderHud`/`hudState`/`hudHtml` with `infoHtml`/`commandsHtml`/`queueHtml`), the result-overlay HTML and the audio door (`playSfx`/`isMuted`/`setMuted`) |
+| 6 | input | 2643-2853 | picking (`pickUnit`/`pickBuilding`/`unitsInBox`), the pure `pointerDown`/`pointerUp` both pointer listeners delegate to, `attachInput`'s pointer/keyboard/mute/command-bar/minimap listeners, `buttonAt` |
+| 7 | boot | 2854-3090 | canvas sizing, `createState`, `resetGame`, `loadAtlas`, `boot` (mute-button sync first), the rAF loop |
+| — | public surface | 3091-3113 | the `AoE2` export banner + object (this plan added `SFX`, `MUTE_PATH`, `playSfx`, `isMuted`, `applyMuteButton`, `setMuted`; the save/load plan added `SAVE_PATH`, `saveGame`, `loadGame`, `markDirty`, `storageGet`, `storageSet`), `module.exports` / `window.Game` wiring |
 
 ## The `Game` object
 
@@ -38,7 +38,7 @@ Persistence: the plain half of that object is the save payload — `encodeState`
 (`index.html:1915`) picks exactly the fields `saveGame` writes, the per-runtime caches (`dom`,
 `view`, `mm`, `mmBase`, `toastMsg`, `toastAt`, `pingAt`, `frame`, `pathQueries`, `sprites`, `rnd`,
 `mapEpoch`, `autosaveAt`, `sound`) stay out of it and are rebuilt on load — so one object shape can be
-written to `localStorage` and read back into a fresh `createState` (`index.html:2879`). The
+written to `localStorage` and read back into a fresh `createState` (`index.html:2890`). The
 ruleset itself is `docs/GAME_RULES.md` §Save / load; the parts are below in
 `### Save / load` (`saveGame`, `index.html:1961`).
 
@@ -69,7 +69,7 @@ the right stockpile — that field being unset was a real bug (deposits silently
 
 Every unit also carries its rendering state: `u.face` (`+1`/`-1`) and `u.anim`, the
 activity clock behind every animation (walk, work, swing). `unitAnim(u)`
-(`index.html:2281`, section 5) maps it to the sprite cell to show; `moveUnit`
+(`index.html:2286`, section 5) maps it to the sprite cell to show; `moveUnit`
 (`index.html:1266`) is the only writer of `u.face`, so units never flip for no reason.
 
 ### Pathfinding (`findPath`, `index.html:1176`)
@@ -120,9 +120,9 @@ Section 4 owns the whole contract. `encodeState` (`index.html:1915`) is the sing
 schema — the field list the harness pins as `SAVE_FIELDS` (`tools/headless-check.js:2602`) —
 `saveGame(path, Game, at = now())` (`index.html:1961`) serialises `{ version, seed, writtenAt,
 state }` and hands the string to `storageSet` (`index.html:1856`), and
-`loadGame(path, Game, raw = storageGet(path))` (`index.html:2075`) reads the slot back. The
+`loadGame(path, Game, raw = storageGet(path))` (`index.html:2080`) reads the slot back. The
 shipped signature is that three-argument one rather than the design's `loadGame(path, raw)`: the
-target `Game` sits in the middle so a test — or `boot` (`index.html:2979`) opening the page — can
+target `Game` sits in the middle so a test — or `boot` (`index.html:2990`) opening the page — can
 load a slot into a game that already exists. `migrate` (`index.html:1975`) and `validState`
 (`index.html:1983`) gate the payload (the version, then the shape) and every refusal ends in
 `resetGame(Game); return false`; `decodeState` (`index.html:2031`) then restores in dependency
@@ -131,7 +131,7 @@ order — world → buildings → `blocks` + `rebuildBlocks` (`index.html:741`) 
 `index.html:668`) → projectiles (`t` relinked by `decodeProjectile`, `index.html:2018`) → the
 id-only fields → `techs` (a `Set`) and `rnd` (rebuilt from the envelope's seed). The schedule is
 `markDirty(Game)` (`index.html:1951`) — pull `Game.autosaveAt` earlier, never later — and
-`stepGame` after `stepSim` (`index.html:3074-3076`) is the only writer, so the write carries the
+`stepGame` after `stepSim` (`index.html:3085-3087`) is the only writer, so the write carries the
 frame it just ran and `stepSim` itself never touches storage. The ruleset is in
 `docs/GAME_RULES.md` §Save / load; the `save / load` banner sits at `index.html:1840`.
 
@@ -140,7 +140,7 @@ frame it just ran and `stepSim` itself never touches storage. The ruleset is in
 Terrain tiles come from `PAL` (three variants per terrain, chosen by a per-tile hash),
 trees/ore/berries are drawn as vector paths (`drawTree`, `drawOre`, `drawBerry`), and
 built buildings blit their team cell from the atlas (`drawBuildings`,
-`index.html:2205`); the `noSprite` kinds (Blacksmith, Market, Watch Tower and Barricade)
+`index.html:2210`); the `noSprite` kinds (Blacksmith, Market, Watch Tower and Barricade)
 have no atlas cell and draw the flat team-coloured footprint instead, so a new building
 never grows `assets/sprites.png`; unbuilt ones keep the ghost footprint with a progress
 overlay while `built < 1`, and a dry farm (empty `field`) keeps its procedural stubble.
@@ -149,10 +149,10 @@ Units come from `assets/sprites.png`: `SPRITES` (`index.html:200`) maps every ki
 its animation cells and `spriteFor(kind, team, anim)` (`index.html:253`) resolves one;
 `BLD_SPRITES` (`index.html:267`) holds the built-building cells of the same sheet and
 `bldSpriteFor(kind, team)` (`index.html:287`) resolves those, each cell drawn at the
-building's exact footprint. `unitAnim(u)` (`index.html:2281`) decides which animation a
+building's exact footprint. `unitAnim(u)` (`index.html:2286`) decides which animation a
 unit plays from its order — villagers farm/chop/mine (a/b frames per harvested resource)
 plus idle/walk, militia and archer idle/walk plus attack_a/attack_b — and `drawUnits`
-(`index.html:2297`) blits the cell at integer pixels with `drawImage` and mirrors it with
+(`index.html:2302`) blits the cell at integer pixels with `drawImage` and mirrors it with
 `scale(-1, 1)` when `u.face` is `-1`.
 The 1px walk bob applies only to walk cells; work/swing animations animate through their
 own a/b frames. The old team-coloured disc/square drawing stays as the
@@ -160,13 +160,13 @@ fallback whenever no atlas is loaded. On top of the sprite: selection ring, heal
 the carry dot tinted by `CARRY_COLOR`.
 
 Canvases go through `beginCanvas(canvas, w, h)`; sizes come from `sizeW/sizeH(dom)` with
-node-safe fallbacks (`view_W/view_H`, `index.html:2868-2869`). The footer is one fixed-height
-element owned by `hudHtml` (`index.html:2487`): `renderHud` (`index.html:2446`) stamps it
+node-safe fallbacks (`view_W/view_H`, `index.html:2879-2880`). The footer is one fixed-height
+element owned by `hudHtml` (`index.html:2492`): `renderHud` (`index.html:2451`) stamps it
 with the `data-state` answered by `hudState` (`group` / `units` / `building` / `none`) and
 writes the same three panels — `infoHtml`, `commandsHtml`, `queueHtml` — in the same order
 for every selection, so the frame never resizes the map and the CSS can pin it to
 `height:74px` with every panel a fixed `overflow:hidden` box (the command panel is a
-row-based button grid). The game-over overlay is `resultHtml` (`index.html:2496`) written
+row-based button grid). The game-over overlay is `resultHtml` (`index.html:2501`) written
 into `#result` and hidden again by its `show` class the moment `Game.result` goes back to
 null.
 
@@ -181,9 +181,9 @@ collapse to villagers (AoE2 behaviour). Commands: left select, right click issue
 WASD/arrows pan, `Ctrl+1..9` set group, `1..9` recall, and `H`/`F`/`B`/`L`/`G`/`M`/`R`/`K`/`E`/`C`/`W`
 arm every placeable building, `T` upgrade age, `Esc` clears placement then selection. The command bar is
 rebuilt every frame, so its clicks are **delegated to its parent** — `Game.dom.commands ||
-Game.dom.hud`, the footer in a browser — and `buttonAt` (`index.html:2702`) is the single
+Game.dom.hud`, the footer in a browser — and `buttonAt` (`index.html:2707`) is the single
 button lookup that delegate and the `#result` overlay's listener (wired in `boot`,
-`index.html:3020`).
+`index.html:3031`).
 
 ## Test harness design
 
