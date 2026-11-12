@@ -21,8 +21,9 @@ across the plan.
   never retuned) and `check-stats.mjs --write` renders the `TECHS` table beside the
   other section-1 blocks; the check now proves 265 fields.
 - **T3 — one combat math (9708a20):** `unitAttack`/`unitArmor` replace the duplicated
-  age-scaling expressions in §4 — attack is the row's number × the age multiplier ×
-  every researched tech of the attacker's damage class, armour is the row's plus the
+  age-scaling expressions in §4 — attack is the row's number × the age multiplier,
+  plus the flat attack of every researched tech of the attacker's damage class (a
+  tech's +1 stays +1 in every age); armour is the row's plus the
   techs' flat armour, and `hitUnit` lands `max(1, attack − armour)` — while
   `Game.techs` (the researched-id set) joins `createState`/`resetGame`
   (166 checks, the new §9d pins the stack on the melee and pierce paths).
