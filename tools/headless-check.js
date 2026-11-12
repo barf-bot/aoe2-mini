@@ -461,7 +461,7 @@ check(AoE2.unitAnim(am) === 'walk', 'anim: ordered militia walk', AoE2.unitAnim(
 // collides with a unit cell or another building cell (shared rect set from 5b).
 // Rule amended by the blacksmith plan (T1): every BLD kind has a cell per team,
 // EXCEPT a kind marked `noSprite` -- those must answer bldSpriteFor(...) ===
-// null, which is what routes the renderer to its procedural look (index.html:1853).
+// null, which is what routes the renderer to its procedural look (index.html:1885).
 let bldSpriteErr = '';
 const bldRects = new Set(rects);
 const cellKinds = Object.keys(AoE2.BLD).filter((k) => !AoE2.BLD[k].noSprite);
