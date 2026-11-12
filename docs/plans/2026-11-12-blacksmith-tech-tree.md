@@ -131,7 +131,7 @@ proving check and the `Map of this file` banner stays truthful.
     §9c's two exact-damage checks pass **unmodified** — at Dark Age with no techs every number
     is the number it was before, which is the proof the collapse changed nothing.
   - test: 6 new §9d checks, written first — `math: a Dark Age militia swings the table's
-    number`, `math: the age multiplier and a Forge bonus stack in one number` (`ageBonus = 1`
+    number`, `math: the age multiplier and a Forge bonus stack in one number` (`ageBonus = 2`
     + `forge` → `4 * 1.5 + 1`), `math: Forge raises the melee line and not the archer line`,
     `math: Fletching raises the archer line and not the melee line`, `math: Scale Mail raises
     the melee line's armour and Bracer the archer line's`, `math: armour softens a hit but
