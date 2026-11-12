@@ -149,8 +149,9 @@ the first fix adds.
 
 ### Save/load via localStorage (T1–T5) — plan `docs/plans/2026-11-12-save-load.md`
 
-The game remembers the session (a2c29c1 → b411139); the harness went 217 → 248 checks across
-the plan, `check-stats.mjs` 322 → 325 fields, and `assets/sprites.png` / `preview.png` stayed
+The game remembers the session (a2c29c1 → b411139, review fixes 19ea58e and 5cdf080); the
+harness went 217 → 249 checks across the plan — 248 from T1–T5 plus the load check 19ea58e
+adds — `check-stats.mjs` 322 → 325 fields, and `assets/sprites.png` / `preview.png` stayed
 byte-identical (no render path changed).
 
 - **T1 — the save side (a2c29c1):** `CFG.VERSION: 1` joins `data/units.json` (with its
@@ -165,7 +166,7 @@ byte-identical (no render path changed).
   and `Game.blocks` leave as an array and an object, a projectile's target leaves as `tk` +
   `tid`, and an order's `src` leaves as the tile or farm it names (217 → 225 checks, 323 stat
   fields).
-- **T2 — the load side (83116d3):** `loadGame(path, Game, raw = storageGet(path))` answers a
+- **T2 — the load side (83116d3, 19ea58e):** `loadGame(path, Game, raw = storageGet(path))` answers a
   boolean and never throws — the whole refusal ladder (no slot, empty slot, unparseable text, a
   `version` `migrate` cannot read, a shape `validState` cannot walk) ends in
   `resetGame(Game); return false`. `decodeState` restores in dependency order, bumps `mapEpoch`
@@ -174,6 +175,11 @@ byte-identical (no render path changed).
   envelope's seed. The shipped signature is this three-argument one rather than the design's
   `loadGame(path, raw)`: the target `Game` is the middle argument so a test — or `boot` — can load
   a slot into a game that already exists (225 → 237 checks).
+  The farm half of that relink landed in `19ea58e`: `decodeOrder` called the `byId` Map as a
+  function (`buildingById is not a function`), so every save carrying a farm `harvest` /
+  `go_deposit` order threw inside the decode and was refused as corrupt — it now reads
+  `byId.get(e.src.b)`, proven by the `load: a farm source is relinked, not left as a stored
+  id` check that commit adds.
 - **T3 — the autosave schedule (6ce19b9):** `CFG.AUTOSAVE_DEBOUNCE: 2` and `CFG.AUTOSAVE_EVERY:
   30` join `data/units.json`, `Game.autosaveAt` joins `createState`/`resetGame`, and
   `markDirty(Game)` — called by every §4 mutator and by `stepSim`'s three completion events —
@@ -194,8 +200,9 @@ byte-identical (no render path changed).
   citations including `save / load`, `autosaveAt` plus the persistence note in the `Game` block,
   the `### Save / load` subsection and the harness count), `docs/ROADMAP.md` (P2.9 shipped, its
   leftovers folded into P2.12) and `AGENTS.md` (the file-length claim, the export line, the
-  `Map of this file` span) re-pointed at the final file — every `index.html:NNN` reference and
-  section range re-measured through `tools/audit-line-refs.js`.
+  `Map of this file` span — the `index.html` banner line for §4 and `stepGame`'s docstring
+  carry that wording since 5cdf080) re-pointed at the final file — every `index.html:NNN`
+  reference and section range re-measured through `tools/audit-line-refs.js`.
 
 ## [Unreleased] — 2026-11-11
 

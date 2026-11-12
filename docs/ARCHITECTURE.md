@@ -190,7 +190,7 @@ button lookup that delegate and the `#result` overlay's listener (wired in `boot
 - `tools/headless-check.js` — reads `index.html`, extracts the `<script>` body into a temp
   `.js`, installs a stub `document`/`window` (elements with `textContent`/`innerHTML`
   accessors, cached per id, `fire()` to dispatch events, a Proxy 2D context that swallows
-  every draw call), requires it, then asserts 248 invariants. It never opens a browser. Node
+  every draw call), requires it, then asserts 249 invariants. It never opens a browser. Node
   has no `Image`, so the sandbox defines one (section 2b) whose `src` setter decodes the
   real sheet — caveat measured on `@napi-rs/canvas` 1.1.0: an `Image` built that way
   reports the right size but paints nothing, so this stub proves the loading *wiring*
