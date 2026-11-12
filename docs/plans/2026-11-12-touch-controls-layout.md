@@ -1,6 +1,6 @@
 # Touch controls + responsive layout (round: P2 #11)
 
-Status: in progress
+Status: done
 
 ## Design
 
@@ -212,7 +212,7 @@ to re-decide):
     `header{…}` padding is `2px 6px`, not the base rule's `6px 10px`, and `gap` shrinks from `14px`
     to `6px`).
 
-- [ ] T4: docs sync and the full verification pass
+- [x] T4: docs sync and the full verification pass
   - files: `docs/GAME_RULES.md` (the `## Camera & controls` section at `:324` gains the touch
     sentence — tap / drag / press-and-hold 600 ms — and the `## Interface` section at `:308` gains
     the 720 px stacked-footer paragraph; every `index.html:NNNN` ref in both sections that T1-T3's

@@ -249,6 +249,44 @@ and `assets/sprites.png` / `preview.png` stayed byte-identical (no render path c
   `index.html:NNN` reference and section range re-measured through
   `tools/audit-line-refs.js`.
 
+### Touch controls and responsive layout (T1–T4) — plan `docs/plans/2026-11-12-touch-controls-layout.md`
+
+The phone gets an input path and a layout (e6a1f27 → 1968834); the harness went 266 → 275
+checks across the plan and `assets/sprites.png` / `preview.png` stayed byte-identical (no
+render path changed).
+
+- **T1 — one input path (e6a1f27):** the `#view` canvas gains `touch-action:none` and the
+  DOM block's `mousemove`/`mousedown`/`mouseup` listeners become
+  `pointermove`/`pointerdown`/`pointerup` plus `pointercancel` — PointerEvent covers mouse
+  *and* touch, so desktop behaviour is unchanged and §10/§10b's fires were retyped rather
+  than duplicated (a `mousedown` fired at a block with no `mousedown` listener would pass
+  vacuously). The click decisions move into two pure §6 helpers: `pointerDown` arms a
+  placement or anchors `Game.drag = { x0, y0, x1, y1, t0, id }`, `pointerUp` keeps the old
+  body — tap selects the unit or building under the point, a moved press selects the box,
+  villagers win a mixed drag. One pointer per drag: a second finger cannot move the anchored
+  box or end the drag it does not own, and `pointercancel` drops the drag with no selection
+  and no order (266 → 269 checks).
+- **T2 — press-and-hold commands (238ac88):** `LONG_PRESS_MS = 600` and `LONG_PRESS_SLOP = 8`
+  join the hand-written section-1 block beside `MUTE_PATH` — not `CFG`, which
+  `tools/check-stats.mjs` generates from `data/` — and `pointerUp` grows the hold branch
+  ahead of the select branches: a press that long that stayed within 8 px of its start calls
+  the same `issueOrder` the `contextmenu` listener calls and leaves the selection alone,
+  exactly as a right-click does. The new §10c section proves all three releases — hold on
+  ground, short tap, move-then-release (269 → 272 checks).
+- **T3 — the 720 px layout (1968834):** one `@media (max-width:720px)` block written last so
+  it wins the cascade — header padding `6px 10px` → `2px 6px` (gap `14px` → `6px`) and the
+  footer keeps the HUD-frame round's exact `flex:0 0 74px;height:74px` while its
+  `flex-direction` turns to `column`, stacking info (title only), the command grid and the
+  queue line inside the same 74 px; `#stage` keeps the freed header rows for the map. No
+  selector is renamed and nothing is hidden on desktop. New §11c asserts the block's position
+  *and* the shared `74px` in both readers (272 → 275 checks).
+- **T4 — docs sync:** this entry plus `docs/GAME_RULES.md` (the touch sentence in
+  `## Camera & controls`, the 720 px paragraph in `## Interface`), `docs/ARCHITECTURE.md` (the
+  §1 row gaining `LONG_PRESS_MS`/`LONG_PRESS_SLOP`, the §6 row naming the two pointer helpers
+  and every restamped span), `docs/ROADMAP.md` (P2.11 shipped) and `AGENTS.md` (the
+  file-length claim) re-pointed at the final file — every `index.html:NNN` reference and
+  section range re-measured through `tools/audit-line-refs.js`.
+
 ## [Unreleased] — 2026-11-11
 
 ### Board rules pass (T1–T5) — plan `docs/plans/2026-11-04-board-rules.md`

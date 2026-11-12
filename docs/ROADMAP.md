@@ -68,12 +68,20 @@ prototypes stall.
    reopens on the saved game), and the debounced autosave writes without a `Save` press.
    Left over: multiple save slots, cloud sync and share codes — folded into P2 item 12.
 10. **Sound.** Shipped 2026-11-12 by the sound plan (`docs/plans/2026-11-12-sound.md`):
-    `SFX` (`index.html:417-424`) authors six rows — hit, arrow, build, age, victory, defeat —
-    and `playSfx(Game, name)` (`index.html:2101`) renders each one as an oscillator plus gain
+    `SFX` (`index.html:433-440`) authors six rows — hit, arrow, build, age, victory, defeat —
+    and `playSfx(Game, name)` (`index.html:2117`) renders each one as an oscillator plus gain
     envelope through the Web Audio API, so no audio file enters the repo; the header
     `Sound on/off` button mutes it and the preference survives a reload through
     `aoe2mini:muted`. Nothing cut — the plan's six rows are the shipped set.
-11. **Touch controls** for phones (tap-select, long-press command), plus a responsive layout.
+11. **Touch controls** for phones (tap-select, long-press command), plus a responsive
+    layout. Shipped 2026-11-12 by the touch-controls plan
+    (`docs/plans/2026-11-12-touch-controls-layout.md`): `pointerDown`/`pointerUp`
+    (`index.html:2666`, `index.html:2677`) answer mouse and touch from one path —
+    `touch-action:none` on the canvas, one pointer per drag, and a 600 ms press-and-hold
+    that issues the order a right-click would — while a `@media (max-width:720px)` block
+    (`index.html:73`) stacks the footer panels and trims the header on narrow widths. Cut
+    from this round: pinch-zoom, two-finger pan, virtual joystick, on-screen keyboard,
+    gamepad, tablet split-view and minimap drag on touch.
 12. **Replay / seeded challenge** — the `mulberry32` seed is already a shareable handle on a
     map, and the save payload is the raw material for a replay; carries save/load's leftovers
     too: multiple save slots, cloud sync and share codes.
