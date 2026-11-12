@@ -91,7 +91,7 @@
 'use strict';
 /* =========================================================================
    AoE2 Mini -- a single-file browser RTS prototype (Dark Age slice)
-   Controls: left click / drag to select, right click to command, WASD to pan.
+   Controls: left click / drag to select, right click to command, WASD / arrows to pan.
 
    Map of this file:
      1. config      tuning constants (stats, costs, sizes)
@@ -2173,7 +2173,7 @@ function infoHtml(Game) {
       (ups.length ? '<br>Upgrades: ' + ups.join(', ') : ''), pctOf(b.hp, b.maxHp));
   }
   return shell('', 'Left click or drag to select<br>Right click to move / attack / gather<br>' +
-    'WASD or screen edges pan<br>Ctrl+1..9 group, 1..9 recall', 0);
+    'WASD / arrows or screen edges pan<br>Ctrl+1..9 group, 1..9 recall', 0);
 }
 
 function commandsHtml(Game) {

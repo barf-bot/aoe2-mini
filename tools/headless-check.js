@@ -2284,6 +2284,19 @@ check(kPlacing === 'blacksmith' && Game.placing === null,
     'input: ' + k + ' arms ' + label + ' placement',
     k + '=' + String(armed) + ' esc=' + String(Game.placing));
 });
+
+/* The keys the handler implements and the controls the game advertises are one
+   contract: setKey pans up on `w`/`ArrowUp`, but every build hotkey — the
+   barricade's `w` included (the plan's "w is not free" ruling) — returns before
+   setKey runs, so keyboard pan-up is ArrowUp and `w` belongs to the Barricade.
+   The file banner and the footer's help line are the two surfaces that state it,
+   so both have to carry the post-barricade wording, not `WASD to pan.` */
+const bannerCtl = (html.match(/^ +Controls: (.+)$/m) || [])[1] || '';
+const footerCtl = (AoE2.infoHtml(AoE2.createState()).match(/>([^<]*screen edges pan)/) || [])[1] || '';
+check(bannerCtl === 'left click / drag to select, right click to command, WASD / arrows to pan.' &&
+      footerCtl === 'WASD / arrows or screen edges pan',
+  'input: the advertised controls name the keys the handler implements',
+  'banner=' + JSON.stringify(bannerCtl) + ' footer=' + JSON.stringify(footerCtl));
 const mmBefore = Game.cam.x;
 doc.getElementById('minimap').fire('mousedown', { clientX: 84, clientY: 84, target: doc.getElementById('minimap') });
 check(Game.cam.x !== mmBefore, 'input: minimap click moves the camera', mmBefore + ' -> ' + Math.round(Game.cam.x));
