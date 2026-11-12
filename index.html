@@ -99,7 +99,7 @@
      1. config      tuning constants (stats, costs, sizes)
      2. world       seeded map generation (terrain + resources)
      3. entities    unit / building factories
-     4. commands    orders, economy, combat, enemy AI   <- pure logic
+     4. commands    orders, economy, combat, save/load, enemy AI   <- pure logic
      5. render      canvas terrain, sprites, minimap, HUD
      6. input       mouse + keyboard
      7. boot        DOM wiring and the frame loop
@@ -2917,7 +2917,7 @@ function startLoop(Game) {
   window.requestAnimationFrame(frame);
 }
 
-/** Per-frame work: camera panning, then the simulation. */
+/** Per-frame work: camera panning, the simulation, then the autosave tick. */
 function stepGame(Game, dt) {
   const s = CFG.PAN_SPEED * dt, k = Game.keys;
   if (k.up) Game.cam.y -= s;
