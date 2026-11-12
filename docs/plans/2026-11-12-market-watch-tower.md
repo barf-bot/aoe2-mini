@@ -94,7 +94,7 @@ proving check and the `Map of this file` banner stays truthful.
     `noSprite` rule, which now covers both kinds without being edited, and §7, §10, §11 re-run
     unmodified.
 
-- [ ] T2: `trade(Game, b, res, direction)` — the market's sell/buy command
+- [x] T2: `trade(Game, b, res, direction)` — the market's sell/buy command
   - files: `index.html` §4 (`trade(Game, b, res, direction)` directly after `researchTech` at
     `index.html:1625`, DOM-free; the `AoE2` export object at `index.html:2568-2579` gains
     `trade`), `tools/headless-check.js` (a new

@@ -1649,6 +1649,25 @@ function researchTech(Game, b, id) {
   return b;
 }
 
+/** Market trade. The whole refusal ladder runs before the first helper moves a
+ *  unit (toast's pattern in `train` / `researchTech`), and both directions are
+ *  the same two helpers: only a row carrying `trade` rates can trade, and a
+ *  lot of 100 — the figure the design fixed — changes sides at the row's rate. */
+function trade(Game, b, res, direction) {
+  const def = b && BLD[b.kind];
+  if (!def || !def.trade) return toast(Game, (def ? def.label : String(b && b.kind)) + ' cannot trade');
+  if (b.built < 1) return toast(Game, 'Still building');
+  if ((def.age ?? 0) > Game.age) return toast(Game, def.label + ' requires ' + AGES[def.age]);
+  if (direction !== 'sell' && direction !== 'buy') return toast(Game, 'Unknown trade direction ' + direction);
+  if (['food', 'wood', 'stone'].indexOf(res) < 0) return toast(Game, 'Cannot trade ' + res);
+  const lot = direction === 'sell' ? { [res]: 100 } : { gold: def.trade.buy };
+  const gain = direction === 'sell' ? { gold: def.trade.sell } : { [res]: 100 };
+  if (!canAfford(Game, b.team, lot)) return toast(Game, 'Not enough ' + missing(Game, b.team, lot));
+  spend(Game, b.team, lot);
+  refund(Game, b.team, gain);
+  return b;
+}
+
 function upgradeAge(Game) {
   if (Game.age >= AGES.length - 1) return toast(Game, 'Imperial Age reached');
   const cost = { food: Game.age === 0 ? CFG.AGE_FOOD : CFG.AGE_FOOD * 2 };
@@ -2588,7 +2607,7 @@ const AoE2 = {
   tileOf, findPath, formationSlots, separate,
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
-  build, cancelConstruction, demolish, train, researchTech, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
+  build, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame, commandsHtml, queueHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,

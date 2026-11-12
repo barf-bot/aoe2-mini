@@ -1552,6 +1552,81 @@ check(!rbWrong.err && rbWrong.msg === 'Barracks cannot research Forge' && rbWron
   'research: a barracks cannot research a blacksmith tech',
   rbWrong.err ? 'researchTech threw ' + rbWrong.err : rbWrong.msg);
 
+/* ---- 8c. market trade (2026-11-12 market plan, T2) ------------------ */
+/* One pure command, the design's refusal ladder: everything the market cannot
+   do is toasted before anything moves, and both directions move exactly the
+   authored pair (100 food/wood/stone for 33 gold, 100 back for 67). Every
+   refusal fixture compares the whole res[team] so a half-done trade cannot
+   slip through, and the command itself is asserted to return the building. */
+const marketAt = (age, built) => {
+  const st = AoE2.createState();
+  st.age = age;
+  st.res[0] = { food: 300, wood: 300, gold: 100, stone: 300 };
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const s = v && freeSpotAround(st.world, st, tOf(v.x), tOf(v.y),
+    AoE2.BLD.market.w, AoE2.BLD.market.h, 8);
+  if (!s) return null;
+  const b = AoE2.makeBuilding(st, 'market', 0, s.tx, s.ty);
+  b.built = built;
+  return { st, b };
+};
+/** One trade call on `st`/`b`, optionally presetting stockpile fields (the
+ *  §8b `rbTry` shape): the res snapshot is taken after the preset. */
+const tradeTry = (st, b, res, dir, set) => {
+  const team = b ? b.team : 0;
+  if (set) for (const k in set) st.res[team][k] = set[k];
+  const before = JSON.stringify(st.res[team]);
+  let err = '', ret;
+  try { ret = AoE2.trade(st, b, res, dir); } catch (e) { err = String((e && e.message) || e); }
+  return { err, msg: st.toastMsg, before, after: JSON.stringify(st.res[team]), ret };
+};
+const expectRes = (from, delta) => JSON.stringify(Object.assign(JSON.parse(from), delta));
+const refusal = (name, r, want) =>
+  check(!r.err && r.msg === want && r.after === r.before, name,
+    r.err ? 'trade threw ' + r.err : r.msg + ' / res ' + (r.after === r.before ? 'untouched' : 'touched'));
+const trF = marketAt(1, 1);
+const trSell = trF && tradeTry(trF.st, trF.b, 'food', 'sell');
+check(!!trSell && !trSell.err && trSell.ret === trF.b &&
+      trSell.after === expectRes(trSell.before, { food: JSON.parse(trSell.before).food - 100,
+        gold: JSON.parse(trSell.before).gold + AoE2.BLD.market.trade.sell }),
+  "trade: selling 100 food pays the row's 33 gold",
+  !trSell ? 'no 2x2 site for the market'
+    : trSell.err ? 'trade threw ' + trSell.err
+      : 'res ' + trSell.after + ' (was ' + trSell.before + '), returned ' +
+        (trSell.ret === trF.b ? 'the market' : String(trSell.ret)));
+const trBuy = trF && tradeTry(trF.st, trF.b, 'wood', 'buy');
+check(!!trBuy && !trBuy.err && trBuy.ret === trF.b &&
+      trBuy.after === expectRes(trBuy.before, { gold: JSON.parse(trBuy.before).gold - AoE2.BLD.market.trade.buy,
+        wood: JSON.parse(trBuy.before).wood + 100 }),
+  "trade: buying 100 wood costs the row's 67 gold",
+  !trBuy ? 'no 2x2 site for the market'
+    : trBuy.err ? 'trade threw ' + trBuy.err
+      : 'res ' + trBuy.after + ' (was ' + trBuy.before + '), returned ' +
+        (trBuy.ret === trF.b ? 'the market' : String(trBuy.ret)));
+/* Selling must never drive a stockpile negative, and buying must never take
+   gold it does not have: both are refused with the res object field-for-field
+   identical, so no partial spend can hide in either direction. */
+refusal('trade: selling 100 wood with 40 in the stockpile is refused',
+  trF && tradeTry(trF.st, trF.b, 'wood', 'sell', { wood: 40 }), 'Not enough wood');
+refusal('trade: buying 100 stone with 20 gold is refused',
+  trF && tradeTry(trF.st, trF.b, 'stone', 'buy', { gold: 20 }), 'Not enough gold');
+refusal('trade: a Dark Age market cannot trade',
+  (() => { const f = marketAt(0, 1); return f && tradeTry(f.st, f.b, 'food', 'sell'); })(),
+  'Market requires Feudal Age');
+refusal('trade: a market still under construction cannot trade',
+  (() => { const f = marketAt(1, 0.4); return f && tradeTry(f.st, f.b, 'food', 'sell'); })(),
+  'Still building');
+const trBar = (() => {
+  if (!trF) return null;
+  const s = freeSpotAround(trF.st.world, trF.st, tOf(trF.b.x + 2 * AoE2.CFG.TILE), tOf(trF.b.y), 2, 2, 8);
+  if (!s) return null;
+  const b = AoE2.makeBuilding(trF.st, 'barracks', 0, s.tx, s.ty);
+  b.built = 1;
+  return b;
+})();
+refusal('trade: a barracks cannot trade',
+  trBar && tradeTry(trF.st, trBar, 'food', 'sell'), 'Barracks cannot trade');
+
 /* ---- 9. combat ------------------------------------------------------ */
 const foe = Game.units.find(u => u.team === 1 && u.kind === 'villager');
 const scout = Game.units.find(u => u.team === 0 && u.kind === 'militia');
