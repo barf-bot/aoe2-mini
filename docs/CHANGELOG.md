@@ -82,6 +82,30 @@ plan.
   every `index.html:NNN` reference and section range re-measured through
   `tools/audit-line-refs.js`.
 
+### Uniform HUD frame (T1–T2) — plan `docs/plans/2026-11-12-uniform-hud-frame.md`
+
+One fixed-height footer for every selection state (c2a2472); the harness went 194 → 197
+checks across the plan.
+
+- **T1 — one owner, one frame (c2a2472):** `hudState(Game)` answers the one selection word
+  the footer is in — `group`, `units`, `building`, `none` — and `hudHtml(Game)` becomes the
+  single writer of its markup: the same three panels (`info` | `commands` | `queue`) in the
+  same order for every state, stamped on the footer with that word as `data-state`.
+  `renderHud` replaces its three `setHTML` calls with one write to `#hud`; the CSS replaces
+  `footer{min-height:74px}` with `footer{flex:0 0 74px;height:74px}` plus fixed-height
+  `overflow:hidden` `.info` (a title/body/bar grid), `.commands` (a row-based button grid)
+  and `.queue` panels, so selecting something no longer resizes the map; `infoHtml` collapses
+  a group to a `N units` title plus one per-kind `.sum` line (3 kinds max, `+K more` beyond)
+  and gives every state the same title/body/hp shell; §6 delegates command clicks off
+  `Game.dom.commands || Game.dom.hud` so the handler survives the footer rebuild in a browser,
+  and `infoHtml`/`hudState`/`hudHtml` join the `AoE2` export (the 3 new §11b checks pin the
+  per-state frame shape and the fixed footer height); `preview.png` regenerates byte-identical.
+- **T2 — docs sync:** this entry plus `docs/GAME_RULES.md` (a `## Interface` section),
+  `docs/ARCHITECTURE.md` (the §5 render cell and the HUD paragraph), `docs/ROADMAP.md` (the
+  Phase-2 item marked shipped) and `AGENTS.md` (the file-length claim, the export line, the
+  `Map of this file` span) re-pointed at the final file — every `index.html:NNN` reference
+  and section range re-measured through `tools/audit-line-refs.js`.
+
 ## [Unreleased] — 2026-11-11
 
 ### Board rules pass (T1–T5) — plan `docs/plans/2026-11-04-board-rules.md`

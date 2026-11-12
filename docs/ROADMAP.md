@@ -71,11 +71,11 @@ Split out of the board-rules request because one plan caps at 8 tasks; phase 1
 - **Cancel construction + demolish.** Shipped 2026-11-04 via
   `docs/plans/2026-11-04-cancel-demolish.md`: cancelling refunds 80% of the cost and frees
   the builder; demolishing a finished building refunds nothing (Town Centers exempt).
-- **Uniform HUD frame.** Selecting a unit, a building or nothing must render one
-  fixed-height overlay instead of today's footer that grows taller for a unit and shifts
-  the layout; one place owns the HUD markup. *Done when:* `#info`, `#commands` and
-  `#queue` render at identical heights for all three selection states and a check asserts
-  the markup shape per state.
+- **Uniform HUD frame.** Shipped 2026-11-12 via
+  `docs/plans/2026-11-12-uniform-hud-frame.md`: `hudState` names the selection (`group` /
+  `units` / `building` / `none`) and `hudHtml` renders the same three fixed-height panels
+  (`#info`, `#commands`, `#queue`) for every state, so selecting something never resizes the
+  map; a group collapses to `N units` plus one per-kind summary line and the command area is a fixed button grid.
 
 ## Deferred from the 2026-11-11 OG-content port plan
 

@@ -102,7 +102,7 @@ proving check and the `Map of this file` banner stays truthful.
     (byte-identical is the proof); there is nothing new to see because the footer is DOM, not
     canvas.
 
-- [ ] T2: docs sync and the full verification pass
+- [x] T2: docs sync and the full verification pass
   - files: `docs/GAME_RULES.md` (a `## Interface` section documenting the fixed-height frame,
     the `data-state` values and the group `N units`/`+N more` summary rule, with the
     `hudHtml` line ref; the `index.html:2101` and `index.html:2449` refs at
