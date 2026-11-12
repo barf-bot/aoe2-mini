@@ -1960,13 +1960,13 @@ function validState(payload) {
 /* A stored order back into a live one: `src` becomes the source object the engine
    works from (the payload only names the tile or farm). A source that is no longer
    there retires the order, the same call resumeGather makes for an emptied tile. */
-function decodeOrder(Game, u, o, buildingById) {
+function decodeOrder(Game, u, o, byId) {
   if (!o || typeof o !== 'object') return { kind: 'idle' };
   const e = Object.assign({}, o);
   if (!e.src || typeof e.src !== 'object') return e;
   let src = null;
   if (e.src.kind === 'farm') {
-    const b = buildingById(e.src.b);
+    const b = byId.get(e.src.b);
     if (b && b.built) src = sourceFromFarm(b);
   } else {
     src = sourceFromTile(Game, u, e.src.tx, e.src.ty);

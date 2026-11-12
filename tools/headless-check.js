@@ -2883,6 +2883,31 @@ loadCheck('load: a harvest order still reads the loaded world', () => {
     ' afterStepping=' + g2.world.amount[k] + ' order=' + (v2 && v2.order.kind)];
 });
 
+loadCheck('load: a farm source is relinked, not left as a stored id', () => {
+  const g = AoE2.createState();
+  const site = AoE2.findSite(g.world, 30, 30, AoE2.BLD.farm.w) || { tx: 30, ty: 30 };
+  const farm = AoE2.makeBuilding(g, 'farm', 0, site.tx, site.ty);
+  farm.built = 1;
+  const v = g.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const tc = g.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+  v.order = { kind: 'go_deposit', b: tc.id, src: AoE2.sourceFromFarm(farm) };
+  const raw = AoE2.saveGame(AoE2.SAVE_PATH, g, LOAD_AT);
+  const saved = JSON.parse(raw).state.units.find((u) => u.id === v.id).order;
+  const g2 = AoE2.createState();
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
+  const v2 = g2.units.find((u) => u.id === v.id);
+  const farm2 = g2.buildings.find((b) => b.id === farm.id);
+  const readBack = v2 && v2.order.src ? v2.order.src.amount : null;
+  if (farm2) farm2.field -= 5;                        // the rebuilt getter must read the LOADED farm
+  return [okLoad === true && saved.kind === 'go_deposit' && saved.b === tc.id &&
+    saved.src.kind === 'farm' && saved.src.b === farm.id && saved.src.res === 'food' &&
+    !!v2 && v2.order.kind === 'go_deposit' && v2.order.b === tc.id &&
+    readBack === AoE2.BLD.farm.field && !!v2.order.src && v2.order.src.amount === farm2.field,
+    'loaded=' + okLoad + ' order=' + JSON.stringify(saved) + ' src.amount ' +
+    String(readBack) + ' -> ' + (v2 && v2.order.src ? v2.order.src.amount : 'none') +
+    ' farm.field=' + (farm2 ? farm2.field : 'gone')];
+});
+
 loadCheck('load: an arrow in flight still hits the loaded unit', () => {
   const { g, raw } = fixtureSave();
   const foe = g.units.find((u) => u.team === 1 && u.kind === 'villager');
