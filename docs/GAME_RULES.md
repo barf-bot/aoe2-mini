@@ -140,8 +140,9 @@ a bug.
   ends an in-progress site, refunding `floor(cost × CFG.CANCEL_REFUND)` — **80%** of the
   defined cost whatever the progress — and frees its builders; `demolish`
   (`index.html:1578`) removes a finished own-team building with no refund, refuses Town
-  Centers (`Cannot demolish a Town Center`) and buildings with a training queue
-  (`Still training`). The footer offers `Cancel` for a foundation and, once the
+  Centers (`Cannot demolish a Town Center`), buildings with a training queue
+  (`Still training`) and buildings with a tech in flight (`Still researching`). The
+  footer offers `Cancel` for a foundation and, once the
   building is finished, its train buttons plus `Demolish` for a non-Town Center building (T5).
 - Training: a building can only train what's in its `trains` list ("Militia needs a Town
   Center" when wrong), must be finished (`Still building`), max 5 in queue (`Queue full`),
