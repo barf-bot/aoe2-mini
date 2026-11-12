@@ -1166,8 +1166,9 @@ check(!!sq4w && sq4w.length === 4 &&
 
 /* ---- 6d. barricade routing (this plan, T3) -------------------------- */
 // Routing around, through and after a wooden segment. Every expected length
-// comes from the harness's own Dijkstra (refSteps / fp), never from the code
-// under test -- the §6c rule, on the §6c fixtures rebuilt with barricades.
+// comes from refSteps, the harness's own Dijkstra -- the §6c rule that findPath
+// may not grade itself; fp is only asked for the route *tiles*, exactly as §6c's
+// own repath fixture asks routeOf -- on the §6c fixtures rebuilt with barricades.
 
 // 19. a flatWithOrder(4) walk whose cached route gets a 1x1 barricade dropped
 // on it -- neither the walker's own tile nor the goal (the §6c 8-check
@@ -1179,6 +1180,7 @@ const barRoute = (() => {
   const { st, v, V, goal, at } = f;
   orderTo(f);
   const preRoute = fp(st, { tx: V.x, ty: V.y }, goal);  // the route on the clean board
+  const refPre = refSteps(st, { tx: V.x, ty: V.y }, goal);   // the clean board's optimum
   if (preRoute === null || preRoute.length < 3) return null;
   const pad = preRoute[1];                              // a route tile, never own tile or goal
   const b = AoE2.makeBuilding(st, 'barricade', 0, pad.tx, pad.ty);
@@ -1186,16 +1188,16 @@ const barRoute = (() => {
   const centre = tileCentre(st, pad.tx, pad.ty);
   const walkAt = AoE2.walkable(st, centre.x, centre.y);
   const blocksLen = (st.blocks.get(b.id) || []).length;
-  const refWith = fp(st, { tx: V.x, ty: V.y }, goal);   // Dijkstra with the segment up
+  const refWith = refSteps(st, { tx: V.x, ty: V.y }, goal);  // the same search, segment up
   AoE2.stepGame(st, DT);                                // the very next step
   const during = routeOf(v);
   const proDuring = v.path === null ? ['no cached route'] : routeProblems(st, v.path);
   const dOk = AoE2.demolish(st, b);
   AoE2.stepGame(st, DT);                                // the first step on the cleared board
-  const refGone = fp(st, { tx: tOf(v.x), ty: tOf(v.y) }, goal);
+  const refGone = refSteps(st, { tx: tOf(v.x), ty: tOf(v.y) }, goal);
   const after = routeOf(v);
   const w = walkOrder(st, v, 400);
-  return { f, V, goal, at, preRoute, pad, b, walkAt, blocksLen, refWith, during, proDuring, dOk, refGone, after, w };
+  return { f, V, goal, at, preRoute, refPre, pad, b, walkAt, blocksLen, refWith, during, proDuring, dOk, refGone, after, w };
 })();
 const barTiles = (p) => p.map((t) => t.tx + ',' + t.ty).join(' ');
 check(!!barRoute && barRoute.walkAt === false && barRoute.blocksLen === 1,
@@ -1203,20 +1205,22 @@ check(!!barRoute && barRoute.walkAt === false && barRoute.blocksLen === 1,
   !barRoute ? 'no flatWithOrder(4) fixture'
     : `barricade at ${barRoute.pad.tx},${barRoute.pad.ty}: walkable=${barRoute.walkAt} ` +
       `blocks=${barRoute.blocksLen} tile(s)`);
-check(!!barRoute && barRoute.during.join(' ') !== barTiles(barRoute.preRoute) &&
-      barRoute.during.length === barRoute.refWith.length && barRoute.proDuring.length === 0,
+check(!!barRoute && barRoute.refPre !== null &&
+      barRoute.preRoute.length === barRoute.refPre + 1 &&
+      barRoute.during.join(' ') !== barTiles(barRoute.preRoute) &&
+      barRoute.during.length === barRoute.refWith + 1 && barRoute.proDuring.length === 0,
   'path: a barricade dropped on a cached route reroutes the walker on the next step',
   !barRoute ? 'no flatWithOrder(4) fixture'
     : `before ${barTiles(barRoute.preRoute)} -> during ${barRoute.during.join(' ')} ` +
-      `(refSteps+1 ${barRoute.refWith.length})` +
+      `(before ${barRoute.refPre} + 1, with the segment ${barRoute.refWith} + 1)` +
       (barRoute.proDuring.length ? '; ' + barRoute.proDuring.join('; ') : ''));
 check(!!barRoute && barRoute.dOk === true &&
       barRoute.after.join(' ') === barTiles(barRoute.preRoute) &&
-      barRoute.after.length === barRoute.refGone.length,
+      barRoute.refGone !== null && barRoute.after.length === barRoute.refGone + 1,
   'path: demolishing that segment restores a route of the pre-build length',
   !barRoute ? 'no flatWithOrder(4) fixture'
     : `demolish ${barRoute.dOk}; route ${barRoute.after.join(' ')} vs pre-build ` +
-      `${barTiles(barRoute.preRoute)} (refSteps+1 ${barRoute.refGone.length}), walk finished in ${barRoute.w.n} steps`);
+      `${barTiles(barRoute.preRoute)} (refSteps ${String(barRoute.refGone)} + 1), walk finished in ${barRoute.w.n} steps`);
 
 // 20. §6c's check-10 unreachable-order fixture rebuilt with wood: the same
 // flatState villager, his eight neighbour tiles ringed with 1x1 barricades
