@@ -657,7 +657,7 @@ function makeBuilding(Game, kind, team, tx, ty) {
     id: Game.nextId++, kind, team, tx, ty, w: def.w, h: def.h,
     x: (tx + def.w / 2) * CFG.TILE, y: (ty + def.h / 2) * CFG.TILE,
     hp: def.hp, maxHp: def.hp, built: 0, field: def.field ? def.field : 0,
-    time: def.time, queue: [], born: Game.time, cd: 0,
+    time: def.time, queue: [], born: Game.time, cd: 0, research: null,
   };
   Game.buildings.push(b);
   rebuildBlocks(Game);                       // occupancy first: workPos reads it
@@ -773,6 +773,17 @@ function stepSim(Game, dt) {
       const p = workPos(Game, b);
       makeUnit(Game, job.kind, b.team, p.x, p.y);
       if (!b.queue.length) break;
+    }
+  }
+
+  for (const b of Game.buildings) {              // one research slot per finished building
+    if (b.built < 1 || !b.research) continue;
+    b.research.t -= dt;
+    if (b.research.t <= 0) {
+      const done = b.research.id;
+      Game.techs.add(done);
+      toast(Game, TECHS[done].label + ' researched');
+      b.research = null;
     }
   }
 
@@ -1570,6 +1581,7 @@ function demolish(Game, b) {
   if (b.built < 1) return toast(Game, 'Not built yet — cancel instead');
   if (b.kind === 'town_center') return toast(Game, 'Cannot demolish a Town Center');
   if (b.queue.length) return toast(Game, 'Still training');
+  if (b.research) return toast(Game, 'Still researching');
   removeBuilding(Game, b);
   toast(Game, def.label + ' demolished');
   return true;
@@ -1605,6 +1617,23 @@ function train(Game, bld, kind) {
   spend(Game, bld.team, KINDS[kind].cost);
   bld.queue.push({ kind, t: KINDS[kind].time });
   return bld;
+}
+
+/** Research button. One tech at a time per building - train's queue pattern
+ * collapsed to a single slot; every refusal goes through toast before
+ * anything is spent. */
+function researchTech(Game, b, id) {
+  const tech = TECHS[id];
+  if (!tech) return toast(Game, 'Unknown tech ' + id);
+  if (tech.building !== b.kind) return toast(Game, BLD[b.kind].label + ' cannot research ' + tech.label);
+  if (b.built < 1) return toast(Game, 'Still building');
+  if (Game.age < tech.age) return toast(Game, tech.label + ' requires ' + AGES[tech.age]);
+  if (Game.techs.has(id)) return toast(Game, tech.label + ' already researched');
+  if (b.research) return toast(Game, BLD[b.kind].label + ' is busy');
+  if (!canAfford(Game, b.team, tech.cost)) return toast(Game, 'Not enough ' + missing(Game, b.team, tech.cost));
+  spend(Game, b.team, tech.cost);
+  b.research = { id, t: tech.time };
+  return b;
 }
 
 function upgradeAge(Game) {
@@ -2526,7 +2555,7 @@ const AoE2 = {
   tileOf, findPath, formationSlots, separate,
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame,
   unitAnim,
-  build, cancelConstruction, demolish, train, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
+  build, cancelConstruction, demolish, train, researchTech, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame, commandsHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,

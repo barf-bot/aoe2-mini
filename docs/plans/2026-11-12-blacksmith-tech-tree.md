@@ -138,7 +138,7 @@ proving check and the `Map of this file` banner stays truthful.
     never below 1` (a 4-damage pierce hit on a `pierceArmor: 7` building deals 1); §9, §9b,
     §9c re-run unmodified.
 
-- [ ] T4: `researchTech` — the blacksmith's one-slot research
+- [x] T4: `researchTech` — the blacksmith's one-slot research
   - files: `index.html` §4 (`researchTech(Game, b, id)` next to `train` at
     `index.html:1530-1544`; `makeBuilding` `index.html:626-631` gains `research: null`;
     `stepSim` `index.html:738-747` ticks it; `demolish` `index.html:1503` refuses a building
