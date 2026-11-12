@@ -39,22 +39,29 @@
   #result h2.win{color:var(--ok);text-shadow:0 0 24px rgba(111,191,115,.45)}
   #result h2.lose{color:var(--bad);text-shadow:0 0 24px rgba(209,88,79,.45)}
   #result p{margin:0;color:var(--dim)}
-  footer{flex:0 0 auto;display:flex;align-items:stretch;gap:0;
-    background:linear-gradient(#1f2330,#171a22);border-top:1px solid var(--line);min-height:74px}
-  #info{flex:0 0 250px;padding:8px 12px;border-right:1px solid var(--line);font-size:12px;color:var(--dim)}
-  #info h4{margin:0 0 4px;color:var(--ink);font-size:13px}
-  #info .hp{margin-top:4px;height:6px;border-radius:3px;background:#0d0f13;overflow:hidden}
-  #info .hp i{display:block;height:100%;background:var(--ok)}
-  #commands{flex:1 1 auto;display:flex;flex-wrap:wrap;align-content:flex-start;gap:6px;padding:8px}
+  footer{flex:0 0 74px;height:74px;display:flex;align-items:stretch;gap:0;
+    background:linear-gradient(#1f2330,#171a22);border-top:1px solid var(--line)}
+  .info{flex:0 0 250px;height:100%;overflow:hidden;display:grid;row-gap:4px;
+    grid-template-rows:16px minmax(0,1fr) 6px;padding:8px 12px;
+    border-right:1px solid var(--line);font-size:12px;color:var(--dim)}
+  .info h4{margin:0;height:16px;line-height:16px;font-size:13px;color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .info .body{overflow:hidden}
+  .info .hp{height:6px;border-radius:3px;background:#0d0f13;overflow:hidden}
+  .info .hp i{display:block;height:100%;background:var(--ok)}
+  .commands{flex:1 1 auto;height:100%;overflow:hidden;padding:8px;display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(92px,1fr));grid-auto-rows:26px;
+    gap:4px;align-content:start}
   button{font:inherit;color:var(--ink);background:linear-gradient(#2c313f,#20242f);
     border:1px solid var(--line);border-radius:3px;padding:6px 10px;cursor:pointer}
   button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
   button:disabled{opacity:.42;cursor:not-allowed}
   button.armed{border-color:var(--gold);color:#1a1a1a;background:linear-gradient(#d9b870,#b08c3f)}
   button .c{color:var(--dim);font-size:11px;margin-left:6px}
-  #queue{flex:0 0 210px;padding:8px;border-left:1px solid var(--line);font-size:11px;color:var(--dim)}
-  #queue .bar{height:6px;background:#0d0f13;border-radius:3px;overflow:hidden;margin-top:4px}
-  #queue .bar i{display:block;height:100%;background:var(--blue)}
+  .queue{flex:0 0 210px;height:100%;overflow:hidden;padding:8px;
+    border-left:1px solid var(--line);font-size:11px;color:var(--dim)}
+  .queue .bar{height:6px;background:#0d0f13;border-radius:3px;overflow:hidden;margin-top:4px}
+  .queue .bar i{display:block;height:100%;background:var(--blue)}
   .hint{color:#6c7181;font-size:11px;padding:8px 12px}
 </style>
 </head>
@@ -77,11 +84,7 @@
     <div id="result"></div>
   </div>
 
-  <footer>
-    <div id="info"></div>
-    <div id="commands"></div>
-    <div id="queue"></div>
-  </footer>
+  <footer id="hud" class="hud"></footer>
 </div>
 
 <script>
@@ -2073,8 +2076,8 @@ function minimapTerrain(Game) {
 function renderHud(Game) {
   const d = Game.dom || {};
   const setText = (el, val) => { if (el && el.textContent !== val) el.textContent = val; };
-  /* info / commands / queue hold markup: write innerHTML when the element has
-     one, otherwise fall back to textContent (keeps the node stub working) */
+  /* d.hud / d.result hold markup: write innerHTML when the element has one,
+     otherwise fall back to textContent (keeps the node stub working) */
   const setHTML = (el, val) => {
     if (!el) return;
     if (typeof el.innerHTML === 'string') { if (el.innerHTML !== val) el.innerHTML = val; return; }
@@ -2086,13 +2089,35 @@ function renderHud(Game) {
   setText(d.set_stone, String(Math.floor(Game.res[0].stone)));
   setText(d.set_pop, popUsed(Game, 0) + '/' + popCap(Game, 0));
   setText(d.set_age, AGES[Game.age]);
-  setHTML(d.info, infoHtml(Game));
-  setHTML(d.commands, commandsHtml(Game));
-  setHTML(d.queue, queueHtml(Game));
+  if (d.hud) {                                            /* one write for the whole frame */
+    if (d.hud.setAttribute) d.hud.setAttribute('data-state', hudState(Game));
+    setHTML(d.hud, hudHtml(Game));
+  }
   setHTML(d.result, resultHtml(Game));          /* '' while the game is still running */
   if (d.result && d.result.classList) {         /* CSS hides it while the class is off */
     if (Game.result) d.result.classList.add('show'); else d.result.classList.remove('show');
   }
+}
+
+/** The one selection word this Game's footer is in, stamped on it as data-state.
+ *  Game.placing deliberately never changes it: placing a building swaps the info
+ *  panel's CONTENT (see infoHtml), not the frame around it. */
+function hudState(Game) {
+  const n = selectedUnits(Game).length;
+  if (n > 1) return 'group';
+  if (n === 1) return 'units';
+  return Game.selectedBuilding ? 'building' : 'none';
+}
+
+/** The single owner of the footer's markup: the three fixed panels in the same
+ *  order for every state, filled by the three pure builders. The frame never
+ *  changes with the selection — only the content inside these boxes — which is
+ *  what lets the CSS pin the footer to one height (see the footer/.info/
+ *  .commands/.queue rules). */
+function hudHtml(Game) {
+  return '<div class="info" id="info">' + infoHtml(Game) + '</div>' +
+    '<div class="commands" id="commands">' + commandsHtml(Game) + '</div>' +
+    '<div class="queue" id="queue">' + queueHtml(Game) + '</div>';
 }
 
 /** The end-of-game overlay markup: empty while the game runs, otherwise the
@@ -2107,28 +2132,42 @@ function resultHtml(Game) {
 }
 
 function infoHtml(Game) {
+  /* every state fills the same three slots (title / body / hp bar) so the panel
+     is the same box whatever is selected; .body clips whatever does not fit */
+  const shell = (title, body, pct) => '<h4>' + title + '</h4><div class="body">' + body +
+    '</div><div class="hp"><i style="width:' + pct + '%"></i></div>';
+  const pctOf = (hp, maxHp) => Math.max(0, Math.min(100, 100 * hp / maxHp));
   const sel = selectedUnits(Game);
-  if (Game.placing) return '<h4>Placing ' + BLD[Game.placing].label + '</h4>Click the map to place, Esc to cancel';
+  if (Game.placing) {
+    return shell('Placing ' + BLD[Game.placing].label, 'Click the map to place, Esc to cancel', 0);
+  }
   if (sel.length === 1) {
     const u = sel[0];
-    return '<h4>' + KINDS[u.kind].label + '</h4>HP ' + Math.ceil(u.hp) + '/' + u.maxHp +
-      '<div class="hp"><i style="width:' + Math.max(0, 100 * u.hp / u.maxHp) + '%"></i></div>' +
-      '<br>Order: ' + u.order.kind + (u.carry ? ' (' + Math.floor(u.carry) + ' ' + u.carryRes + ')' : '');
+    return shell(KINDS[u.kind].label, 'HP ' + Math.ceil(u.hp) + '/' + u.maxHp +
+      '<br>Order: ' + u.order.kind + (u.carry ? ' (' + Math.floor(u.carry) + ' ' + u.carryRes + ')' : ''),
+      pctOf(u.hp, u.maxHp));
   }
   if (sel.length) {
+    /* a group gets ONE summary line instead of one line per unit: per-kind counts,
+       at most 3 kinds named, the rest collapsed into "+K more" */
     const n = {};
     for (const u of sel) n[u.kind] = (n[u.kind] || 0) + 1;
-    return '<h4>' + sel.length + ' units</h4>' + Object.keys(n).map(k => n[k] + ' ' + KINDS[k].label).join('<br>');
+    const kinds = Object.keys(n);
+    const shown = kinds.slice(0, 3).map(k => n[k] + ' ' + KINDS[k].label);
+    if (kinds.length > 3) shown.push('+' + (kinds.length - 3) + ' more');
+    return shell(sel.length + ' units', '<span class="sum">' + shown.join(', ') + '</span>',
+      pctOf(sel.reduce((s, u) => s + u.hp, 0), sel.reduce((s, u) => s + u.maxHp, 0)));
   }
   const b = Game.selectedBuilding;
   if (b) {
     const ups = Object.keys(TECHS).filter(id => TECHS[id].building === b.kind && Game.techs.has(id))
       .map(id => TECHS[id].label);
-    return '<h4>' + BLD[b.kind].label + '</h4>HP ' + Math.ceil(b.hp) + '/' + b.maxHp +
+    return shell(BLD[b.kind].label, 'HP ' + Math.ceil(b.hp) + '/' + b.maxHp +
       (b.field ? '<br>Field: ' + Math.ceil(b.field) : '') +
-      (ups.length ? '<br>Upgrades: ' + ups.join(', ') : '');
+      (ups.length ? '<br>Upgrades: ' + ups.join(', ') : ''), pctOf(b.hp, b.maxHp));
   }
-  return '<div class="hint">Left click or drag to select<br>Right click to move / attack / gather<br>WASD or screen edges pan<br>Ctrl+1..9 group, 1..9 recall</div>';
+  return shell('', 'Left click or drag to select<br>Right click to move / attack / gather<br>' +
+    'WASD or screen edges pan<br>Ctrl+1..9 group, 1..9 recall', 0);
 }
 
 function commandsHtml(Game) {
@@ -2352,9 +2391,12 @@ function attachInput(Game, d) {
   });
   d.addEventListener('keyup', (e) => setKey((e.key || '').toLowerCase(), false));
 
-  /* the command bar is rebuilt every frame -> delegate clicks off its parent */
-  if (Game.dom.commands && Game.dom.commands.addEventListener) {
-    Game.dom.commands.addEventListener('click', (e) => {
+  /* the command bar is rebuilt every frame -> delegate clicks off its parent:
+     in node that is the cached #commands stub the checks fire at, in a browser the
+     footer, the one element that survives the rebuild (hudHtml replaces children) */
+  const cmdHost = Game.dom.commands || Game.dom.hud;
+  if (cmdHost && cmdHost.addEventListener) {
+    cmdHost.addEventListener('click', (e) => {
       const b = buttonAt(e);
       if (!b) return;
       const act = b.getAttribute('data-act'), arg = b.getAttribute('data-arg');
@@ -2541,9 +2583,8 @@ function boot(doc) {
     view: viewEl,
     minimap: d.getElementById('minimap'),
     stage: d.getElementById('stage'),
-    info: d.getElementById('info'),
+    hud: d.getElementById('hud'),
     commands: d.getElementById('commands'),
-    queue: d.getElementById('queue'),
     toast: d.getElementById('toast'),
     result: d.getElementById('result'),
   };
@@ -2623,7 +2664,8 @@ const AoE2 = {
   unitAnim,
   build, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
-  popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame, commandsHtml, queueHtml, resultHtml,
+  popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
+  infoHtml, hudState, hudHtml, commandsHtml, queueHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };
 

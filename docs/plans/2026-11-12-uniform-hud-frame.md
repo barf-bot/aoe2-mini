@@ -1,6 +1,6 @@
 # Uniform HUD frame (round: UI)
 
-Status: planned
+Status: in progress
 
 ## Design
 
@@ -36,7 +36,7 @@ proving check and the `Map of this file` banner stays truthful.
 
 ## Tasks
 
-- [ ] T1: one owner, one frame — `hudState`/`hudHtml`, fixed-height footer, single-write `renderHud`
+- [x] T1: one owner, one frame — `hudState`/`hudHtml`, fixed-height footer, single-write `renderHud`
   - files: `index.html` CSS footer block (`index.html:42-57`, replace), body footer markup
     (`index.html:80-84`, replace), §5 `renderHud` (`index.html:2073-2096`), new `hudState` +
     `hudHtml` inserted between `renderHud` and `resultHtml` (`index.html:2096/2101`), §5

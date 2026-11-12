@@ -2198,6 +2198,64 @@ check(mkShort.includes('data-act="trade" data-arg="food:sell" disabled') &&
   (mkShort.match(/data-act="trade" data-arg="[^"]+"( disabled)?/g) || []).join(' ') || 'no trade buttons');
 Game.selectedBuilding = null;
 
+/* ---- 11b. uniform HUD frame (this plan, T1) -------------------------- */
+/* The frame contract (plan 2026-11-12-uniform-hud-frame T1): hudState answers the
+   one word the footer is stamped with, hudHtml owns its markup, and no selection
+   state may change the footer's STRUCTURE. `topDivs` extracts the class#id of
+   every top-level div in document order, so a state that renders a different shape
+   (a missing panel, an extra wrapper) reads as a different string. */
+const topDivs = (markup) => {
+  const re = /<(\/?)div\b([^>]*)>/g;
+  let m, depth = 0;
+  const out = [];
+  while ((m = re.exec(markup))) {
+    if (m[1] === '/') { depth--; continue; }
+    if (depth === 0) {
+      out.push(((m[2].match(/class="([^"]*)"/) || [0, ''])[1]) + '#' + ((m[2].match(/id="([^"]*)"/) || [0, ''])[1]));
+    }
+    depth++;
+  }
+  return out.join(' ');
+};
+const hudFix = (want, build) => {
+  try {
+    const st = build(AoE2.createState());
+    return { want, state: String(AoE2.hudState(st)), markup: AoE2.hudHtml(st), info: AoE2.infoHtml(st) };
+  } catch (e) { return { want, err: e.message }; }
+};
+const atUnit = (st, kind, i) => AoE2.makeUnit(st, kind, 0,
+  tileCentre(st, 40 + (i % 4), 40 + ((i / 4) | 0)).x, tileCentre(st, 40 + (i % 4), 40 + ((i / 4) | 0)).y).id;
+const pickKind = (kinds) => (st) => { st.selection = kinds.map((k, i) => atUnit(st, k, i)); return st; };
+const pickHouse = (st) => { st.selection = []; st.selectedBuilding = AoE2.makeBuilding(st, 'house', 0, 50, 50); return st; };
+const SHELL = 'info#info commands#commands queue#queue';
+const hudStates = [
+  hudFix('units', (st) => { st.selection = [st.units.find((u) => u.team === 0).id]; return st; }),
+  hudFix('group', pickKind(['villager', 'militia', 'archer'])),
+  hudFix('building', pickHouse),
+  hudFix('none', (st) => st),
+];
+check(hudStates.every((f) => !f.err && f.state === f.want && topDivs(f.markup) === SHELL),
+  'hud: every selection state renders the same footer structure',
+  hudStates.map((f) => f.want + '=' +
+    (f.err ? 'ERR ' + f.err : f.state + ' ' + topDivs(f.markup))).join(' | '));
+
+const squad12 = hudFix('group', pickKind(['villager', 'villager', 'villager', 'villager', 'villager',
+  'militia', 'militia', 'militia', 'militia', 'archer', 'archer', 'archer']));
+const sums = [hudStates[1], squad12].map((f) =>
+  (f.info ? (f.info.match(/<span class="sum"[^>]*>[^<]*<\/span>/g) || []) : ['ERR ' + f.err]).join('|'));
+check(sums[0] === '<span class="sum">1 Villager, 1 Militia, 1 Archer</span>' &&
+      sums[1] === '<span class="sum">5 Villager, 4 Militia, 3 Archer</span>',
+  'hud: a group selection renders one summary element for any squad size',
+  sums.join('  ...  '));
+
+const footerRule = ((html.match(/<style>([\s\S]*?)<\/style>/) || [0, ''])[1]
+  .match(/(?:^|[\s};])footer\s*\{([^}]*)\}/) || [])[1];
+check(!!footerRule && footerRule.includes('height:74px') && !/min-height:74px/.test(html),
+  'hud: the CSS declares one fixed footer height, not a min-height',
+  footerRule === undefined ? 'no footer{…} rule in <style>'
+    : 'footer{' + footerRule.replace(/\s+/g, ' ').trim().slice(0, 90) + '} | min-height:74px=' +
+      /min-height:74px/.test(html));
+
 /* ---- 12. reset ------------------------------------------------------ */
 const unitsBeforeReset = Game.units.length;
 AoE2.resetGame(Game);
