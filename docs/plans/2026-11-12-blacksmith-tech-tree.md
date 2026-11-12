@@ -76,7 +76,7 @@ proving check and the `Map of this file` banner stays truthful.
     absent from a Dark Age `commandsHtml`, present from Feudal); the amended §5b3 check; §7,
     §10, §11 re-run unmodified.
 
-- [ ] T2: `data/techs.json` and the generated `TECHS` table
+- [x] T2: `data/techs.json` and the generated `TECHS` table
   - files: `data/techs.json` (new), `tools/check-stats.mjs` (read the doc, `techValue()`,
     `renderTECHS()` beside `renderBLD` at `tools/check-stats.mjs:135`, the fourth block in
     `writeBlocks` (184-189), the `gameSurface()` guard (163-175), a `diffObject('TECHS', …)`

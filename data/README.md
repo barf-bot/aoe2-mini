@@ -7,14 +7,15 @@ runtime (the product is still one dependency-free file); it carries what the too
 | File | Contains | Consumed by |
 |---|---|---|
 | `units.json` | the unit stat rows the game ships (`villager`, `militia`, `archer`) plus the `CFG` block — hp, attack, attack type (melee/ranged), armours, attack delay, speed in **tiles/s**, costs, train times | `tools/check-stats.mjs` (renders section 1's `CFG`/`KINDS`) |
-| `buildings.json` | the eight building rows — hp, costs, build times, footprints, armours, and the Town Center's attack/range | `tools/check-stats.mjs` (renders section 1's `BLD`) |
+| `buildings.json` | the nine building rows — hp, costs, build times, footprints, armours, the Town Center's attack/range, and the Blacksmith's authored `age` gate + `noSprite` mark | `tools/check-stats.mjs` (renders section 1's `BLD`) |
+| `techs.json` | the four Blacksmith tech rows (`forge` 67, `scale_mail` 74, `fletching` 199, `bracer` 201) — upstream costs, research times and the `atk`/`armor` effect halves the engine reads (`data.Tech[<id>]`) | `tools/check-stats.mjs` (renders section 1's `TECHS`) |
 | `sprites/` + `sprites.json` | the ripped PNG frames the atlas is composed from (the farm frame is the old procedural cell vendored as a PNG — the building rip ships no farm bitmap) and the manifest mapping kind → anim → file | `tools/gen-atlas.js` |
 
 ## Where the numbers come from
 
 | Source | Used for | Notes |
 |---|---|---|
-| [`SiegeEngineers/aoe2techtree` → `data/data.json`](https://raw.githubusercontent.com/SiegeEngineers/aoe2techtree/master/data/data.json) | primary: unit/building rows, ids, internal names | fetched 2026-11-11; raw upstream JSON is ~7 MB, so only the shipped rows are vendored |
+| [`SiegeEngineers/aoe2techtree` → `data/data.json`](https://raw.githubusercontent.com/SiegeEngineers/aoe2techtree/master/data/data.json) | primary: unit/building/tech rows (`data.Unit[<id>]`, `data.Building[<id>]`, `data.Tech[<id>]`), ids, internal names | fetched 2026-11-11; raw upstream JSON is ~7 MB, so only the shipped rows are vendored |
 | [`HSZemi/aoe2dat` → `data/units_buildings_techs.json`](https://raw.githubusercontent.com/HSZemi/aoe2dat/master/data/units_buildings_techs.json) | cross-check: same ids, same values | fetched 2026-11-11 |
 
 Rules written into the files themselves:

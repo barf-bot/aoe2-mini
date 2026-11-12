@@ -1,0 +1,65 @@
+{
+  "source": {
+    "table": "SiegeEngineers/aoe2techtree - data/data.json, key path data.Tech[<id>]; cross-checked against HSZemi/aoe2dat - data/units_buildings_techs.json",
+    "urls": [
+      "https://raw.githubusercontent.com/SiegeEngineers/aoe2techtree/master/data/data.json",
+      "https://raw.githubusercontent.com/HSZemi/aoe2dat/master/data/units_buildings_techs.json"
+    ],
+    "fetched": "2026-11-11",
+    "rule": "Table numbers are copied, never retuned. label/age/building are authored here (listed in authored[]) because the table carries no such columns, and design{} records the two effect halves the design fixed instead of the current DE rows. tools/check-stats.mjs regenerates index.html's TECHS block from this file and fails when the file and the game disagree.",
+    "authored": [
+      "techs.*.label", "techs.*.age", "techs.*.building",
+      "techs.*.atk", "techs.*.armor"
+    ]
+  },
+  "design": {
+    "techs.fletching.effect": "+1 range (the DE row's range half) is not modelled - the engine has one attack number per unit, so only the +1 pierce attack half is ported",
+    "techs.bracer.effect": "the armour half of the DE row (+1 pierce armour) instead of its attack/range half - the design fixes this"
+  },
+  "techs": {
+    "forge": {
+      "id": 67,
+      "name": "Forging",
+      "label": "Forge",
+      "cost": { "food": 150 },
+      "time": 50,
+      "age": 1,
+      "building": "blacksmith",
+      "atk": { "melee": 1, "pierce": 0 },
+      "armor": { "melee": 0, "pierce": 0 }
+    },
+    "scale_mail": {
+      "id": 74,
+      "name": "Scale Mail Armor",
+      "label": "Scale Mail",
+      "cost": { "food": 100 },
+      "time": 40,
+      "age": 1,
+      "building": "blacksmith",
+      "atk": { "melee": 0, "pierce": 0 },
+      "armor": { "melee": 1, "pierce": 1 }
+    },
+    "fletching": {
+      "id": 199,
+      "name": "Fletching",
+      "label": "Fletching",
+      "cost": { "food": 100, "gold": 50 },
+      "time": 30,
+      "age": 1,
+      "building": "blacksmith",
+      "atk": { "melee": 0, "pierce": 1 },
+      "armor": { "melee": 0, "pierce": 0 }
+    },
+    "bracer": {
+      "id": 201,
+      "name": "Bracer",
+      "label": "Bracer",
+      "cost": { "food": 300, "gold": 200 },
+      "time": 40,
+      "age": 1,
+      "building": "blacksmith",
+      "atk": { "melee": 0, "pierce": 0 },
+      "armor": { "melee": 0, "pierce": 1 }
+    }
+  }
+}

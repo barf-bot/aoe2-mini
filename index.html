@@ -326,6 +326,30 @@ const BLD = {
   },
 };
 
+// GENERATED FROM data/techs.json -- edit the data or run `node tools/check-stats.mjs --write`.
+const TECHS = {
+  forge: {
+    label: 'Forge', age: 1, building: 'blacksmith',
+    cost: { food: 150 }, time: 50,
+    atk: { melee: 1, pierce: 0 }, armor: { melee: 0, pierce: 0 },
+  },
+  scale_mail: {
+    label: 'Scale Mail', age: 1, building: 'blacksmith',
+    cost: { food: 100 }, time: 40,
+    atk: { melee: 0, pierce: 0 }, armor: { melee: 1, pierce: 1 },
+  },
+  fletching: {
+    label: 'Fletching', age: 1, building: 'blacksmith',
+    cost: { food: 100, gold: 50 }, time: 30,
+    atk: { melee: 0, pierce: 1 }, armor: { melee: 0, pierce: 0 },
+  },
+  bracer: {
+    label: 'Bracer', age: 1, building: 'blacksmith',
+    cost: { food: 300, gold: 200 }, time: 40,
+    atk: { melee: 0, pierce: 0 }, armor: { melee: 0, pierce: 1 },
+  },
+};
+
 const AGES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
 
 const T = { GRASS:0, WATER:1, FOREST:2, GOLD:3, STONE:4, BERRY:5 };
@@ -2462,7 +2486,7 @@ function stepGame(Game, dt) {
 /* --------------------------- public surface ---------------------------- */
 
 const AoE2 = {
-  CFG, KINDS, BLD, AGES, T, PAL, TEAM, RES_OF_TILE,
+  CFG, KINDS, BLD, TECHS, AGES, T, PAL, TEAM, RES_OF_TILE,
   SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor, BLD_SPRITES, bldSpriteFor,
   makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,
