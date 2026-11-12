@@ -126,6 +126,14 @@ function simulateAndRender(G, Game, realView) {
   // cell it draws through the procedural path T1 left it on.
   if (villagers[0]) { const site = G.findSite(Game.world, Math.floor(villagers[0].x / G.CFG.TILE) + 1, Math.floor(villagers[0].y / G.CFG.TILE), 1);
     const bs = G.makeBuilding(Game, 'blacksmith', 0, site.tx, site.ty); bs.built = 1; }
+  // T5 of the market plan: the pair's own pads, east (+4, 2x2) and west (-3, 1x1)
+  // of the squad's tile so neither overlaps the blacksmith's. Both rows are
+  // noSprite, so the frame shows them as the flat team-coloured rect the
+  // blacksmith cell already paints -- the shared barracks-and-future-kinds draw.
+  if (villagers[0]) { const site = G.findSite(Game.world, Math.floor(villagers[0].x / G.CFG.TILE) + 4, Math.floor(villagers[0].y / G.CFG.TILE) - 1, 2);
+    const mk = G.makeBuilding(Game, 'market', 0, site.tx, site.ty); mk.built = 1; }
+  if (villagers[0]) { const site = G.findSite(Game.world, Math.floor(villagers[0].x / G.CFG.TILE) - 3, Math.floor(villagers[0].y / G.CFG.TILE) + 1, 1);
+    const wt = G.makeBuilding(Game, 'watch_tower', 0, site.tx, site.ty); wt.built = 1; }
   G.renderFrame(Game);
 
   const png = realView.toBuffer('image/png');

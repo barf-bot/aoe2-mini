@@ -174,7 +174,7 @@ proving check and the `Map of this file` banner stays truthful.
     `lineOfSight × TILE` (`index.html:899`); `range: 8` is carried as data but only units read
     it (`autoAcquire`, `index.html:925`), so these checks measure line of sight.
 
-- [ ] T5: the committed frame — both buildings in `preview.png`
+- [x] T5: the committed frame — both buildings in `preview.png`
   - files: `tools/render-preview.js` (the `simulateAndRender` fixture, beside the blacksmith
     line at `tools/render-preview.js:123-125`), `preview.png`
   - change: two more `makeBuilding(... built = 1)` lines in the fixture — a Market on
