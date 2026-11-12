@@ -3203,4 +3203,54 @@ uiCheck('boot: opening the page with an empty slot gives the standard settlement
   ]);
 });
 
+/* ---- 14. sound (this plan, T1) ------------------------------- */
+/* `SFX` is the sound contract: one row per sound, five fields per row, `fire`
+   naming the function that plays it. The audio path and the call-site checks
+   below both read this table instead of re-typing specs, the way §13 reads
+   SAVE_FIELDS. */
+const soundCheck = (name, fn) => {
+  let out;
+  try { out = fn(); } catch (e) { bad(name, 'threw ' + e.message); return; }
+  check(out[0], name, out[1]);
+};
+const scriptFnNames = () => {
+  const names = new Set();
+  const re = /^function ([A-Za-z0-9_]+)/gm;
+  let mm;
+  while ((mm = re.exec(m[1]))) names.add(mm[1]);
+  return names;
+};
+const SFX_WAVES = ['sine', 'square', 'sawtooth', 'triangle', 'custom'];
+const SFX_FIELDS = ['wave', 'freq', 'dur', 'gain', 'fire'];
+
+soundCheck('sound: the SFX table names every sound once and completely', () => {
+  const sfx = AoE2.SFX;
+  if (!sfx || typeof sfx !== 'object') return [false, 'AoE2.SFX is ' + String(sfx)];
+  const names = scriptFnNames();
+  const keys = Object.keys(sfx).sort();
+  const problems = [];
+  if (keys.join(',') !== ['age', 'arrow', 'build', 'defeat', 'hit', 'victory'].join(','))
+    problems.push('names=' + JSON.stringify(keys));
+  for (const name of Object.keys(sfx)) {
+    const row = sfx[name];
+    if (!row || typeof row !== 'object') { problems.push(name + ':row not an object'); continue; }
+    const extra = Object.keys(row).filter((k) => SFX_FIELDS.indexOf(k) < 0);
+    if (extra.length) problems.push(name + ':extra fields ' + extra.join(','));
+    if (SFX_WAVES.indexOf(row.wave) < 0) problems.push(name + ':wave ' + JSON.stringify(row.wave));
+    if (!Array.isArray(row.freq) || !row.freq.length ||
+        !row.freq.every((f) => typeof f === 'number' && isFinite(f) && f > 0))
+      problems.push(name + ':freq ' + JSON.stringify(row.freq));
+    if (!(typeof row.dur === 'number' && isFinite(row.dur) && row.dur > 0))
+      problems.push(name + ':dur ' + JSON.stringify(row.dur));
+    if (!(typeof row.gain === 'number' && isFinite(row.gain) && row.gain > 0 && row.gain <= 1))
+      problems.push(name + ':gain ' + JSON.stringify(row.gain));
+    if (typeof row.fire !== 'string') problems.push(name + ':fire ' + JSON.stringify(row.fire));
+    else if (!names.has(row.fire)) problems.push(name + ':fire ' + row.fire + ' is not a top-level function');
+  }
+  const shape = Object.keys(sfx).map((n) => n + '=' + sfx[n].wave +
+    '[' + (Array.isArray(sfx[n].freq) ? sfx[n].freq.join(',') : JSON.stringify(sfx[n].freq)) + ']' +
+    sfx[n].dur + '/' + sfx[n].gain + '@' + sfx[n].fire).join(' ');
+  return [problems.length === 0, (problems.length ? 'problems: ' + problems.join(' ') : 'ok ') + shape];
+});
+
 report();

@@ -379,6 +379,7 @@ const TECHS = {
 
 const AGES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
 const SAVE_PATH = 'aoe2mini:save';
+const MUTE_PATH = 'aoe2mini:muted';
 
 const T = { GRASS:0, WATER:1, FOREST:2, GOLD:3, STONE:4, BERRY:5 };
 
@@ -404,6 +405,19 @@ const RES_OF_TILE = {
 };
 const CARRY_COLOR = {
   food:'#e7b16a', wood:'#9ec96f', gold:'#f0d264', stone:'#c6c8cf',
+};
+
+/* every sound the game can make, authored by hand like AGES: one row per
+   sound, five fields each. `playSfx` (section 5) synthesises the row and the
+   section 14 checks bind to the `fire` column, so the table is the contract
+   both readers share. `freq` is the list one oscillator ramps through. */
+const SFX = {
+  hit:     { wave: 'triangle', freq: [170, 60],       dur: 0.14, gain: 0.35, fire: 'hitUnit' },
+  arrow:   { wave: 'sawtooth', freq: [880, 320],      dur: 0.10, gain: 0.18, fire: 'spawnArrow' },
+  build:   { wave: 'square',   freq: [220, 140],      dur: 0.20, gain: 0.25, fire: 'updateUnit' },
+  age:     { wave: 'triangle', freq: [392, 523, 659], dur: 0.60, gain: 0.30, fire: 'upgradeAge' },
+  victory: { wave: 'sawtooth', freq: [523, 659, 784], dur: 0.90, gain: 0.30, fire: 'setResult' },
+  defeat:  { wave: 'sawtooth', freq: [392, 311, 262], dur: 1.10, gain: 0.28, fire: 'setResult' },
 };
 
 /* --------------------------- 2. world / map ---------------------------- */
@@ -2943,7 +2957,7 @@ function stepGame(Game, dt) {
 /* --------------------------- public surface ---------------------------- */
 
 const AoE2 = {
-  CFG, KINDS, BLD, TECHS, AGES, T, PAL, TEAM, RES_OF_TILE,
+  CFG, KINDS, BLD, TECHS, AGES, T, PAL, TEAM, RES_OF_TILE, SFX, MUTE_PATH,
   SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor, BLD_SPRITES, bldSpriteFor,
   makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,
