@@ -193,7 +193,7 @@ proving check and the `Map of this file` banner stays truthful.
     no new assertion belongs here; `node tools/headless-check.js` still prints `194/194` and
     `assets/sprites.png` stays byte-identical.
 
-- [ ] T6: Docs sync and the full verification pass
+- [x] T6: Docs sync and the full verification pass
   - files: `docs/GAME_RULES.md` (the `## Buildings (BLD)` table at `docs/GAME_RULES.md:110`
     gains Market (1800 hp, 2×2, 175 wood, 60 s) and Watch Tower (850 hp, 1×1, 35 wood +
     125 stone, 80 s); the age-gate bullet stops naming only the Blacksmith and names every row

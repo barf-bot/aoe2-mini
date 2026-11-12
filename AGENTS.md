@@ -48,7 +48,7 @@ reads the JSON at runtime, it carries the rendered result.
 The game exports its internals for exactly this reason:
 
 ```js
-if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;  // index.html:2582
+if (typeof module !== 'undefined' && module.exports) module.exports = AoE2;  // index.html:2630
 ```
 
 If you add a new mechanic, add the check that proves it. Fix the test *and* the code with
@@ -60,7 +60,7 @@ stubbed `Image` that reports the right dimensions can still paint nothing (see
 
 - **Files over ~300 lines: write section-by-section (or via a terminal heredoc); use
   `patch` for edits.** A single 1400-line `write_file` has truncated mid-write before and
-  cost a full debugging cycle. `index.html` is 2589 lines — patch it, don't rewrite it.
+  cost a full debugging cycle. `index.html` is 2637 lines — patch it, don't rewrite it.
 - Keep the `Map of this file` banner (`index.html:89-105`) truthful when functions move.
 - Section 4 (`commands`) must stay DOM-free: pure functions taking `(Game, …)`. Anything
   that touches `document`/`window` belongs in sections 5-7, guarded with

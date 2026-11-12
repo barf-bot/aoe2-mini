@@ -44,6 +44,44 @@ across the plan.
   `index.html:NNN` reference and section range re-measured through
   `tools/audit-line-refs.js`.
 
+### Market and Watch Tower (T1–T6) — plan `docs/plans/2026-11-12-market-watch-tower.md`
+
+Two Feudal buildings (8ae891b → 9fa8321); the harness went 175 → 194 checks across the
+plan.
+
+- **T1 — the two rows, `e` and `c` (8ae891b):** `data/buildings.json` gains `market`
+  (1800 hp, 2×2, 175 wood, 60 s, **age 1**) and `watch_tower` (850 hp, 1×1, 35 wood +
+  125 stone, 80 s, **age 1**) on their vendored rows, plus the authored
+  `trade: { sell: 33, buy: 67 }` the upstream table has no column for;
+  `check-stats.mjs` learns a `tradeValue` helper and the optional-field pattern so the
+  generated `BLD` carries `trade`, `assets/sprites.png` stays byte-identical (both rows
+  are `noSprite`), and the `e`/`c` hotkeys join the keydown block (175 → 181 checks).
+- **T2 — `trade` (d494576):** one DOM-free §4 command sells or buys exactly 100 units of
+  food, wood or stone at the row's own rate; every refusal goes through `toast` before a
+  unit moves (`Cannot trade <>` for a resource the row excludes or an unknown direction,
+  `Not enough <res>`, `Still building`, the age gate, and a building with no trade rates
+  — `Barracks cannot trade`), and the `AoE2` export gains `trade` (181 → 188 checks).
+- **T3 — the trade surface (41ed51e):** `commandsHtml` grows six `data-act="trade"`
+  buttons on a finished Market — Sell/Buy per resource, args `food|sell`, `wood|buy`, … —
+  each button carrying `disabled` exactly when its own half would be refused, the
+  footer's delegated click handler dispatches `trade`, and the panel rebuilds in the same
+  tick so the stockpile numbers move on click (188 → 191 checks).
+- **T4 — the tower's shot (302d8a1):** checks only, because the Watch Tower adds no
+  combat code — they pin the row driving the existing arrow path (attack 5 scaled by the
+  age multiplier, accuracy 100, reload 2, reach `lineOfSight × CFG.TILE`), that it holds
+  fire while the enemy stands beyond that line, and that the Market (attack 0) never
+  fires (191 → 194 checks).
+- **T5 — the committed frame (9fa8321):** `tools/render-preview.js` places the pair in
+  the `simulateAndRender` fixture beside the blacksmith — Market east, Watch Tower west —
+  and `preview.png` regenerates showing all three procedural footprints.
+- **T6 — docs sync:** this entry plus `docs/GAME_RULES.md` (the two table rows, the
+  three-row age-gate bullet, the Market trade and Watch Tower rules, the `E`/`C` hotkeys),
+  `docs/ARCHITECTURE.md` (the §4 contents cell gains `trade`, the render paragraph names
+  the `noSprite` pair), `docs/ROADMAP.md` (P1.5 shipped, the leftovers recorded) and
+  `AGENTS.md` (the file-length claim, the export line) re-pointed at the final file —
+  every `index.html:NNN` reference and section range re-measured through
+  `tools/audit-line-refs.js`.
+
 ## [Unreleased] — 2026-11-11
 
 ### Board rules pass (T1–T5) — plan `docs/plans/2026-11-04-board-rules.md`
