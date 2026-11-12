@@ -1856,10 +1856,11 @@ function drawBuildings(Game, view) {
       c.fillRect(x + 4, y + 4, w - 8, 4);
       c.fillRect(x + 4, y + h - 8, w - 8, 4);
     }
-    if (b.queue.length) {
-      const total = KINDS[b.queue[0].kind].time;
+    const job = b.research ? { t: b.research.t, total: TECHS[b.research.id].time }
+      : b.queue.length ? { t: b.queue[0].t, total: KINDS[b.queue[0].kind].time } : null;
+    if (job) {
       c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(x, y - 6, w, 4);
-      c.fillStyle = '#5b8fd6'; c.fillRect(x, y - 6, w * (1 - b.queue[0].t / total), 4);
+      c.fillStyle = '#5b8fd6'; c.fillRect(x, y - 6, w * (1 - job.t / job.total), 4);
     }
     if (b.hp < b.maxHp) {
       c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(x, y - 10, w, 3);
@@ -2089,8 +2090,11 @@ function infoHtml(Game) {
   }
   const b = Game.selectedBuilding;
   if (b) {
+    const ups = Object.keys(TECHS).filter(id => TECHS[id].building === b.kind && Game.techs.has(id))
+      .map(id => TECHS[id].label);
     return '<h4>' + BLD[b.kind].label + '</h4>HP ' + Math.ceil(b.hp) + '/' + b.maxHp +
-      (b.field ? '<br>Field: ' + Math.ceil(b.field) : '');
+      (b.field ? '<br>Field: ' + Math.ceil(b.field) : '') +
+      (ups.length ? '<br>Upgrades: ' + ups.join(', ') : '');
   }
   return '<div class="hint">Left click or drag to select<br>Right click to move / attack / gather<br>WASD or screen edges pan<br>Ctrl+1..9 group, 1..9 recall</div>';
 }
@@ -2104,6 +2108,13 @@ function commandsHtml(Game) {
       const ok = canAfford(Game, b.team, KINDS[k].cost) && popUsed(Game, b.team) < popCap(Game, b.team);
       out.push('<button data-act="train" data-arg="' + k + '"' + (ok ? '' : ' disabled') + '>' +
         KINDS[k].label + '<span class="c">' + fmtCost(KINDS[k].cost) + '</span></button>');
+    }
+    for (const id in TECHS) {                        // research buttons for this building
+      const t = TECHS[id];
+      if (t.building !== b.kind || Game.techs.has(id)) continue;
+      out.push('<button data-act="research" data-arg="' + id + '"' +
+        (!canAfford(Game, b.team, t.cost) || b.research ? ' disabled' : '') + '>' +
+        t.label + '<span class="c">' + fmtCost(t.cost) + '</span></button>');
     }
   }
   if (b && b.built < 1) {
@@ -2140,6 +2151,12 @@ function queueHtml(Game) {
     return '<div class="hint">Building ' + BLD[b.kind].label + '</div><div class="bar"><i style="width:' +
       Math.round(100 * b.built) + '%"></i></div>';
   }
+  if (b.research) {                                  // the research slot shows its own bar
+    const r = b.research;
+    return '<div class="hint">Researching ' + TECHS[r.id].label + '</div><div class="bar"><i style="width:' +
+      Math.max(0, Math.min(100, 100 * (1 - r.t / TECHS[r.id].time))) + '%"></i></div>';
+  }
+
   if (!b.queue.length) return '<div class="hint">' + BLD[b.kind].label + ': idle</div>';
   const q = b.queue[0];
   const pct = Math.max(0, Math.min(100, 100 * (1 - q.t / KINDS[q.kind].time)));
@@ -2299,6 +2316,7 @@ function attachInput(Game, d) {
       const act = b.getAttribute('data-act'), arg = b.getAttribute('data-arg');
       if (act === 'build') Game.placing = arg;
       else if (act === 'train' && Game.selectedBuilding) train(Game, Game.selectedBuilding, arg);
+      else if (act === 'research' && Game.selectedBuilding) researchTech(Game, Game.selectedBuilding, arg);
       else if (act === 'cancel' && Game.selectedBuilding) cancelConstruction(Game, Game.selectedBuilding);
       else if (act === 'demolish' && Game.selectedBuilding) demolish(Game, Game.selectedBuilding);
       else if (act === 'age') upgradeAge(Game);
@@ -2557,7 +2575,7 @@ const AoE2 = {
   unitAnim,
   build, cancelConstruction, demolish, train, researchTech, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
-  popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame, commandsHtml, resultHtml,
+  popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame, commandsHtml, queueHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };
 

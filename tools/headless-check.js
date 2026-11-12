@@ -1914,6 +1914,49 @@ Game.selection = [];
 check(!bsDark && bsFeudal, 'ui: the Blacksmith button appears with the Feudal Age',
   'darkAge=' + bsDark + ' feudal=' + bsFeudal);
 
+// T5: the research surface. A built Blacksmith (fixture; the Game above is
+// Feudal since the age check) offers its unresearched TECHS rows as
+// data-act="research" buttons with costs, unaffordable ones disabled
+// (Bracer's 200 gold > our 50), researched ones gone; the queue panel grows
+// a Researching bar from b.research; and clicking a button dispatches
+// through the delegated listener to researchTech.
+Game.selection = [];
+Game.selectedBuilding = { kind: 'blacksmith', team: 0, built: 1, hp: 1800, maxHp: 1800, queue: [], research: null };
+const bsB = Game.selectedBuilding;
+const bsCmd = (() => {
+  const plain = AoE2.commandsHtml(Game);
+  Game.techs.add('forge');
+  const withForge = AoE2.commandsHtml(Game);
+  Game.techs.delete('forge');
+  return { plain, withForge };
+})();
+check(bsCmd.plain.includes('data-act="research" data-arg="forge"') &&
+  bsCmd.plain.includes('data-act="research" data-arg="fletching"') &&
+  bsCmd.plain.includes('100 F 50 G') &&
+  bsCmd.plain.includes('data-act="research" data-arg="bracer" disabled') &&
+  !bsCmd.withForge.includes('data-act="research" data-arg="forge"') &&
+  bsCmd.withForge.includes('data-act="research" data-arg="fletching"'),
+  'ui: a built Blacksmith offers its unresearched techs with their costs',
+  (bsCmd.plain.match(/data-act="research" data-arg="\w+"/g) || []).join(' ') || 'no research buttons');
+const qStart = (bsB.research = { id: 'forge', t: AoE2.TECHS.forge.time }, AoE2.queueHtml(Game));
+const qHalf = (bsB.research.t = 25, AoE2.queueHtml(Game));
+const qIdle = (bsB.research = null, AoE2.queueHtml(Game));
+check(qStart.includes('Researching Forge') && qStart.includes('width:0%') &&
+  qHalf.includes('Researching Forge') && qHalf.includes('width:50%') &&
+  qIdle.includes('Blacksmith: idle'),
+  'ui: the queue panel shows the research bar at the right percentage',
+  qStart.slice(0, 70) + ' | ' + qHalf.slice(0, 70));
+const rBtn = stubEl('button', 'btnRes', 60, 24);
+rBtn.setAttribute('data-act', 'research');
+rBtn.setAttribute('data-arg', 'scale_mail');
+const uiFood0 = Game.res[0].food;
+Game.dom.commands.listeners.click.forEach(fn => fn({ target: rBtn }));
+check(!!bsB.research && bsB.research.id === 'scale_mail' &&
+  bsB.research.t === AoE2.TECHS.scale_mail.time && Game.res[0].food === uiFood0 - 100,
+  'ui: clicking a research button starts that research and spends the cost',
+  'slot ' + JSON.stringify(bsB.research) + ' food ' + Game.res[0].food + ' was ' + uiFood0);
+Game.selectedBuilding = null;
+
 /* ---- 12. reset ------------------------------------------------------ */
 const unitsBeforeReset = Game.units.length;
 AoE2.resetGame(Game);

@@ -166,7 +166,7 @@ proving check and the `Map of this file` banner stays truthful.
     research at a time` (a second tech while the first is in flight), `research: a barracks
     cannot research a blacksmith tech`; the existing §8 training checks re-run unmodified.
 
-- [ ] T5: the research surface — buttons, bars, the upgrade list, the committed frame
+- [x] T5: the research surface — buttons, bars, the upgrade list, the committed frame
   - files: `index.html` §5 `infoHtml` (1983-2003, the selected-building branch), `commandsHtml`
     (2005-2040), `queueHtml` (2042-2054), `drawBuildings` (1766-1770), §6's delegated click
     handler (2201-2211), `tools/render-preview.js` (the fixture, next to the `makeUnit`

@@ -121,6 +121,11 @@ function simulateAndRender(G, Game, realView) {
   // T4 of the content port: an archer joins the frame through the same factory
   // train() uses, so the committed preview shows the new atlas cell.
   if (villagers[0]) G.makeUnit(Game, 'archer', 0, villagers[0].x + 26, villagers[0].y + 14);
+  // T5 of the blacksmith tech tree: a finished Blacksmith on the findSite
+  // tile beside the squad, so the committed frame shows it - with no atlas
+  // cell it draws through the procedural path T1 left it on.
+  if (villagers[0]) { const site = G.findSite(Game.world, Math.floor(villagers[0].x / G.CFG.TILE) + 1, Math.floor(villagers[0].y / G.CFG.TILE), 1);
+    const bs = G.makeBuilding(Game, 'blacksmith', 0, site.tx, site.ty); bs.built = 1; }
   G.renderFrame(Game);
 
   const png = realView.toBuffer('image/png');
