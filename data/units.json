@@ -13,6 +13,7 @@
     "cfg.GATHER_RATE", "cfg.CANCEL_REFUND", "cfg.AGE_FOOD", "cfg.WAVE_EVERY", "cfg.ACQUIRE",
     "cfg.BUILDING_ACQUIRE", "cfg.UNIT_SEP", "cfg.PAN_SPEED", "cfg.EDGE", "cfg.RES",
     "cfg.PROJ_SPEED", "cfg.ASTAR_MAX_NODES", "cfg.VERSION",
+    "cfg.AUTOSAVE_DEBOUNCE", "cfg.AUTOSAVE_EVERY",
     "units.*.label", "units.*.r", "units.*.buildable", "units.*.atkType"
   ],
   "design": {
@@ -40,7 +41,8 @@
     "PROJ_SPEED": 176,
     "ASTAR_MAX_NODES": 4000,
     "RES": { "tree": 60, "gold": 800, "stone": 450, "berry": 150 },
-    "VERSION": 1
+    "VERSION": 1,
+    "AUTOSAVE_DEBOUNCE": 2, "AUTOSAVE_EVERY": 30
   },
   "cfgNotes": {
     "TILE": "px per tile (single zoom level for now)",
@@ -58,7 +60,9 @@
     "EDGE": "px edge-scroll band",
     "PROJ_SPEED": "px/s an arrow flies (8 tiles/s - the table carries no projectile speed)",
     "ASTAR_MAX_NODES": "expansion cap for one A* query (the table carries no pathfinding budget)",
-    "VERSION": "save payload schema stamp - loadGame accepts only this version, migrate() converts older ones"
+    "VERSION": "save payload schema stamp - loadGame accepts only this version, migrate() converts older ones",
+    "AUTOSAVE_DEBOUNCE": "seconds a mutator waits before the save writes (a burst inside the window keeps ONE pending save)",
+    "AUTOSAVE_EVERY": "seconds between autosaves of a quiet game (the table carries no save cadence)"
   },
   "units": {
     "villager": {

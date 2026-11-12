@@ -2926,4 +2926,149 @@ loadCheck('load: the loaded HUD renders the same data-state', () => {
     ' selectedIsOwnBuilding=' + (g2.buildings.indexOf(g2.selectedBuilding) >= 0)];
 });
 
+/* The autosave schedule. Each check swaps a counting fakeStorage in for
+   global.localStorage so it can see exactly how many writes a frame made. */
+const autoCheck = (name, fn) => {
+  let out;
+  try { out = fn(); } catch (e) { bad(name, 'threw ' + e.message); return; }
+  check(out[0], name, out[1]);
+};
+const withStorage = (fn) => {
+  const keep = global.localStorage;
+  const s = fakeStorage();
+  global.localStorage = s;
+  try { return fn(s); } finally { global.localStorage = keep; }
+};
+/* A settlement with every cost payable and Feudal unlocked, so each command
+   below actually commits instead of refusing (a refusal never marks). */
+const fundedGame = () => {
+  const g = AoE2.createState();
+  g.res[0] = { food: 9000, wood: 9000, gold: 9000, stone: 9000 };
+  g.age = 1;
+  return g;
+};
+const builtAt = (g, kind, ty) => {
+  const s = AoE2.findSite(g.world, 40, ty, AoE2.BLD[kind].w) || { tx: 40, ty };
+  const b = AoE2.makeBuilding(g, kind, 0, s.tx, s.ty);
+  b.built = 1; b.hp = b.maxHp;
+  return b;
+};
+const siteAt = (g, kind, ty) => {
+  const s = AoE2.findSite(g.world, 40, ty, AoE2.BLD[kind].w) || { tx: 40, ty };
+  return AoE2.makeBuilding(g, kind, 0, s.tx, s.ty);
+};
+
+autoCheck('autosave: a fresh settlement is saved by the first frame', () => {
+  const g = AoE2.createState();
+  const startAt = g.autosaveAt;
+  return withStorage((s) => {
+    AoE2.stepGame(g, DT);
+    const raw = AoE2.storageGet(AoE2.SAVE_PATH);
+    const env = raw === null ? {} : JSON.parse(raw);
+    return [startAt === 0 && s.sets === 1 && env.version === AoE2.CFG.VERSION &&
+      env.state.time === DT && env.state.units.length === g.units.length,
+      'autosaveAt=' + startAt + ' writes=' + s.sets + ' version=' + env.version +
+      ' state.time=' + env.state.time + ' (DT=' + DT + ')'];
+  });
+});
+
+autoCheck('autosave: a burst of changes inside the window writes once', () => {
+  const g = fundedGame();
+  const tc = g.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+  const site = AoE2.findSite(g.world, 40, 44, 1) || { tx: 40, ty: 44 };
+  const market = builtAt(g, 'market', 46);
+  const v = g.units.find((u) => u.team === 0 && u.kind === 'villager');
+  return withStorage((s) => {
+    AoE2.stepGame(g, DT);                                  // the frame the burst happens in
+    const written = s.sets;
+    const burstTime = g.time;
+    g.selection = [v.id];
+    AoE2.issueOrder(g, v.x, v.y);
+    const house = AoE2.build(g, 'house', site.tx * AoE2.CFG.TILE, site.ty * AoE2.CFG.TILE);
+    AoE2.train(g, tc, 'villager');
+    if (house) AoE2.cancelConstruction(g, house);
+    AoE2.trade(g, market, 'food', 'sell');
+    const scheduled = g.autosaveAt;                            // the burst's schedule, before another frame runs
+    const quiet = Math.ceil(AoE2.CFG.AUTOSAVE_DEBOUNCE / DT) - 1;
+    for (let i = 0; i < quiet; i++) AoE2.stepGame(g, DT);
+    const held = s.sets;                                       // the debounced window holds: nothing written
+    AoE2.stepGame(g, DT);                                      // the window closes: the second write
+    return [written === 1 && scheduled === burstTime + AoE2.CFG.AUTOSAVE_DEBOUNCE && held === 1 && s.sets === 2,
+      'burst=' + written + ' scheduled=' + scheduled.toFixed(3) + ' after' + quiet + 'frames=' + held +
+      ' next=' + s.sets];
+  });
+});
+
+autoCheck('autosave: a quiet game writes only on the interval', () => {
+  const g = AoE2.createState();
+  return withStorage((s) => {
+    AoE2.stepGame(g, DT);                                  // the write at t
+    const first = s.sets;
+    const t = g.time;
+    const schedule = g.autosaveAt;
+    for (let i = 0; i < 899; i++) AoE2.stepGame(g, DT);
+    const quiet = s.sets;                                  // 899 frames later: still nothing written
+    AoE2.stepGame(g, DT);                                  // the 900th: t + CFG.AUTOSAVE_EVERY
+    return [first === 1 && schedule === t + AoE2.CFG.AUTOSAVE_EVERY && quiet === 1 && s.sets === 2 &&
+      g.autosaveAt === g.time + AoE2.CFG.AUTOSAVE_EVERY &&
+      Math.abs(g.time - t - AoE2.CFG.AUTOSAVE_EVERY) < DT,
+      'writes ' + first + '->' + quiet + '->' + s.sets + ' t=' + t.toFixed(3) +
+      ' schedule=' + schedule.toFixed(3) + ' now=' + g.time.toFixed(3)];
+  });
+});
+
+autoCheck('autosave: every mutator moves the schedule', () => {
+  const sites = [
+    ['issueOrder', (g) => {
+      const v = g.units.find((u) => u.team === 0 && u.kind === 'villager');
+      g.selection = [v.id];
+      AoE2.issueOrder(g, v.x, v.y);
+    }],
+    ['build', (g) => {
+      const s = AoE2.findSite(g.world, 40, 40, 1) || { tx: 40, ty: 40 };
+      AoE2.build(g, 'house', s.tx * AoE2.CFG.TILE, s.ty * AoE2.CFG.TILE);
+    }],
+    ['train', (g) => AoE2.train(g, g.buildings.find((b) => b.team === 0 && b.kind === 'town_center'), 'villager')],
+    ['cancelConstruction', (g) => AoE2.cancelConstruction(g, siteAt(g, 'house', 44))],
+    ['demolish', (g) => AoE2.demolish(g, builtAt(g, 'house', 45))],
+    ['removeBuilding', (g) => AoE2.removeBuilding(g, siteAt(g, 'house', 46))],
+    ['researchTech', (g) => AoE2.researchTech(g, builtAt(g, 'blacksmith', 47), 'forge')],
+    ['trade', (g) => AoE2.trade(g, builtAt(g, 'market', 48), 'food', 'sell')],
+    ['upgradeAge', (g) => AoE2.upgradeAge(g)],
+  ];
+  const tally = sites.map(([name, run]) => {
+    const g = fundedGame();
+    g.autosaveAt = Infinity;
+    run(g);
+    return name + '=' + (g.autosaveAt === g.time + AoE2.CFG.AUTOSAVE_DEBOUNCE ? 'ok' : String(g.autosaveAt));
+  });
+  const g = fundedGame();
+  g.autosaveAt = 5;
+  AoE2.resetGame(g);
+  const reset = g.autosaveAt === g.time;
+  return [tally.every((t) => t.endsWith('=ok')) && reset, tally.join(' ') + ' resetGame=' + reset];
+});
+
+autoCheck('autosave: a training that completes marks the game again', () => {
+  const g = fundedGame();
+  const tc = g.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+  return withStorage((s) => {
+    AoE2.stepGame(g, DT);                                  // the frame that writes the settlement
+    AoE2.train(g, tc, 'villager');
+    const afterTrain = g.autosaveAt;
+    const frames = Math.ceil(AoE2.KINDS.villager.time / DT) + 2;
+    let bornAt = null, bornSchedule = null;
+    for (let i = 0; i < frames; i++) {
+      const n = g.units.length;
+      AoE2.stepGame(g, DT);
+      if (bornAt === null && g.units.length > n) { bornAt = g.time; bornSchedule = g.autosaveAt; }
+    }
+    return [bornAt !== null && bornSchedule === bornAt + AoE2.CFG.AUTOSAVE_DEBOUNCE &&
+      bornSchedule > afterTrain,
+      'trained at t=' + (bornAt === null ? 'never' : bornAt.toFixed(3)) + ' schedule ' +
+      afterTrain.toFixed(3) + ' -> ' + (bornSchedule === null ? 'n/a' : bornSchedule.toFixed(3)) +
+      ' writes=' + s.sets];
+  });
+});
+
 report();

@@ -131,6 +131,8 @@ const CFG = {
   ASTAR_MAX_NODES: 4000,          // expansion cap for one A* query (the table carries no pathfinding budget)
   RES: { tree: 60, gold: 800, stone: 450, berry: 150 },
   VERSION: 1,                     // save payload schema stamp - loadGame accepts only this version, migrate() converts older ones
+  AUTOSAVE_DEBOUNCE: 2,           // seconds a mutator waits before the save writes (a burst inside the window keeps ONE pending save)
+  AUTOSAVE_EVERY: 30,             // seconds between autosaves of a quiet game (the table carries no save cadence)
 };
 
 // GENERATED FROM data/units.json -- edit the data or run `node tools/check-stats.mjs --write`.
@@ -729,6 +731,7 @@ function removeBuilding(Game, b) {
   Game.buildings.splice(i, 1);
   rebuildBlocks(Game);
   Game.mapEpoch++;                         // the walkable set moved again (findPath)
+  markDirty(Game);                         // the board changed, so a save is owed
   if (Game.selectedBuilding === b) Game.selectedBuilding = null;
   setResult(Game);
   return true;
@@ -796,6 +799,7 @@ function stepSim(Game, dt) {
       const job = b.queue.shift();
       const p = workPos(Game, b);
       makeUnit(Game, job.kind, b.team, p.x, p.y);
+      markDirty(Game);                     // a unit appearing is a change the sim made
       if (!b.queue.length) break;
     }
   }
@@ -806,6 +810,7 @@ function stepSim(Game, dt) {
     if (b.research.t <= 0) {
       const done = b.research.id;
       Game.techs.add(done);
+      markDirty(Game);                     // a finished tech is a change the sim made
       toast(Game, TECHS[done].label + ' researched');
       b.research = null;
     }
@@ -818,6 +823,7 @@ function stepSim(Game, dt) {
 
   if (Game.units.some(u => u.dead)) {
     Game.units = Game.units.filter(u => !u.dead);
+    markDirty(Game);                       // a death is a change the sim made
     Game.selection = Game.selection.filter(id => Game.units.some(u => u.id === id));
   }
 
@@ -1524,7 +1530,7 @@ function issueOrder(Game, wx, wy) {
     u.slot = slot;
     n++;
   });
-  if (n) Game.pingAt = Game.time;
+  if (n) { Game.pingAt = Game.time; markDirty(Game); }
 }
 
 /** Builder for a new site (T5, the multi-build bug): the old code took
@@ -1572,6 +1578,7 @@ function build(Game, kind, atX, atY) {
   const b = makeBuilding(Game, kind, 0, site.tx, site.ty);
   v.order = { kind: 'build', b: b.id };
   Game.placing = null;
+  markDirty(Game);                         // the spend and the new site are a change
   toast(Game, def.label + ' started');
   return b;
 }
@@ -1590,6 +1597,7 @@ function cancelConstruction(Game, b) {
   for (const u of Game.units) {
     if (!u.dead && u.order.kind === 'build' && u.order.b === b.id) u.order = { kind: 'idle' };
   }
+  markDirty(Game);                         // the refund and the lost site are a change
   removeBuilding(Game, b);
   toast(Game, def.label + ' cancelled');
   return true;
@@ -1606,6 +1614,7 @@ function demolish(Game, b) {
   if (b.kind === 'town_center') return toast(Game, 'Cannot demolish a Town Center');
   if (b.queue.length) return toast(Game, 'Still training');
   if (b.research) return toast(Game, 'Still researching');
+  markDirty(Game);                         // the lost building is a change
   removeBuilding(Game, b);
   toast(Game, def.label + ' demolished');
   return true;
@@ -1640,6 +1649,7 @@ function train(Game, bld, kind) {
   if (popUsed(Game, bld.team) >= popCap(Game, bld.team)) return toast(Game, 'Need more houses');
   spend(Game, bld.team, KINDS[kind].cost);
   bld.queue.push({ kind, t: KINDS[kind].time });
+  markDirty(Game);                         // the paid-for queue is a change
   return bld;
 }
 
@@ -1657,6 +1667,7 @@ function researchTech(Game, b, id) {
   if (!canAfford(Game, b.team, tech.cost)) return toast(Game, 'Not enough ' + missing(Game, b.team, tech.cost));
   spend(Game, b.team, tech.cost);
   b.research = { id, t: tech.time };
+  markDirty(Game);                         // the paid-for research is a change
   return b;
 }
 
@@ -1676,6 +1687,7 @@ function trade(Game, b, res, direction) {
   if (!canAfford(Game, b.team, lot)) return toast(Game, 'Not enough ' + missing(Game, b.team, lot));
   spend(Game, b.team, lot);
   refund(Game, b.team, gain);
+  markDirty(Game);                         // the swapped resources are a change
   return b;
 }
 
@@ -1686,6 +1698,7 @@ function upgradeAge(Game) {
   spend(Game, 0, cost);
   Game.age++;
   Game.ageBonus = Game.age;
+  markDirty(Game);                         // the age up is a change
   toast(Game, AGES[Game.age] + ' reached');
 }
 
@@ -1888,6 +1901,16 @@ function encodeState(Game) {
     started: Game.started,
     result: Game.result,
   };
+}
+
+/* The autosave schedule. A command never writes the save itself, it only pulls
+   Game.autosaveAt earlier (never later): a burst of changes inside the window
+   costs ONE write and a quiet game keeps its AUTOSAVE_EVERY rhythm. stepGame is
+   the only caller that writes, so neither stepSim nor the render path reaches
+   localStorage on its own. */
+function markDirty(Game) {
+  const due = Game.time + CFG.AUTOSAVE_DEBOUNCE;
+  if (due < Game.autosaveAt) Game.autosaveAt = due;
 }
 
 /* The envelope: { version, seed, writtenAt, state }. `at` pins writtenAt so the
@@ -2727,7 +2750,7 @@ function createState() {
     cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, placing: null,
     time: 0, wave: 0, age: 0, ageBonus: 0, techs: new Set(), nextId: 1, started: false, result: null, rnd: mulberry32(CFG.SEED),
     mapEpoch: 0, pathQueries: 0, // walkable-set epoch + findPath budget, both section-4 path state
-    dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0,
+    dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0, autosaveAt: 0,
   };
   Game.toast = (m) => toast(Game, m);
   resetGame(Game);
@@ -2741,6 +2764,7 @@ function resetGame(Game) {
   Game.buildings = [];
   Game.nextId = 1;
   Game.time = 0; Game.wave = 0; Game.age = 0; Game.ageBonus = 0; Game.techs = new Set(); Game.rnd = mulberry32(CFG.SEED);
+  Game.autosaveAt = Game.time;             // due now: the next frame writes this settlement
   Game.mapEpoch = 0; Game.pathQueries = 0; // section-4 path state: fresh map, no cached routes
   Game.selection = []; Game.selectedBuilding = null; Game.placing = null; Game.result = null;
   Game.mmBase = null;
@@ -2896,6 +2920,12 @@ function stepGame(Game, dt) {
   Game.cam.x = clamp(Game.cam.x, 0, Math.max(0, Game.world.w * CFG.TILE - view_W(Game)));
   Game.cam.y = clamp(Game.cam.y, 0, Math.max(0, Game.world.h * CFG.TILE - view_H(Game)));
   stepSim(Game, dt);
+  /* The autosave tick, last so the write carries the frame it just ran; the only
+     place in the game that ever writes the save. */
+  if (Game.time >= Game.autosaveAt) {
+    saveGame(SAVE_PATH, Game);
+    Game.autosaveAt = Game.time + CFG.AUTOSAVE_EVERY;
+  }
 }
 
 /* --------------------------- public surface ---------------------------- */
@@ -2911,7 +2941,7 @@ const AoE2 = {
   build, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
-  SAVE_PATH, saveGame, loadGame, storageGet, storageSet,
+  SAVE_PATH, saveGame, loadGame, markDirty, storageGet, storageSet,
   infoHtml, hudState, hudHtml, commandsHtml, queueHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };
