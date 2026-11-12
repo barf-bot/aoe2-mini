@@ -2376,14 +2376,16 @@ check(bannerCtl === 'left click / tap / drag to select, right click / press-and-
       footerCtl === 'WASD / arrows or screen edges pan',
   'input: the advertised controls name the keys the handler implements',
   'banner=' + JSON.stringify(bannerCtl) + ' footer=' + JSON.stringify(footerCtl));
-/* One-pointer rule (T1): a drag belongs to the pointer that started it, so a second
-   finger cannot drag the anchored box around and its release cannot end the first
-   finger's drag. The owning pointer's pointerup then answers exactly what the
-   mouse click at the same canvas point answers, so both routes agree. */
+/* One-pointer rule (T1): a drag belongs to the pointer that started it — a second
+   press cannot take the drag over, a second move cannot drag the anchored box around
+   and a second release cannot end it. The owning pointer's pointerup then answers
+   exactly what the mouse click at the same canvas point answers, so both routes agree. */
 const twoFinger = (() => {
   const s = {};
   doc.fire('pointerdown', { clientX: px, clientY: py, target: view, pointerId: 1 });
   s.anchor = Game.drag ? { x0: Game.drag.x0, x1: Game.drag.x1, id: Game.drag.id } : null;
+  doc.fire('pointerdown', { clientX: px + 6, clientY: py + 6, target: view, pointerId: 2 });
+  s.afterOtherDown = Game.drag ? { x0: Game.drag.x0, x1: Game.drag.x1, id: Game.drag.id } : null;
   doc.fire('pointermove', { clientX: px + 12, clientY: py + 12, target: view, pointerId: 2 });
   s.x1AfterOtherMove = Game.drag ? Game.drag.x1 : null;
   doc.fire('pointerup', { clientX: px + 12, clientY: py + 12, target: view, pointerId: 2 });
@@ -2395,6 +2397,7 @@ const twoFinger = (() => {
 })();
 check(twoFinger.anchor !== null && twoFinger.anchor.id === 1 &&
       twoFinger.anchor.x1 === twoFinger.anchor.x0 &&
+      JSON.stringify(twoFinger.afterOtherDown) === JSON.stringify(twoFinger.anchor) &&
       twoFinger.x1AfterOtherMove === twoFinger.anchor.x0 &&
       twoFinger.idAfterOtherUp === 1 && twoFinger.dragAfterOwnUp === null &&
       JSON.stringify(twoFinger.selAfterOwnUp) === JSON.stringify([pick.id]),
