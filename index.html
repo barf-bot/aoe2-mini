@@ -318,6 +318,12 @@ const BLD = {
     trains: ['archer'],
     attack: 0, meleeArmor: 1, pierceArmor: 8, lineOfSight: 6, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 10,
   },
+  blacksmith: {
+    label: 'Blacksmith', hp: 1800, w: 1, h: 1,
+    cost: { wood: 150 }, time: 40, pop: 0,
+    trains: [],
+    attack: 0, meleeArmor: 0, pierceArmor: 7, lineOfSight: 6, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 0, age: 1, noSprite: true,
+  },
 };
 
 const AGES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
@@ -1462,6 +1468,7 @@ function build(Game, kind, atX, atY) {
   const clicked = atX !== undefined && atY !== undefined
     ? { tx: Math.floor(atX / CFG.TILE), ty: Math.floor(atY / CFG.TILE) }
     : null;
+  if ((def.age ?? 0) > Game.age) return toast(Game, def.label + ' requires ' + AGES[def.age]);
   const v = pickBuilder(Game, clicked);
   if (!v) return toast(Game, Game.units.some(u => u.team === 0 && u.kind === 'villager')
     ? 'All villagers are building' : 'No villager available');
@@ -2024,6 +2031,7 @@ function commandsHtml(Game) {
     for (const k in BLD) {
       if (k === 'town_center') continue;
       const def = BLD[k];
+      if ((def.age ?? 0) > Game.age) continue;   // age-locked kinds are not offered at all
       out.push('<button data-act="build" data-arg="' + k + '"' +
         (Game.placing === k ? ' class="armed"' : '') +
         (canAfford(Game, 0, def.cost) ? '' : ' disabled') + '>' +
@@ -2191,6 +2199,7 @@ function attachInput(Game, d) {
     if (k === 'g') { Game.placing = Game.placing === 'mining_camp' ? null : 'mining_camp'; return; }
     if (k === 'm') { Game.placing = Game.placing === 'mill' ? null : 'mill'; return; }
     if (k === 'r') { Game.placing = Game.placing === 'archery_range' ? null : 'archery_range'; return; }
+    if (k === 'k') { Game.placing = Game.placing === 'blacksmith' ? null : 'blacksmith'; return; }
     if (k === 't') { upgradeAge(Game); return; }
     setKey(k, true);
   });

@@ -1,6 +1,6 @@
 # Blacksmith tech tree
 
-Status: planned
+Status: in progress
 
 ## Design
 
@@ -41,7 +41,7 @@ proving check and the `Map of this file` banner stays truthful.
 
 ## Tasks
 
-- [ ] T1: The Blacksmith row, the age gate and the `k` hotkey
+- [x] T1: The Blacksmith row, the age gate and the `k` hotkey
   - files: `data/buildings.json` (`buildings.blacksmith` + `source.rule` + `source.authored`),
     `tools/check-stats.mjs` (`bldValue`, the optional-field pattern at `tools/check-stats.mjs:101`),
     `index.html` §1 `BLD` (regenerated), §4 `build` (`index.html:1459-1468`), §5 `commandsHtml`

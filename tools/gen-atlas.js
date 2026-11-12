@@ -106,7 +106,8 @@ async function main() {
   const arg = (name, dflt) => { const i = argv.indexOf('--' + name); return i === -1 ? dflt : argv[i + 1]; };
   const OUT = path.resolve(arg('out', path.join(ROOT, 'assets', 'sprites.png')));
 
-  /* --- every unit kind in KINDS needs its anims, every BLD kind a frame --- */
+  /* --- every unit kind in KINDS needs its anims, every BLD kind a frame
+   *     (kinds marked noSprite carry no cell and are exempt) --- */
   for (const kind of Object.keys(G.KINDS)) {
     if (!M.units[kind]) fail(`KINDS.${kind} has no entry in data/sprites.json`);
   }
@@ -114,6 +115,7 @@ async function main() {
     if (!G.KINDS[kind]) fail(`data/sprites.json has a unit kind '${kind}' that KINDS lacks`);
   }
   for (const kind of Object.keys(G.BLD)) {
+    if (G.BLD[kind].noSprite) continue;   // age-gated kinds with no cell yet (see check-stats BLD.*)
     if (!M.buildings[kind]) fail(`BLD.${kind} has no entry in data/sprites.json`);
   }
   for (const kind of Object.keys(M.buildings)) {

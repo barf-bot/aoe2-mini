@@ -459,9 +459,13 @@ check(AoE2.unitAnim(am) === 'walk', 'anim: ordered militia walk', AoE2.unitAnim(
 // Task 5: every building kind x team has a cell, drawn at its exact footprint
 // (b.w*TILE x b.h*TILE), reachable through bldSpriteFor, and no building cell
 // collides with a unit cell or another building cell (shared rect set from 5b).
+// Rule amended by the blacksmith plan (T1): every BLD kind has a cell per team,
+// EXCEPT a kind marked `noSprite` -- those must answer bldSpriteFor(...) ===
+// null, which is what routes the renderer to its procedural look (index.html:1760).
 let bldSpriteErr = '';
 const bldRects = new Set(rects);
-for (const kind of Object.keys(AoE2.BLD)) {
+const cellKinds = Object.keys(AoE2.BLD).filter((k) => !AoE2.BLD[k].noSprite);
+for (const kind of cellKinds) {
   const cells = AoE2.BLD_SPRITES[kind];
   if (!Array.isArray(cells) || cells.length !== AoE2.TEAM.length) {
     bldSpriteErr = `BLD_SPRITES.${kind}: expected one cell per team`; break;
@@ -485,13 +489,23 @@ for (const kind of Object.keys(AoE2.BLD)) {
     bldRects.add(key);
   });
 }
+
+for (const kind of Object.keys(AoE2.BLD)) {          // noSprite kinds answer null
+  if (!AoE2.BLD[kind].noSprite) continue;
+  for (let team = 0; team < AoE2.TEAM.length && !bldSpriteErr; team++) {
+    if (AoE2.bldSpriteFor(kind, team) !== null)
+      bldSpriteErr = `bldSpriteFor('${kind}', ${AoE2.TEAM[team].name}): a noSprite kind must answer null`;
+  }
+}
 for (const kind of Object.keys(AoE2.BLD_SPRITES)) {          // catch stray entries
   if (!AoE2.BLD[kind]) { bldSpriteErr = 'BLD_SPRITES entry for unknown kind ' + kind; break; }
 }
-check(!bldSpriteErr, 'sprites: every building kind x team has a unique cell at its exact footprint',
+check(!bldSpriteErr, 'sprites: every BLD kind has a cell per team (noSprite answers null)',
   bldSpriteErr ? 'bad: ' + bldSpriteErr
-    : Object.keys(AoE2.BLD).length * AoE2.TEAM.length + ' building cells + ' +
-      cellCount + ' unit cells in the ' + sheet.w + 'x' + sheet.h + ' sheet');
+    : cellKinds.length * AoE2.TEAM.length + ' building cells + ' + cellCount +
+      ' unit cells in the ' + sheet.w + 'x' + sheet.h + ' sheet' +
+      (cellKinds.length === Object.keys(AoE2.BLD).length ? ''
+        : ' (+' + (Object.keys(AoE2.BLD).length - cellKinds.length) + ' noSprite kinds)'));
 
 /* ---- 5c. atlas wiring ----------------------------------------------- */
 // setAtlas is the single injection point for the sheet, so the renderer has one
@@ -1210,6 +1224,53 @@ check(!!mbHouse && !!mbFarm && !!mbBuilders &&
     : 'house builder [' + mbBuilders[0].join(',') + '] farm builder [' + mbBuilders[1].join(',') + ']' +
       ' built ' + Math.round(mbHouse.built * 100) + '%/' + Math.round(mbFarm.built * 100) + '%');
 
+// T1 blacksmith: the BLAC row joins BLD behind an authored `age` gate -- a
+// Dark Age village is refused with a toast before any villager is drafted
+// (the gate runs ahead of pickBuilder), and from Feudal on the table's
+// numbers are real: exactly the row's 150 wood and its 40s site.
+const bsGate = (() => {
+  const st = AoE2.createState();
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const wood0 = st.res[0].wood;
+  let built, threw = null;
+  try { built = AoE2.build(st, 'blacksmith'); } catch (e) { threw = e; }
+  return { built, threw, toast: st.toastMsg, wood: st.res[0].wood, wood0, order: v && v.order.kind };
+})();
+check(!bsGate.threw && bsGate.built === undefined &&
+      bsGate.toast === 'Blacksmith requires Feudal Age' && bsGate.wood === bsGate.wood0,
+  'build: a Dark Age settlement cannot raise a Blacksmith (Feudal only)',
+  bsGate.threw ? 'threw: ' + bsGate.threw.message
+    : 'built=' + String(bsGate.built) + ' toast=' + JSON.stringify(bsGate.toast) +
+      ' wood=' + bsGate.wood + ' (was ' + bsGate.wood0 + ')');
+const bsF = (() => {
+  const st = AoE2.createState();
+  st.age = 1;
+  st.res[0].wood = 200;                               // START holds 100; the row costs 150
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const spot = freeSpotAround(st.world, st, tOf(v.x), tOf(v.y), 1, 1, 8);
+  st.selection = [v.id];                              // pin the builder so the walk is deterministic, as the §7 house check does
+  const wood0 = st.res[0].wood;
+  let b, threw = null;
+  try { b = spot && AoE2.build(st, 'blacksmith', spot.tx * AoE2.CFG.TILE + 4, spot.ty * AoE2.CFG.TILE + 4); }
+  catch (e) { threw = e; }
+  const spent = b ? wood0 - st.res[0].wood : NaN;
+  // Work only accrues once the builder reaches the site (updateUnit's build
+  // branch works on arrival), so a 1x1 pad off the corner costs a short walk
+  // the §7 house fixture never pays -- its 2x2 footprint reaches the builder's
+  // own tile. Step to completion and compare the duration with the table's
+  // time: never faster, and the walk capped at 8s (the pad is <= 8 tiles off).
+  const time = AoE2.BLD.blacksmith && AoE2.BLD.blacksmith.time;
+  let steps = 0;
+  if (b) while (b.built < 1 && steps < Math.ceil((time + 8) / DT)) { AoE2.stepGame(st, DT); steps++; }
+  return { spot, b, threw, spent, built: b ? b.built : 0, seconds: +(steps * DT).toFixed(2), time };
+})();
+check(!!bsF.spot && !bsF.threw && !!bsF.b && Math.round(bsF.spent) === 150 &&
+      bsF.built >= 1 && bsF.seconds >= bsF.time - DT && bsF.seconds <= bsF.time + 8,
+  "build: a Feudal Blacksmith costs the table's 150 wood and completes in 40s",
+  !bsF.spot ? 'no free 1x1 pad near a villager'
+    : bsF.threw ? 'threw: ' + bsF.threw.message
+      : 'spent=' + bsF.spent + ' built in ' + bsF.seconds + 's (table ' + bsF.time + 's + walk)');
+
 /* ---- 7b. camps + drop-off routing (v2 task 3) ----------------------- */
 // Lumber/Mining camps and the Mill join BLD at their AoE2 costs and sizes, and
 // a carrying villager must walk to the DEDICATED building for what they carry
@@ -1608,6 +1669,11 @@ check(Game.placing === null, 'command: Esc cancels placement', String(Game.placi
   check(Game.placing === want, 'command: hotkey ' + k + ' arms ' + want + ' placement', String(Game.placing));
   doc.fire('keydown', { key: 'Escape', target: view });
 });
+doc.fire('keydown', { key: 'k', target: view });
+const kPlacing = Game.placing;
+doc.fire('keydown', { key: 'Escape', target: view });
+check(kPlacing === 'blacksmith' && Game.placing === null,
+  'input: k arms Blacksmith placement', 'k=' + String(kPlacing) + ' esc=' + String(Game.placing));
 const mmBefore = Game.cam.x;
 doc.getElementById('minimap').fire('mousedown', { clientX: 84, clientY: 84, target: doc.getElementById('minimap') });
 check(Game.cam.x !== mmBefore, 'input: minimap click moves the camera', mmBefore + ' -> ' + Math.round(Game.cam.x));
@@ -1705,6 +1771,19 @@ check(Game.age === 1 && Game.res[0].food === 400, 'age: Feudal Age costs 500 foo
 check(AoE2.AGES[Game.age] === 'Feudal Age', 'age: label follows the age', AoE2.AGES[Game.age]);
 check(AoE2.upgradeAge(Game) === undefined && Game.res[0].food === 400 || true, 'age: Castle Age needs 1000 food',
   JSON.stringify(Game.toastMsg));
+// T1: the gate in the command bar -- paired states like the half/done checks
+// above: a Dark Age village (fresh fixture) offers no Blacksmith button, and
+// the now-Feudal Game (the age check above) does.
+const bsDark = (() => {
+  const st = AoE2.createState();
+  st.selection = st.units.filter((u) => u.team === 0 && u.kind === 'villager').map((u) => u.id);
+  return AoE2.commandsHtml(st).includes('data-arg="blacksmith"');
+})();
+Game.selection = blueVill().map((u) => u.id);
+const bsFeudal = AoE2.commandsHtml(Game).includes('data-act="build" data-arg="blacksmith"');
+Game.selection = [];
+check(!bsDark && bsFeudal, 'ui: the Blacksmith button appears with the Feudal Age',
+  'darkAge=' + bsDark + ' feudal=' + bsFeudal);
 
 /* ---- 12. reset ------------------------------------------------------ */
 const unitsBeforeReset = Game.units.length;

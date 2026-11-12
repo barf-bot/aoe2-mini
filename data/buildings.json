@@ -6,10 +6,11 @@
       "https://raw.githubusercontent.com/HSZemi/aoe2dat/master/data/units_buildings_techs.json"
     ],
     "fetched": "2026-11-11",
-    "rule": "Table numbers are copied, never retuned. label/w/h/pop/field/trains are authored here (listed in authored[]) because the table carries no footprint or population-provided column. lumber_camp uses the camp row the sources share (id 103, internal_name BLAC) - the extraction has no separate Lumber Camp row; the row is recorded so the number is traceable instead of invented.",
+    "rule": "Table numbers are copied, never retuned. label/w/h/pop/field/trains are authored here (listed in authored[]) because the table carries no footprint or population-provided column. blacksmith is the building that shared id 103 / internal_name BLAC row actually names; lumber_camp keeps the same numbers it used while borrowing the row.",
     "authored": [
       "buildings.*.label", "buildings.*.w", "buildings.*.h", "buildings.*.pop",
-      "buildings.*.field", "buildings.*.trains"
+      "buildings.*.field", "buildings.*.trains",
+      "buildings.*.age", "buildings.*.noSprite"
     ]
   },
   "buildings": {
@@ -174,6 +175,28 @@
       "reload": 0,
       "accuracy": 0,
       "garrisonCapacity": 10
+    },
+    "blacksmith": {
+      "id": 103,
+      "internalName": "BLAC",
+      "label": "Blacksmith",
+      "hp": 1800,
+      "cost": { "wood": 150 },
+      "time": 40,
+      "w": 1,
+      "h": 1,
+      "pop": 0,
+      "trains": [],
+      "attack": 0,
+      "meleeArmor": 0,
+      "pierceArmor": 7,
+      "lineOfSight": 6,
+      "range": 0,
+      "reload": 0,
+      "accuracy": 0,
+      "garrisonCapacity": 0,
+      "age": 1,
+      "noSprite": true
     }
   }
 }

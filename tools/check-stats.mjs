@@ -99,6 +99,9 @@ function bldValue(b) {
     garrisonCapacity: mustNum(b.garrisonCapacity, `${where}.garrisonCapacity`),
   };
   if (b.field !== undefined) v.field = mustNum(b.field, `${where}.field`);
+  if (b.age !== undefined) v.age = mustNum(b.age, `${where}.age`);
+  if (b.noSprite !== undefined) v.noSprite = typeof b.noSprite === 'boolean'
+    ? b.noSprite : fail(`${where}.noSprite must be true/false`);
   return v;
 }
 
@@ -136,7 +139,7 @@ function renderBLD() {
   const body = Object.keys(bldsDoc.buildings).map((name) => {
     const v = bldValue(bldsDoc.buildings[name]);
     const extras = ['attack', 'meleeArmor', 'pierceArmor', 'lineOfSight', 'range', 'reload',
-                    'accuracy', 'garrisonCapacity', 'field'].filter((k) => v[k] !== undefined);
+                    'accuracy', 'garrisonCapacity', 'field', 'age', 'noSprite'].filter((k) => v[k] !== undefined);
     return [
       `  ${name}: {`,
       `    label: '${v.label}', hp: ${v.hp}, w: ${v.w}, h: ${v.h},`,
