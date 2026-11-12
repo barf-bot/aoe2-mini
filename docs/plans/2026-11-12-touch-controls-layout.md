@@ -1,6 +1,6 @@
 # Touch controls + responsive layout (round: P2 #11)
 
-Status: done
+Status: in progress
 
 ## Design
 
