@@ -61,11 +61,17 @@ prototypes stall.
    frames belong to this item too. Resource objects and ground tiles drawn from `PAL`
    remain. *Done when:* the same atlas approach covers the resource objects and the
    `noSprite` rows without growing the repo past one small PNG.
-9. **Save/load** via `localStorage` — `Game` is already a plain object, so `JSON`
-   serialisation is nearly free; needs version-stamping.
+9. **Save/load** via `localStorage`. Shipped 2026-11-12 by the save/load plan
+   (`docs/plans/2026-11-12-save-load.md`): `saveGame` writes the version-stamped
+   `{ version, seed, writtenAt, state }` envelope into the one `SAVE_PATH` slot,
+   `loadGame(path, Game, raw)` validates it and puts the game back on the board (the page now
+   reopens on the saved game), and the debounced autosave writes without a `Save` press.
+   Left over: multiple save slots, cloud sync and share codes — folded into P2 item 12.
 10. **Sound** — tiny embedded blips for attack/build/age-up.
 11. **Touch controls** for phones (tap-select, long-press command), plus a responsive layout.
-12. **Replay / seeded challenge** — the `mulberry32` seed is already a shareable handle on a map.
+12. **Replay / seeded challenge** — the `mulberry32` seed is already a shareable handle on a
+    map, and the save payload is the raw material for a replay; carries save/load's leftovers
+    too: multiple save slots, cloud sync and share codes.
 
 ## Phase 2 of the 2026-11-04 rules pass (designed, not yet planned)
 

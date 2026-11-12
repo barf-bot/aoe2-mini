@@ -147,6 +147,56 @@ the first fix adds.
   `index.html:NNN` reference and section range re-measured through
   `tools/audit-line-refs.js`.
 
+### Save/load via localStorage (T1–T5) — plan `docs/plans/2026-11-12-save-load.md`
+
+The game remembers the session (a2c29c1 → b411139); the harness went 217 → 248 checks across
+the plan, `check-stats.mjs` 322 → 325 fields, and `assets/sprites.png` / `preview.png` stayed
+byte-identical (no render path changed).
+
+- **T1 — the save side (a2c29c1):** `CFG.VERSION: 1` joins `data/units.json` (with its
+  `cfgNotes` line and `authored[]` entry) so the schema stamp is vendored like every other
+  number, `SAVE_PATH = 'aoe2mini:save'` is declared beside `const AGES`, and the §4
+  `save / load` block gets the two-function door to `localStorage` — `storageGet` answers
+  `null`, `storageSet` answers `false` (and removes the key on `null`) whenever the platform has
+  no storage or refuses the write, which is how node and private mode keep running — plus
+  `encodeState` and `saveGame(path, Game, at = now())` writing the `{ version, seed, writtenAt,
+  state }` envelope. Pinning `writtenAt` is what turns `save -> load -> save` into a byte
+  comparison; the encoded field list becomes the harness's `SAVE_FIELDS` contract, `Game.techs`
+  and `Game.blocks` leave as an array and an object, a projectile's target leaves as `tk` +
+  `tid`, and an order's `src` leaves as the tile or farm it names (217 → 225 checks, 323 stat
+  fields).
+- **T2 — the load side (83116d3):** `loadGame(path, Game, raw = storageGet(path))` answers a
+  boolean and never throws — the whole refusal ladder (no slot, empty slot, unparseable text, a
+  `version` `migrate` cannot read, a shape `validState` cannot walk) ends in
+  `resetGame(Game); return false`. `decodeState` restores in dependency order, bumps `mapEpoch`
+  so every cached route re-paths around the loaded buildings, relinks each `order.src` and each
+  projectile `t` to the decoded objects instead of frozen copies, and rebuilds `Game.rnd` from the
+  envelope's seed. The shipped signature is this three-argument one rather than the design's
+  `loadGame(path, raw)`: the target `Game` is the middle argument so a test — or `boot` — can load
+  a slot into a game that already exists (225 → 237 checks).
+- **T3 — the autosave schedule (6ce19b9):** `CFG.AUTOSAVE_DEBOUNCE: 2` and `CFG.AUTOSAVE_EVERY:
+  30` join `data/units.json`, `Game.autosaveAt` joins `createState`/`resetGame`, and
+  `markDirty(Game)` — called by every §4 mutator and by `stepSim`'s three completion events —
+  pulls the schedule earlier and never later, so a burst of commands inside the window costs ONE
+  write while a quiet game keeps its 30 s rhythm. The write itself sits in `stepGame` AFTER
+  `stepSim(Game, dt)` — the plan said before, and after is what makes the saved payload carry the
+  frame that just ran (`state.time === DT`), which is what the new check asserts — so `stepSim`
+  itself never writes and harness loops touch no storage (237 → 242 checks, 325 stat fields).
+- **T4 — the page surface (b411139):** the header ends with
+  `<button id="save" class="save" type="button">Save</button>` — `margin-left:auto` keeps the
+  resource row from reflowing, so the header height and `preview.png` cannot move — and clicking
+  it writes the slot and toasts `Saved`; `boot` reads the slot straight after `createState()`,
+  ahead of the `!d` guard so a doc-less boot restores like a browser one; and the three new-game
+  paths (`N`, the footer's `New map`, the victory overlay's `New game`) clear the slot before
+  `resetGame`, which schedules the rewrite (242 → 248 checks).
+- **T5 — docs sync:** this entry plus `docs/GAME_RULES.md` (the `## Save / load` section and the
+  `N` hotkey), `docs/ARCHITECTURE.md` (the §1–§7 and public-surface spans, the §4 block
+  citations including `save / load`, `autosaveAt` plus the persistence note in the `Game` block,
+  the `### Save / load` subsection and the harness count), `docs/ROADMAP.md` (P2.9 shipped, its
+  leftovers folded into P2.12) and `AGENTS.md` (the file-length claim, the export line, the
+  `Map of this file` span) re-pointed at the final file — every `index.html:NNN` reference and
+  section range re-measured through `tools/audit-line-refs.js`.
+
 ## [Unreleased] — 2026-11-11
 
 ### Board rules pass (T1–T5) — plan `docs/plans/2026-11-04-board-rules.md`
