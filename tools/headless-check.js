@@ -2449,6 +2449,53 @@ doc.fire('pointermove', { clientX: 300, clientY: 712, target: cmdBarEl });
 AoE2.stepGame(Game, DT);
 check(Game.cam.y === camF && Game.mouse === null,
   'input: hovering the footer command bar does not pan', camF + ' -> ' + Game.cam.y);
+/* ---- 10c. touch: press-and-hold command (this plan, T2) ---- */
+/* A LONG_PRESS_MS press that never moved fires the same dispatch the right-click
+   path uses, which is how a phone issues orders. The three releases below are the
+   whole decision table: hold → order, short tap → select, move → box select. */
+const hv = blueVill()[0];
+const pt = (dx, dy, ts) => ({ clientX: hv.x - Game.cam.x + dx, clientY: hv.y - Game.cam.y + dy,
+                              target: view, timeStamp: ts });
+const orderOf = (u) => JSON.stringify(u.order);
+
+const holdGround = (() => {
+  const s = {};
+  doc.fire('pointerdown', pt(0, 0, 0));
+  doc.fire('pointerup', pt(0, 0, 10));                 // the T1 tap: select him
+  s.sel = Game.selection.slice(); s.bld = Game.selectedBuilding; s.ord0 = orderOf(hv);
+  doc.fire('pointerdown', pt(44, 0, 0));               // then hold 700 ms on ground
+  doc.fire('pointerup', pt(44, 0, 700));
+  s.kind = hv.order && hv.order.kind; s.ord = orderOf(hv);
+  s.selNow = Game.selection.slice(); s.bldNow = Game.selectedBuilding; s.drag = Game.drag;
+  return s;
+})();
+check(['move', 'harvest'].indexOf(holdGround.kind) >= 0 && holdGround.drag === null &&
+      JSON.stringify(holdGround.selNow) === JSON.stringify(holdGround.sel) &&
+      holdGround.bldNow === holdGround.bld,
+  'input: a 600 ms hold on ground issues the order the right-click path uses',
+  JSON.stringify(holdGround));
+
+const shortTap = (() => {
+  const s = { sel: Game.selection.slice(), ord: orderOf(hv) };
+  doc.fire('pointerdown', pt(0, 0, 0));
+  doc.fire('pointerup', pt(0, 0, 300));                // the desktop tap, unchanged
+  s.selNow = Game.selection.slice(); s.ordNow = orderOf(hv); s.drag = Game.drag;
+  return s;
+})();
+check(shortTap.drag === null && shortTap.selNow.length === 1 && shortTap.selNow[0] === hv.id &&
+      shortTap.ordNow === shortTap.ord,
+  'input: a hold shorter than 600 ms selects and commands nobody', JSON.stringify(shortTap));
+
+const moveHold = (() => {
+  const s = { ord: orderOf(hv) };
+  doc.fire('pointerdown', pt(-12, -12, 0));
+  doc.fire('pointermove', pt(0, 0, 400));
+  doc.fire('pointerup', pt(0, 0, 700));                // moved 12 px: a drag, not a hold
+  s.sel = Game.selection.slice(); s.ordNow = orderOf(hv); s.drag = Game.drag;
+  return s;
+})();
+check(moveHold.drag === null && moveHold.ordNow === moveHold.ord && moveHold.sel.indexOf(hv.id) >= 0,
+  'input: moving then releasing commands nobody, whatever the hold', JSON.stringify(moveHold));
 
 /* ---- 11. command bar buttons ---------------------------------------- */
 Game.selection = [];

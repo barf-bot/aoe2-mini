@@ -383,6 +383,10 @@ const TECHS = {
 const AGES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
 const SAVE_PATH = 'aoe2mini:save';
 const MUTE_PATH = 'aoe2mini:muted';
+/* touch: a press this long that stayed inside this many pixels is the right-click
+   the desktop has. Hand-written beside SAVE_PATH/MUTE_PATH, not in CFG — that block
+   is generated from data/units.json by tools/check-stats.mjs. */
+const LONG_PRESS_MS = 600; const LONG_PRESS_SLOP = 8;
 
 const T = { GRASS:0, WATER:1, FOREST:2, GOLD:3, STONE:4, BERRY:5 };
 
@@ -2653,14 +2657,19 @@ function pointerDown(Game, p) {
   Game.drag = { x0: p.sx, y0: p.sy, x1: p.sx, y1: p.sy, t0: p.t, id: p.id };
 }
 
-/** Where a pointer came up: a still press selects what is under it, a moved press
- *  selects the box it swept (villagers win a mixed drag, as in AoE2). `t0` and `id`
- *  are carried through for the press-and-hold rule, which reads them before this. */
+/** Where a pointer came up, decided by what the press did. A LONG_PRESS_MS press
+ *  that never moved is the touch right-click — the exact `issueOrder` call the
+ *  contextmenu listener makes, so the two triggers cannot diverge, and, like a
+ *  right-click, it leaves the selection alone. Any shorter press selects: the unit
+ *  under the point, or the box it swept (villagers win a mixed drag, as in AoE2). */
 function pointerUp(Game, p) {
   if (!Game.drag || p.id !== Game.drag.id) return;
   const drag = Game.drag;
   Game.drag = null;
   const dx = Math.abs(p.sx - drag.x0), dy = Math.abs(p.sy - drag.y0);
+  if (dx < LONG_PRESS_SLOP && dy < LONG_PRESS_SLOP && p.t - drag.t0 >= LONG_PRESS_MS) {
+    issueOrder(Game, p.x, p.y); return;
+  }
   Game.selectedBuilding = null;
   if (dx < 4 && dy < 4) {
     const hit = pickUnit(Game, p.x, p.y);

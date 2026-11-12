@@ -139,7 +139,7 @@ to re-decide):
     Visual: `node tools/render-preview.js` + look at `preview.png` — expected byte-identical, the
     proof that the desktop frame did not move.
 
-- [ ] T2: press-and-hold issues the command a right-click gives
+- [x] T2: press-and-hold issues the command a right-click gives
   - files: `index.html` — §1 hand-written block after `MUTE_PATH` (`index.html:385`, add
     `const LONG_PRESS_MS = 600; const LONG_PRESS_SLOP = 8;`), §6 `pointerUp` (the function T1 put
     at `index.html:2645`) gains the hold branch; `tools/headless-check.js` — a new
