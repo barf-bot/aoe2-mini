@@ -24,24 +24,29 @@ function unitsInBox(Game, ax, ay, bx, by) {
 }
 /** Where a pointer went down, in every frame the command needs: the canvas point
  *  (drag box), the world point (order / build target) and the press identity
- *  (t = timeStamp, id = pointerId) that tells a tap from a hold and one finger
- *  from two. `attachInput` derives it from the event; the pure helpers never
- *  touch the DOM, so the harness can drive mouse and touch through the same code. */
+ *  (t = timeStamp, id = pointerId, type = pointerType) that tells a tap from a hold
+ *  and a finger from a cursor. `attachInput` derives it from the event; the pure
+ *  helpers never touch the DOM, so the harness can drive mouse and touch through the
+ *  same code. A second finger turns the press into a camera pan (`fingerDown`) and
+ *  marks the drag it lands in, so the selection box stops where it already was. */
 function pointerDown(Game, p) {
   if (Game.placing) { build(Game, Game.placing, p.x, p.y); return; }
-  if (Game.drag && p.id !== Game.drag.id) return;   // one live drag: its own pointer
-  Game.drag = { x0: p.sx, y0: p.sy, x1: p.sx, y1: p.sy, t0: p.t, id: p.id };
+  const pan = fingerDown(Game, p);
+  if (Game.drag && p.id !== Game.drag.id) { Game.drag.pan = pan; return; }  // not its finger: keep the anchor
+  Game.drag = { x0: p.sx, y0: p.sy, x1: p.sx, y1: p.sy, t0: p.t, id: p.id, pan };
 }
 
 /** Where a pointer came up, decided by what the press did. A LONG_PRESS_MS press
  *  that never moved is the touch right-click — the exact `issueOrder` call the
  *  contextmenu listener makes, so the two triggers cannot diverge, and, like a
  *  right-click, it leaves the selection alone. Any shorter press selects: the unit
- *  under the point, or the box it swept (villagers win a mixed drag, as in AoE2). */
+ *  under the point, or the box it swept (villagers win a mixed drag, as in AoE2) —
+ *  unless the pan consumed it (`drag.pan`), which is the `pointercancel` case. */
 function pointerUp(Game, p) {
   if (!Game.drag || p.id !== Game.drag.id) return;
   const drag = Game.drag;
   Game.drag = null;
+  if (drag.pan) return;                        // the press only ever moved the camera
   const dx = Math.abs(p.sx - drag.x0), dy = Math.abs(p.sy - drag.y0);
   if (dx < LONG_PRESS_SLOP && dy < LONG_PRESS_SLOP && p.t - drag.t0 >= LONG_PRESS_MS) {
     issueOrder(Game, p.x, p.y); return;
@@ -58,6 +63,56 @@ function pointerUp(Game, p) {
     if (box.length && v.length) box = v;      // AoE2 prefers villagers on mixed drags
     Game.selection = box.map(u => u.id);
   }
+}
+
+/* ---- the live fingers and the camera they move (docs/TODO.md P2-16b) ----------
+   `Game.touches` (`src/boot.js:44`, transient like `Game.mmPointer`) maps every
+   finger down to the canvas point it last reported, and `Game.pan` is the point the
+   pair pivots around while two of them are down. A mouse pointer joins neither —
+   `p.type` is the only thing that separates a finger from a cursor — so one finger,
+   with or without a cursor on the same screen, still selects and commands exactly as
+   the two functions above always did. */
+
+/** Record a finger going down; true once a second one joins the first, which is the
+ *  moment the pair takes the camera (`Game.pan` becomes their pivot). */
+function fingerDown(Game, p) {
+  if (p.type !== 'touch' || p.id in Game.touches) return false;
+  Game.touches[p.id] = { sx: p.sx, sy: p.sy };
+  if (Object.keys(Game.touches).length < 2) return false;
+  Game.pan = fingerMid(Game);
+  return true;
+}
+
+/** A lifted or cancelled finger leaves the set; the pan it belonged to ends with it,
+ *  so the finger left behind is an ordinary one-finger press again. */
+function fingerUp(Game, p) {
+  if (p.type !== 'touch' || !(p.id in Game.touches)) return;
+  delete Game.touches[p.id];
+  Game.pan = null;
+}
+
+/** The pivot of the live fingers: their midpoint as a pair, the centroid when more
+ *  than two are down — a third finger joins the pan, it never starts a second one.
+ *  Null only for the empty set, which no caller asks about. */
+function fingerMid(Game) {
+  let x = 0, y = 0, n = 0;
+  for (const id in Game.touches) { x += Game.touches[id].sx; y += Game.touches[id].sy; n++; }
+  return n ? { x: x / n, y: y / n } : null;
+}
+
+/** A move by one of the fingers that are panning: the world follows them, so the
+ *  camera takes the negative of the pivot delta through `setCam`, the selection box
+ *  stops growing and `Game.mouse` goes null — a finger that is steering must not also
+ *  pin the cursor to a screen edge and start the edge-scroll. False for every other
+ *  move, which `attachInput` then handles the way it always did. */
+function fingerMove(Game, p) {
+  if (!Game.pan || p.type !== 'touch' || !(p.id in Game.touches)) return false;
+  Game.touches[p.id] = { sx: p.sx, sy: p.sy };
+  const mid = fingerMid(Game);
+  panCamera(Game, mid.x - Game.pan.x, mid.y - Game.pan.y);
+  Game.pan = mid;
+  Game.mouse = null;
+  return true;
 }
 
 /** The BUTTON a click landed on, walked up from the event target: the command bar
@@ -80,17 +135,21 @@ function attachInput(Game, d) {
     const cw = view.width || r.width || 1, ch = view.height || r.height || 1;
     const sx = (e.clientX - r.left) * (cw / (r.width || cw));
     const sy = (e.clientY - r.top) * (ch / (r.height || ch));
-    return { x: sx + Game.cam.x, y: sy + Game.cam.y, sx, sy, t: e.timeStamp, id: e.pointerId };
+    return { x: sx + Game.cam.x, y: sy + Game.cam.y, sx, sy, t: e.timeStamp, id: e.pointerId, type: e.pointerType };
   };
 
   /* PointerEvent covers mouse and touch, so the three mouse listeners became two
      pointer ones plus `touch-action:none` on #view: one path decides both, and a
-     touch drag cannot scroll the page. The guard keeps a pointer that does not own
-     the live drag (a second finger) from moving the cursor or the box. */
+     touch drag cannot scroll the page. A move is offered to `fingerMove` first — a
+     finger that is part of a live pan moves the camera and nothing else — and only
+     then to the owner guard, which keeps a pointer that is not the live drag's owner
+     (a second mouse button, or a second finger before the pan begins) from moving the
+     cursor or the box. */
   d.addEventListener('pointermove', (e) => {
-    if (Game.drag && e.pointerId !== Game.drag.id) return;
     const r = rect();
     const w = toWorld(e);
+    if (fingerMove(Game, w)) return;
+    if (Game.drag && w.id !== Game.drag.id) return;
     Game.cursor = { x: w.x, y: w.y };
     // Feed the edge-scroll only while the pointer is over the canvas: coords measured
     // against the view go out of range when the pointer sits on header/footer chrome,
@@ -118,12 +177,17 @@ function attachInput(Game, d) {
      select nobody, order nobody, and the same rule applies to the hover. */
   d.addEventListener('pointerup', (e) => {
     if (e.button !== 0) return;
-    pointerUp(Game, toWorld(e));
+    const w = toWorld(e);
+    fingerUp(Game, w);                              // ends its part in any pan before the press is judged
+    pointerUp(Game, w);
     if (e.pointerType !== 'mouse') Game.mouse = null;
   });
 
   d.addEventListener('pointercancel', (e) => {
-    if (Game.drag && e.pointerId !== Game.drag.id) return;
+    const w = toWorld(e);
+    const owned = Game.drag && w.id === Game.drag.id;
+    fingerUp(Game, w);
+    if (Game.drag && !owned) return;               // the other finger went away: keep the drag and its hover
     Game.drag = null;
     if (e.pointerType !== 'mouse') Game.mouse = null;
   });
@@ -227,14 +291,26 @@ function attachInput(Game, d) {
   }
 }
 
+/** The one camera clamp: a wanted top-left corner, kept inside the world — 0 to the
+ *  map minus the viewport, floored at zero so a map smaller than the window cannot be
+ *  panned at all. `centerCamOnFraction` (the minimap) and `panCamera` (two fingers)
+ *  are the only writers of `Game.cam` outside `resetGame`, and both go through here,
+ *  so the two paths cannot disagree about where the map ends. */
+function setCam(Game, x, y) {
+  Game.cam.x = clamp(x, 0, Math.max(0, Game.world.w * CFG.TILE - view_W(Game)));
+  Game.cam.y = clamp(y, 0, Math.max(0, Game.world.h * CFG.TILE - view_H(Game)));
+}
+
 /** The one fraction-to-camera rule: a point on the minimap, as a fraction of its
  *  width/height, becomes the world point the camera centres on, clamped to the
  *  map. The press and the drag both call it so they cannot drift. */
 function centerCamOnFraction(Game, fx, fy) {
-  Game.cam.x = clamp(fx * Game.world.w * CFG.TILE - view_W(Game) / 2,
-                     0, Math.max(0, Game.world.w * CFG.TILE - view_W(Game)));
-  Game.cam.y = clamp(fy * Game.world.h * CFG.TILE - view_H(Game) / 2,
-                     0, Math.max(0, Game.world.h * CFG.TILE - view_H(Game)));
+  setCam(Game, fx * Game.world.w * CFG.TILE - view_W(Game) / 2,
+              fy * Game.world.h * CFG.TILE - view_H(Game) / 2);
 }
+
+/** Pan by a screen delta (dx, dy): the camera travels the other way by the same
+ *  amount, so the world under the fingers stays under the fingers. */
+function panCamera(Game, dx, dy) { setCam(Game, Game.cam.x - dx, Game.cam.y - dy); }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }

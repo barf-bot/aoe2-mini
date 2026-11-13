@@ -21,7 +21,8 @@ no framework, no dependencies, one PNG of unit art. Open `index.html` and play.
   your own a `Defeat` one; the simulation freezes and the overlay's `New game` restarts
 - Controls: click / drag-select, control groups (`Ctrl+1…9`, `1…9` to recall), right-click
   move / attack / gather, hotkeys (`H` house, `F` farm, `B` barracks, `L` lumber camp,
-  `G` mining camp, `M` mill, `R` archery range, `T` age, `Esc` to cancel), minimap camera drag
+  `G` mining camp, `M` mill, `R` archery range, `T` age, `Esc` to cancel), minimap camera drag,
+  two-finger touch pan
 - An enemy village that reacts and fights back
 
 ## Known limits (it's a prototype)

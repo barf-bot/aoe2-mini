@@ -5,6 +5,34 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Added — `docs/TODO.md` P2-16b: the camera pans with two fingers
+
+- `Game.touches` (id → the canvas point each finger last reported) and `Game.pan` (the point
+  the pair pivot around) join `Game.drag` and `Game.mmPointer` in the state
+  (`src/boot.js:44`); both are live input state and never saved (`src/save.js:234`).
+  `toWorld` now carries `pointerType` through as `p.type` — the only thing that separates a
+  finger from a cursor — and `fingerDown`/`fingerMove`/`fingerUp` (`src/input.js:78`) track the
+  fingers with it. Two of them down make every move shift `Game.cam` by the negative of their
+  midpoint delta; while a pan runs the selection box freezes, `Game.mouse` goes null (so the
+  edge-scroll band stops reading a finger that is steering) and the owning finger's release
+  neither selects nor commands, the rule `pointercancel` already applied. One finger — with or
+  without a mouse on the same screen — behaves exactly as before and a mouse never enters pan
+  mode, so the one-pointer contract needed no edit.
+- The clamp the pan needs is shared instead of duplicated: `setCam` (`src/input.js:299`) is the
+  one world clamp both `centerCamOnFraction` (`src/input.js:307`, the minimap) and `panCamera`
+  (`src/input.js:314`, the fingers) write through, so the two cannot disagree about where the
+  map ends.
+- The footer help line (`src/hud.js:103`) now reads `WASD / arrows / two fingers or screen edges
+  pan` — the string `tools/checks/08-input.js` pins — and the README controls line names it;
+  the `index.html` banner keeps its mouse-and-keyboard wording.
+- checks: 333 → 338, all five in `tools/checks/08-input.js`: the pair's pivot and the exact
+  camera result of a move by either finger, the frozen box plus cleared hover plus untouched
+  selection, the owner's silent release, the map-corner clamp, and a mouse pointer never
+  entering pan mode while its own drag still tracks.
+- No phone and no browser on this box, so the mechanic is proven by synthetic pointer events and
+  the entry's "check on a real phone" half moves to `docs/ROADMAP.md` item 13. `preview.png`
+  regenerates byte-identical (no render path changed).
+
 ### Fixed — `docs/TODO.md` P2-16 (header half): the phone header ran off the right edge
 
 - The 720 px block (`src/style.css:68`) wraps the header into two rows — brand + Save + Mute
@@ -65,8 +93,8 @@ commits on `main`.
 - `attachInput` listened to `mousedown` on `#minimap` only, so a press jumped the
   camera and moving with the button held did nothing — the "minimap camera drag"
   the README advertises never followed the drag. The canvas path above it already
-  used pointer events (`src/input.js:90`), so the minimap now does too
-  (`src/input.js:191`): `pointerdown` — left button only, so a right-click on the
+  used pointer events (`src/input.js:148`), so the minimap now does too
+  (`src/input.js:255`): `pointerdown` — left button only, so a right-click on the
   minimap neither drags nor reaches the canvas `contextmenu` order path — records
   `Game.mmPointer` (`src/boot.js:44`, transient like `Game.mmBase`, not saved) and
   recentres, `pointermove` recentres only while that very pointer is down, and
@@ -74,7 +102,7 @@ commits on `main`.
   element offers one (the stub DOM does not, so it is guarded), keeping moves and
   the release arriving at `#minimap` even when the pointer strays off it.
 - The fraction-to-camera maths left the listener body for one named helper,
-  `centerCamOnFraction` (`src/input.js:233`), called by the press and the drag
+  `centerCamOnFraction` (`src/input.js:307`), called by the press and the drag
   alike so the two cannot drift.
 - checks: 324 → 327. `tools/checks/08-input.js` replaces its `mousedown` assertion
   with four: the `pointerdown` press moves the camera and arms `Game.mmPointer`, a
@@ -85,8 +113,8 @@ commits on `main`.
 
 ### Fixed — `docs/TODO.md` P2-12: `W` placed a barricade instead of panning
 
-- The keydown handler (`src/input.js:145`) armed Barricade placement on `w` and returned
-  before `setKey` (`src/input.js:164`) ran, so the `WASD / arrows to pan` the `index.html`
+- The keydown handler (`src/input.js:209`) armed Barricade placement on `w` and returned
+  before `setKey` (`src/input.js:203`) ran, so the `WASD / arrows to pan` the `index.html`
   banner and the footer help line (`src/hud.js:103`) advertise had no up key: `ArrowUp`
   panned, `W` did not. The hotkey moves to `q` — the only letter next to the WASD cluster
   no handler used — and `w` reaches `setKey` again, so `keys.up` is set on press and

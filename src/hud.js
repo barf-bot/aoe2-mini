@@ -100,7 +100,7 @@ function infoHtml(Game) {
       (ups.length ? '<br>Upgrades: ' + ups.join(', ') : ''), pctOf(b.hp, b.maxHp));
   }
   return shell('', 'Left click or drag to select<br>Right click to move / attack / gather<br>' +
-    'WASD / arrows or screen edges pan<br>Ctrl+1..9 group, 1..9 recall', 0);
+    'WASD / arrows / two fingers or screen edges pan<br>Ctrl+1..9 group, 1..9 recall', 0);
 }
 
 function commandsHtml(Game) {

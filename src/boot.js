@@ -42,6 +42,7 @@ function createState() {
     res: [{ food: 0, wood: 0, gold: 0, stone: 0 }, { food: 0, wood: 0, gold: 0, stone: 0 }],
     selection: [], selectedBuilding: null, groups: {}, keys: {},
     cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, mmPointer: null, placing: null,
+    touches: {}, pan: null,   // live touch fingers + their pivot: input state, never saved (src/save.js:234)
     time: 0, wave: 0, age: [0, 0], ageBonus: [0, 0], techs: [new Set(), new Set()], nextId: 1, started: false, result: null, rnd: mulberry32(CFG.SEED),
     mapEpoch: 0, pathQueries: 0, // walkable-set epoch + findPath budget, both section-4 path state
     dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0, autosaveAt: 0, sound: null,

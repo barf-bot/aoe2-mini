@@ -29,12 +29,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P2 — smaller defects
 
-### 16b. No way to pan the camera by touch
-
-**Unverified:** there seems to be no way to pan the camera by touch — panning is keyboard
-or mouse edge-scroll, and `Game.mouse` is cleared when a finger lifts. Check on a real
-phone, then add a two-finger or drag-on-empty-ground pan.
-
 ### 17. README says "fog of war", the game has none
 
 **Verified** — there is no fog, visibility or explored-tile code in `src/`. Remove the

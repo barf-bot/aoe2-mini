@@ -140,7 +140,7 @@ check(wDown === true && Game.keys.up === false,
 const bannerCtl = (html.match(/^ +Controls: (.+)$/m) || [])[1] || '';
 const footerCtl = (AoE2.infoHtml(AoE2.createState()).match(/>([^<]*screen edges pan)/) || [])[1] || '';
 check(bannerCtl === 'left click / tap / drag to select, right click / press-and-hold to command, WASD / arrows to pan.' &&
-      footerCtl === 'WASD / arrows or screen edges pan',
+      footerCtl === 'WASD / arrows / two fingers or screen edges pan',
   'input: the advertised controls name the keys the handler implements',
   'banner=' + JSON.stringify(bannerCtl) + ' footer=' + JSON.stringify(footerCtl));
 /* One-pointer rule (T1): a drag belongs to the pointer that started it — a second
@@ -333,5 +333,102 @@ check(slopEdge.afterHold !== slopEdge.before &&        // only the hold branch c
       slopEdge.sel.indexOf(hv.id) >= 0 && slopEdge.drag === null,
   'input: 7 px of drift still commands and 8 px already selects (LONG_PRESS_SLOP)',
   JSON.stringify(slopEdge));
+
+/* ---- 10d. two-finger pan (docs/TODO.md P2-16b) -------------------- */
+/* Two fingers down own the camera: `Game.pan` is their midpoint, every move by either
+   one scrolls the world by the negative of that delta, the drag box stops growing,
+   `Game.mouse` (the edge-scroll input) goes null and the owning finger's release
+   neither selects nor commands — the rule `pointercancel` already applies. A mouse
+   never joins the finger set, so the one-pointer contract the T1 check pins above
+   still describes a cursor exactly. */
+const tp = (id, cx, cy, ts) => ({ clientX: cx, clientY: cy, target: view, pointerId: id,
+                                  pointerType: 'touch', timeStamp: ts });
+const panPair = (() => {
+  const s = { sel: [pick.id], ord: JSON.stringify(pick.order) };
+  Game.cam.x = 500; Game.cam.y = 300;
+  Game.selection = [pick.id];
+  Game.mouse = { x: 100, y: 100, w: 1200, h: 700 };
+  doc.fire('pointerdown', tp(41, 600, 400, 0));                 // one finger: the ordinary press
+  s.panAfterOne = Game.pan;
+  s.touchesAfterOne = Object.keys(Game.touches).length;
+  doc.fire('pointerdown', tp(42, 700, 500, 10));                // the second one turns it into a pan
+  s.panAfterTwo = Game.pan && { x: Game.pan.x, y: Game.pan.y };
+  s.touchesAfterTwo = Object.keys(Game.touches).length;
+  s.dragAfterTwo = Game.drag && { x0: Game.drag.x0, y0: Game.drag.y0, x1: Game.drag.x1, id: Game.drag.id };
+  doc.fire('pointermove', tp(42, 710, 510, 20));                // the other finger moves: mid 655,455
+  s.camAfterOtherMove = { x: Game.cam.x, y: Game.cam.y };
+  s.mouseAfter = Game.mouse;
+  s.dragAfterMove = Game.drag && { x0: Game.drag.x0, x1: Game.drag.x1, y1: Game.drag.y1 };
+  s.selAfterMove = Game.selection.slice();
+  doc.fire('pointermove', tp(41, 590, 440, 30));                // the owner moves too: mid 650,475
+  s.camAfterOwnerMove = { x: Game.cam.x, y: Game.cam.y };
+  doc.fire('pointerup', tp(41, 590, 440, 300));                 // a 300 ms press: a tap would select
+  s.dragAfterOwnerUp = Game.drag;
+  s.selAfterOwnerUp = Game.selection.slice();
+  s.ordAfterOwnerUp = JSON.stringify(pick.order);
+  s.panAfterOwnerUp = Game.pan;
+  s.touchesAfterOwnerUp = Object.keys(Game.touches).length;
+  doc.fire('pointerup', tp(42, 700, 500, 310));
+  s.panAfterBothUp = Game.pan;
+  s.touchesAfterBothUp = Object.keys(Game.touches).length;
+  Game.cam.x = 3; Game.cam.y = 3;                               // the map corner: nothing to pan into
+  doc.fire('pointerdown', tp(51, 600, 400, 0));
+  doc.fire('pointerdown', tp(52, 700, 500, 10));                // mid 650,450
+  doc.fire('pointermove', tp(51, 660, 460, 20));                // mid 680,480: 3 - 30 = -27 → 0
+  s.clamped = { x: Game.cam.x, y: Game.cam.y };
+  doc.fire('pointerup', tp(51, 660, 460, 30));
+  doc.fire('pointerup', tp(52, 700, 500, 40));
+  return s;
+})();
+check(panPair.panAfterOne === null && panPair.touchesAfterOne === 1 &&
+      panPair.panAfterTwo !== null && panPair.panAfterTwo.x === 650 &&
+      panPair.panAfterTwo.y === 450 && panPair.touchesAfterTwo === 2 &&
+      panPair.camAfterOtherMove.x === 495 && panPair.camAfterOtherMove.y === 295 &&
+      panPair.camAfterOwnerMove.x === 500 && panPair.camAfterOwnerMove.y === 275,
+  'input: two fingers down pan the camera by the negative midpoint delta',
+  JSON.stringify(panPair));
+check(panPair.dragAfterTwo !== null && panPair.dragAfterTwo.x0 === 600 &&
+      panPair.dragAfterMove !== null && panPair.dragAfterMove.x0 === 600 &&
+      panPair.dragAfterMove.x1 === 600 && panPair.dragAfterMove.y1 === 400 &&
+      panPair.mouseAfter === null &&
+      JSON.stringify(panPair.selAfterMove) === JSON.stringify(panPair.sel),
+  'input: a pan freezes the drag box, clears the hover and leaves the selection alone',
+  JSON.stringify(panPair));
+check(panPair.dragAfterOwnerUp === null && panPair.panAfterOwnerUp === null &&
+      panPair.touchesAfterOwnerUp === 1 && panPair.touchesAfterBothUp === 0 &&
+      panPair.panAfterBothUp === null &&
+      JSON.stringify(panPair.selAfterOwnerUp) === JSON.stringify(panPair.sel) &&
+      panPair.ordAfterOwnerUp === panPair.ord,
+  'input: the owning finger of a pan lifts without selecting or commanding',
+  JSON.stringify(panPair));
+check(panPair.clamped.x === 0 && panPair.clamped.y === 0,
+  'input: panning past the map corner clamps to the same limit the minimap uses',
+  JSON.stringify(panPair.clamped));
+
+const mousePan = (() => {
+  const s = { cam: { x: Game.cam.x, y: Game.cam.y } };
+  const mp = (id, cx, cy, ts) => ({ clientX: cx, clientY: cy, target: view, pointerId: id,
+                                    pointerType: 'mouse', timeStamp: ts });
+  const mx = pick.x - Game.cam.x, my = pick.y - Game.cam.y;
+  s.mx = mx; s.my = my;
+  doc.fire('pointerdown', mp(61, mx, my, 0));
+  s.panOne = Game.pan;
+  s.touchesOne = Object.keys(Game.touches).length;
+  doc.fire('pointermove', mp(61, mx + 5, my, 10));
+  s.x1 = Game.drag && Game.drag.x1;
+  doc.fire('pointerdown', mp(62, mx + 20, my, 20));             // a second mouse pointer, no finger
+  s.panTwo = Game.pan;
+  s.touchesTwo = Object.keys(Game.touches).length;
+  doc.fire('pointerup', mp(62, mx + 20, my, 30));
+  doc.fire('pointerup', mp(61, mx, my, 40));
+  s.selAfter = Game.selection.slice();
+  s.camAfter = { x: Game.cam.x, y: Game.cam.y };
+  return s;
+})();
+check(mousePan.panOne === null && mousePan.panTwo === null &&
+      mousePan.touchesOne === 0 && mousePan.touchesTwo === 0 &&
+      mousePan.x1 === mousePan.mx + 5,
+  'input: a mouse pointer never enters pan mode, and still drags its box',
+  JSON.stringify(mousePan));
 
 report();

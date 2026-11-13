@@ -81,15 +81,19 @@ that before starting anything below.
 11. **Touch controls** for phones (tap-select, long-press command), plus a responsive
     layout. Shipped 2026-11-12 by the touch-controls plan
     (`docs/plans/2026-11-12-touch-controls-layout.md`): `pointerDown`/`pointerUp`
-    (`src/input.js:30`, `src/input.js:41`) answer mouse and touch from one path —
+    (`src/input.js:32`, `src/input.js:45`) answer mouse and touch from one path —
     `touch-action:none` on the canvas, one pointer per drag, and a 600 ms press-and-hold
     that issues the order a right-click would — while a `@media (max-width:720px)` block
     (`src/style.css:67`) stacks the footer panels and trims the header on narrow widths. Cut
-    from this round: pinch-zoom, two-finger pan, virtual joystick, on-screen keyboard,
-    gamepad, tablet split-view and minimap drag on touch.
+    from this round: pinch-zoom, virtual joystick, on-screen keyboard, gamepad, tablet
+    split-view and minimap drag on touch — two-finger pan shipped later, as item 13.
 12. **Replay / seeded challenge** — the `mulberry32` seed is already a shareable handle on a
     map, and the save payload is the raw material for a replay; carries save/load's leftovers
     too: multiple save slots, cloud sync and share codes.
+13. **Verify two-finger panning on a real phone.** The mechanic for `docs/TODO.md` P2-16b shipped
+    (`fingerDown`, `src/input.js:78`) with `tools/checks/08-input.js` as its only proof — this box
+    has no browser and no device. *Done when:* a finger-on-glass try confirms the pan tracks the
+    fingers, stops at the map edge and leaves one-finger select alone.
 
 ## Phase 2 of the 2026-11-04 rules pass (designed, not yet planned)
 
