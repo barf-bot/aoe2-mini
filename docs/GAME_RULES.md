@@ -101,12 +101,12 @@ a bug.
   shoots; the arrow crosses the gap at 176 px/s (`CFG.PROJ_SPEED`), is bound to exactly
   one mark, lands 80 % of the time and is deleted either way, so a shot at a corpse never
   splashes onto the next body. Built buildings with attack > 0 (Town Center 5, LOS 8,
-  reload 2 s, accuracy 100 %) shoot through the same path, on
-  `stepBuildingAttacks` (`src/sim.js:136`).
+  reload 2 s, accuracy 100 %) shoot through the same path, on `stepBuildingAttacks`
+  (`src/sim.js:136`), at any unit `targetableAsEnemy` (`src/sim.js:326`) lets them hit.
 - Auto-acquire (`autoAcquire`, `src/sim.js:169`): non-villager fighters spot the nearest
   enemy unit within their own reach — `range` tiles for a shooter, `CFG.ACQUIRE` (6) for a
   melee unit — else the nearest enemy building within `CFG.BUILDING_ACQUIRE` (5), at any
-progress (`attackableAsEnemy`, `src/sim.js:317`). Snap to the next target the moment
+  progress (`attackableAsEnemy`, `src/sim.js:317`). Snap to the next target the moment
   their current one dies. Villagers never start fights; they only attack when ordered.
 - Damage is computed in one place (`unitAttack`/`unitArmor`, `src/sim.js:55`/`src/sim.js:69`):
   attack = the row's `atk` × `(1 + 0.25 × ageBonus[team])` — the age multiplier of the

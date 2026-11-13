@@ -66,9 +66,11 @@ commits on `main`.
   link and the in-flight walk both ride along.
 - One targetability rule for units now exists: `targetableAsEnemy` (`src/sim.js:326`) — alive,
   another team, not inside a building — read by `autoAcquire` (`src/sim.js:175`),
-  `orderForUnit` (`src/commands.js:12`), `issueOrder` (`src/commands.js:54`) and the AI's
-  `nearestEnemy` (`src/ai.js:38`) instead of four hand-written copies of the predicate, and
-  `pickUnit` / `unitsInBox` (`src/input.js:7`, `src/input.js:23`) refuse an inside unit too.
+  `stepBuildingAttacks` (`src/sim.js:143`), `orderForUnit` (`src/commands.js:12`),
+  `issueOrder` (`src/commands.js:54`) and the AI's `nearestEnemy` (`src/ai.js:38`) instead of
+  five hand-written copies of the predicate — the fifth, a tower's gun still arrowing a militia
+  sheltered in his own barracks, is the review round's catch — and `pickUnit` / `unitsInBox`
+  (`src/input.js:7`, `src/input.js:23`) refuse an inside unit too.
   Population still counts him: `selectedUnits` (`src/economy.js:127`) drops him so he cannot be
   ordered or recalled, while `popUsed` / `popCommitted` keep the slot he always held. A
   `removeBuilding` (`src/entities.js:124`) — raze, cancel or demolish — evicts the garrison onto
@@ -81,12 +83,16 @@ commits on `main`.
 - No data, no `src/config.js` and no `assets/sprites.png` byte moved (`tools/check-stats.mjs`
   still prints `373 fields checked`, `tools/gen-atlas.js` leaves the sheet byte-identical) and the
   committed `preview.png` is unchanged, because the seeded scene garrisons nobody.
-- checks: 382 → 406 — `tools/checks/08-input.js` 40 → 50 (§10e: the two commands, every refusal
-  string, the ring placement, the per-kind and empty-building cases), `07-combat.js` 38 → 44
+- checks: 382 → 409 — `tools/checks/08-input.js` 40 → 50 (§10e: the two commands, every refusal
+  string, the ring placement, the per-kind and empty-building cases), `07-combat.js` 38 → 46
   (§9h: not picked, not box-selected, not targetable, an arrow on his building missing him, the
-  walk that ends and parks him, hittable again after `Leave`), `09-hud.js` 35 → 41 (§11e: the
-  count, the buttons, both clicks and the population line) and `10-reset-save.js` 36 → 38 (§13:
-  the garrisoned pair and a pending garrison walk through save → reset → load).
+  walk that ends and parks him, hittable again after `Leave`, a tower that cannot shoot a unit
+  inside, a raze that evicts the garrison), `09-hud.js` 35 → 41 (§11e: the count, the buttons,
+  both clicks and the population line), `10-reset-save.js` 36 → 38 (§13: the garrisoned pair and
+  a pending garrison walk through save → reset → load) and `tools/checks/13-render.js` 11 → 12
+  (§16e: neither blitted on the field nor dotted on the minimap). The review round added the
+  three checks the plan's task list had dropped (the tower's gun and the eviction in §9h, the
+  minimap dot in §16e) and restamped the plan's `done when` totals to the measured numbers.
 - Not in this round (and still open): garrisoned units shooting out of towers and keeps (needs
   the per-range attack work of P1-4), enemy units taking refuge in a dying building, hp regen
   inside, the AI garrisoning its own villagers, and P1-5's last leftover — trade carts and land
