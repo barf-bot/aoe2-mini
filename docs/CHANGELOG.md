@@ -5,6 +5,48 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep
+
+- `data/buildings.json` gained the two vendored rows the chain was missing — `guard_tower`
+  (`data.Building[234]`, `WCTW2`: 1500 hp, 35 wood + 125 stone, 80 s, attack 7, armour 2/8) and
+  `keep` (`[235]`, `WCTW3`: 2250 hp, the same cost and time, attack 8, armour 3/9) — numbers
+  copied, not retuned, plus the authored halves the table has no column for: the labels, the 1×1
+  footprints, `pop: 0`, `noSprite: true`, the `age: 1` / `age: 2` gates and the two `upgradesTo`
+  links (`buildings.watch_tower.upgradesTo`, `buildings.guard_tower.upgradesTo`, both listed in
+  `source.authored`). `tools/check-stats.mjs` validates and prints `upgradesTo`, so the field can
+  reach `src/config.js` no other way than the data: 333 → 373 fields checked, `src/config.js`
+  317 → 331 lines. No art entered the repo — `assets/sprites.png` is byte-identical before and
+  after `tools/gen-atlas.js`, because both rows are `noSprite`.
+- `upgradeBuilding` (`src/commands.js:278`) refuses through `toast` — `Not your building`,
+  `Already under construction`, `<label> has no upgrade`, `<label> requires <Age>`,
+  `Not enough <res>`, `All villagers are building` / `No villager available` — and otherwise spends
+  the next row's cost, writes `b.upgrade` and restarts the site on that row's clock;
+  `promoteBuilding` (`src/commands.js:315`), called by the sim's `b.built >= 1` branch
+  (`src/sim.js:252`), flips `b.kind` so hp, attack, armours, range and footprint come from the new
+  row. A tower mid-upgrade is therefore just a half-built building (it shoots nobody, which
+  `stepBuildingAttacks` already enforced) and `src/save.js` needed no new field and no
+  `CFG.VERSION` bump. Cancelling an upgrade refunds the tier being paid for —
+  `floor(35 × 0.8) = 28` wood and `floor(125 × 0.8) = 100` stone — and leaves the Watch Tower
+  standing instead of removing it (`cancelConstruction`, `src/commands.js:166`).
+- The command grid (`commandsHtml`, `src/hud.js:106`) offers `Upgrade to Guard Tower` on a finished
+  tower and nothing for a House or a finished Keep, and its click reaches
+  `upgradeBuilding` (`src/input.js:251`).
+- checks: 364 → 381. `tools/checks/05-construction.js` went 67 → 80 — two of them §7e's
+  table-driven age loop picking up the new rows for free, the other nine the plan's §7f (both age
+  refusals with the bank untouched, the Feudal spend and the Guard Tower it completes into, the
+  Keep edge, a half-upgraded tower holding fire while the finished one's arrow carries attack 7,
+  `Keep has no upgrade` and `Not your building`, the no-villager refusal and the cancel refund) —
+  and `tools/checks/09-hud.js` 31 → 35 (§11's button markup, the missing button on a House and a
+  Keep, the click that spends the tier and the info panel naming the tier the tower became). The
+  plan's arithmetic said 376 and 380; its §7f list names nine checks where its `done when` counts
+  eight, so the tree is one ahead of its own total.
+- `preview.png` now carries the chain's middle tier: the render fixture places a finished
+  `guard_tower` on the tile `findSite` answers next to the Watch Tower's pad, so the committed
+  frame shows the blacksmith, Market, Watch Tower, Barricade and Guard Tower footprints.
+- Not in this round (and still open): garrison mechanics, trade carts and land trade (P1-5's other
+  leftovers), the Stone Wall / Fortified Wall chain and gates (P1-6), ripped art for the three
+  towers (P2-8) and the enemy AI building or upgrading towers — `aiStep`'s build order is unchanged.
+
 ### Added — `docs/ROADMAP.md` P0-1: real-browser smoke test (`tools/browser-smoke.js`)
 
 - Playability used to be proven by a stub DOM (`tools/lib/harness.js`) plus a headless render

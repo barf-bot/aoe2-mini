@@ -24,7 +24,7 @@ transpiling, no bundling.
 
 ## Art pipeline
 
-Terrain is drawn procedurally from the palettes in `src/config.js:282-291`, and the only
+Terrain is drawn procedurally from the palettes in `src/config.js:296-305`, and the only
 runtime image is `assets/sprites.png`, composed by `tools/gen-atlas.js` from
 `data/sprites.json` plus the vendored frames in `data/sprites/` — never hand-edit that file.
 One atlas means one loader (`loadAtlas` in `src/boot.js`) and one deterministic generator, so
@@ -75,7 +75,7 @@ those five and outside `npm run check`: it opens the page in a real Chrome (Play
 `1.58.0` — the version whose bundled Chromium build is the one this box ships), asserts the
 app booted on both the working copy and the live site, writes `tools/out/local.png` and
 `tools/out/live.png` and prints a JSON summary per target. It needs a browser and network,
-so `tools/headless-check.js` must never require it: the 364-check suite stays plain node.
+so `tools/headless-check.js` must never require it: the 381-check suite stays plain node.
 The generated `tools/out/` is scratch, not committed.
 
 `tools/headless-check.js` runs every file in `tools/checks/`, each in its own process.

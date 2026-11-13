@@ -101,7 +101,7 @@ a bug.
 - Auto-acquire (`autoAcquire`, `src/sim.js:169`): non-villager fighters spot the nearest
   enemy unit within their own reach — `range` tiles for a shooter, `CFG.ACQUIRE` (6) for a
   melee unit — else the nearest enemy building within `CFG.BUILDING_ACQUIRE` (5), at any
-  progress (`attackableAsEnemy`, `src/sim.js:313`). Snap to the next target the moment
+  progress (`attackableAsEnemy`, `src/sim.js:314`). Snap to the next target the moment
   their current one dies. Villagers never start fights; they only attack when ordered.
 - Damage is computed in one place (`unitAttack`/`unitArmor`, `src/sim.js:55`/`src/sim.js:69`):
   attack = the row's `atk` × `(1 + 0.25 × ageBonus[team])` — the age multiplier of the
@@ -138,20 +138,42 @@ a bug.
 | Market | Feudal | 1800 | 2×2 | 175 wood | 60 s | — | — |
 | Watch Tower | Feudal | 850 | 1×1 | 35 wood + 125 stone | 80 s | — | — |
 | Barricade | Feudal | 150 | 1×1 | 3 wood | 7 s | — | — |
+| Guard Tower | Feudal | 1500 | 1×1 | 35 wood + 125 stone | 80 s | — | — |
+| Keep | Castle | 2250 | 1×1 | 35 wood + 125 stone | 80 s | — | — |
 
 - Every row carries an explicit `age` (`buildings.*.age` in `data/buildings.json`,
   generated into `BLD`): the five Dark Age rows — Town Center, House, Farm, Lumber Camp,
-  Mining Camp — are `age: 0`, the seven Feudal rows — Barracks (the table's own
+  Mining Camp — are `age: 0`, the eight Feudal rows — Barracks (the table's own
   `internal_name` is `Barracks Age1`), Mill, Archery Range, Blacksmith, Market, Watch
-  Tower, Barricade — are `age: 1`. `build` (`src/commands.js:114`) refuses a row whose
+  Tower, Guard Tower, Barricade — are `age: 1`, and the one Castle row — Keep — is `age: 2`.
+  `build` (`src/commands.js:114`) refuses a row whose
   age the village has not reached *before* picking a builder or spending
   (`Barracks requires Feudal Age`), `canPlaceAt` (`src/commands.js:156`) answers the same
   gate for the placement ghost, and `commandsHtml` (`src/hud.js:106`) never offers the
   locked buttons — hotkeys `b`, `m`, `r`, `k`, `e`, `c`, `q`. The Blacksmith's `age: 1` was
-  the first gated row (P1-4); the other eleven rows are now gated by the same number, and
+  the first gated row (P1-4); the other thirteen rows are now gated by the same number, and
   §7e of `tools/checks/05-construction.js` proves both halves per row: the Dark Age
   refusal spends nothing and raises nothing, and the same village at the row's own age
   builds it for exactly its cost.
+- The tower upgrade chain (`docs/plans/2026-11-13-tower-upgrade-chain.md`): `BLD` carries an
+  authored `upgradesTo` on `watch_tower` (→ `guard_tower`) and on `guard_tower` (→ `keep`),
+  and `upgradeBuilding` (`src/commands.js:278`) is the command that reads it. It reuses the
+  construction pipeline instead of a second timer — spend the next row's cost, write
+  `b.upgrade = <next kind>`, restart `b.built` at 0 over the next row's `time`, draft the
+  village's builder — so the half-upgraded tower shoots nobody (`stepBuildingAttacks`,
+  `src/sim.js:136`) and `promoteBuilding` (`src/commands.js:315`) flips `b.kind` the frame
+  the site finishes; hp, attack, armours, range and footprint are then the new row's and the
+  `Guard Tower complete` toast names it. The refusal ladder is `build`'s, in order:
+  `Not your building`, `Already under construction`, `<label> has no upgrade`,
+  `<label> requires <Age>`, `Not enough <res>`, `All villagers are building` /
+  `No villager available` — every one answered before anything is spent. Cancelling an
+  upgrade in progress (`cancelConstruction`, `src/commands.js:166`) refunds
+  `floor(CFG.CANCEL_REFUND × BLD[b.upgrade].cost)` — the tier being paid for, not the one
+  standing — and leaves the old tier built (`Guard Tower upgrade cancelled`) instead of
+  removing the building. Population never moves: all three tower rows carry `pop: 0`. The
+  grid offers the button only when the next tier exists and the team's age allows it, and
+  `disabled` when its cost is short (`commandsHtml`, `src/hud.js:106`); §7f of
+  `tools/checks/05-construction.js` proves the ladder, both edges and the refund.
 - The Barricade adds no placement or combat code of its own: `build` (`src/commands.js:114`)
   drafts its crew (`pickBuilders`, `src/commands.js:93`) through the same `canPlaceAt`
   (`src/commands.js:156`) rule, cancelling refunds
@@ -223,7 +245,7 @@ a bug.
   (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:173`) all test
   `built >= 1`, as does the enemy's `aiStep` (`src/ai.js:4`). An *enemy* building follows the
   other half of the rule: attackable at any progress, a 0 % foundation included, the way
-  AoE2 does it (`attackableAsEnemy`, `src/sim.js:313`).
+  AoE2 does it (`attackableAsEnemy`, `src/sim.js:314`).
 
 ## Technologies (`TECHS`)
 
@@ -246,7 +268,7 @@ a bug.
 
 ## Ages (`AGES`)
 
-Dark Age → Feudal Age → Castle Age (`src/config.js:272`): Castle Age is the last age, as the
+Dark Age → Feudal Age → Castle Age (`src/config.js:286`): Castle Age is the last age, as the
 README states, and `upgradeAge` (`src/commands.js:266`) answers `Castle Age reached` there.
 Cost (`src/config.js:17`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
 costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle). Hotkey `T`.
@@ -277,7 +299,7 @@ same seeded start and clears `result` back to `null`. No auto-restart, no countd
 
 ## Save / load
 
-The game remembers itself through one `localStorage` slot: `SAVE_PATH` (`src/config.js:273`) is the
+The game remembers itself through one `localStorage` slot: `SAVE_PATH` (`src/config.js:287`) is the
 key, `storageGet` / `storageSet` (`src/save.js:9` / `src/save.js:18`) the only door, and both
 answer quietly (`null` / `false`) when the platform has none or refuses the write — which is how
 node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode keep running.
@@ -331,7 +353,7 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
 
 ## Sound (SFX)
 
-Six sounds, one table — `SFX` (`src/config.js:310-317`) — and one door that plays them.
+Six sounds, one table — `SFX` (`src/config.js:324-331`) — and one door that plays them.
 `playSfx(Game, name)` (`src/sound.js:33`) synthesises the row through the Web Audio API (one
 oscillator ramped through the row's `freq` list into a gain envelope) rather than shipping an
 audio file, so the repo stays asset-free with no build step. The `fire` column names the
@@ -359,7 +381,7 @@ the table is the contract, the audio path and the checks are its two readers, th
 - **Mute is presentation, not state** — the header `Sound on/off` button (`index.html:21`)
   toggles through `setMuted` (`src/sound.js:28`), which stamps the button
   (`applyMuteButton`, `src/sound.js:22`) and writes `MUTE_PATH` = `aoe2mini:muted`
-  (`src/config.js:274`) through the same `storageSet` the save slot uses; `isMuted`
+  (`src/config.js:288`) through the same `storageSet` the save slot uses; `isMuted`
   (`src/sound.js:12`) reads the button when there is one and the key when there isn't, so a
   muted game stays muted after a reload and a fresh tab starts unmuted. `boot` calls
   `applyMuteButton` once (`src/boot.js:162`) to honour the saved preference without writing

@@ -25,10 +25,10 @@ simulation.
 | `src/config.js` | no | `CFG`, `KINDS`, `SPRITE_SHEET`/`SPRITES`/`WORK_ANIM`/`spriteFor`, `BLD_SPRITES`/`bldSpriteFor`, `BLD`, `TECHS`, `AGES`, `SAVE_PATH`, `MUTE_PATH`, `LONG_PRESS_MS`/`LONG_PRESS_SLOP`, `T`, `PAL`, `TEAM`, `RES_OF_TILE`, `CARRY_COLOR`, `SFX` — every tunable number; `CFG`/`KINDS`/`BLD`/`TECHS` and the sprite tables are generated from `data/` |
 | `src/world.js` | no | seeded generation (`mulberry32`, `hash2`, `makeWorld`), site search (`findSite`), `berryCluster`, resource tiles (`tileRes`) |
 | `src/entities.js` | no | `setAtlas`, `sourceFromTile`/`sourceFromFarm`, `workSpot`, `makeUnit`, `makeBuilding`, `rebuildBlocks`, `removeBuilding`/`setResult`, `workPos`, `standingSpots` |
-| `src/sim.js` | no | `stepSim`/`updateUnit` (the order state machine), combat math (`unitAttack`/`unitArmor`/`hitUnit`/`hitBuilding`/`autoAcquire`/`attackableAsEnemy`), projectiles (`spawnArrow`/`updateProjectiles`/`stepBuildingAttacks`) |
+| `src/sim.js` | no | `stepSim`/`updateUnit` (the order state machine — its `build` branch ends a site by calling `promoteBuilding` when the site is an upgrade in progress), combat math (`unitAttack`/`unitArmor`/`hitUnit`/`hitBuilding`/`autoAcquire`/`attackableAsEnemy`), projectiles (`spawnArrow`/`updateProjectiles`/`stepBuildingAttacks`) |
 | `src/movement.js` | no | `tileOf`, A\* (`findPath`), `stepToward`/`moveUnit`/`standTarget`, `formationSlots`, `walkable`, `reachOf`, `separate` |
 | `src/economy.js` | no | gathering (`workersOnTile`, `findDropoff`, `deposit`, `depleteTile`, `nextSource`, `resumeGather`), `popCap`/`popUsed`, `selectedUnits`, `canAfford`/`spend`/`refund` |
-| `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`, `canPlaceAt`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, plus `toast` |
+| `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`, `canPlaceAt`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, `upgradeBuilding`/`promoteBuilding`, plus `toast` |
 | `src/ai.js` | no | `aiStep` — the enemy village, acting through the same commands |
 | `src/save.js` | guarded | `storageGet`/`storageSet` (the one door to `localStorage`, node-safe), `encodeState`/`decodeState`, `markDirty`, `saveGame`/`loadGame`, `migrate`/`validState` |
 | `src/sound.js` | guarded | `playSfx` (WebAudio synth of the `SFX` rows), `isMuted`/`setMuted`/`applyMuteButton` |
@@ -90,7 +90,8 @@ type lookup is a flat array index (`ty * world.w + tx`).
 ### Unit order state machine (`updateUnit`, src/sim.js:190)
 
 `idle` → `move` → `harvest` → `go_deposit` → (re-acquire source via `nextSource`) …
-plus `build` (works on a site until `built >= 1`) and `attack` (chase to
+plus `build` (works on a site until `built >= 1`, and promotes it through `promoteBuilding`
+(`src/commands.js:315`) when the site is an upgrade in progress) and `attack` (chase to
 `u.r + target.r + 4`, then swing on `atkTime` cooldown). Carry capacity is
 `CFG.CARRY_MAX`; the carried resource is recorded in `u.carryRes` so `deposit()` credits
 the right stockpile — that field being unset was a real bug (deposits silently vanished).

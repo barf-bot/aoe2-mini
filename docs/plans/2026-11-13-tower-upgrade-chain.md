@@ -291,7 +291,7 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
     `tools/checks/02-sprites.js` §5b3 and `tools/checks/13-render.js`, so no new assertion
     belongs here; `node tools/headless-check.js -q` still prints `380/380`.
 
-- [ ] T5: docs sync and the full verification pass
+- [x] T5: docs sync and the full verification pass
   - files: `docs/GAME_RULES.md`, `docs/ARCHITECTURE.md`, `docs/CHANGELOG.md`,
     `docs/ROADMAP.md`, `AGENTS.md`, `README.md`, this plan's `Status`.
   - change: docs only, one commit, no code edits. `docs/GAME_RULES.md` — the `## Buildings
