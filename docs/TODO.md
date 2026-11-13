@@ -29,10 +29,7 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P2 — smaller defects
 
-### 16. Phone layout
-
-**Verified** at 390×780: the header resources run off the right edge (stone, pop, age and
-both buttons are unreachable) and the footer shows one clipped line.
+### 16b. No way to pan the camera by touch
 
 **Unverified:** there seems to be no way to pan the camera by touch — panning is keyboard
 or mouse edge-scroll, and `Game.mouse` is cleared when a finger lifts. Check on a real

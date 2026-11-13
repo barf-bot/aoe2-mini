@@ -5,6 +5,26 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P2-16 (header half): the phone header ran off the right edge
+
+- The 720 px block (`src/style.css:68`) wraps the header into two rows — brand + Save + Mute
+  on row 1, the six resource cells on row 2 — replacing the single flex row that pushed stone,
+  pop, age and both buttons off a 390 px screen. `header` gains `flex-wrap:wrap`, the buttons
+  take `order:1`/`order:2` (Save keeps `margin-left:auto`, so the pair still sits at the right
+  edge) and `.res{order:3}` moves every cell to the second row. Cell type shrinks to
+  `font-size:9px` labels with `letter-spacing:0` and `font-size:12px` values, and
+  `flex:1 1 0;min-width:0` gives each cell exactly one sixth of the line with
+  `overflow:hidden;text-overflow:ellipsis` on `.res b`, so a long number clips instead of
+  widening the row; the phone button paddings drop to `2px 8px`, because row 1 measured
+  392.7 px at the desktop `4px 14px`/`4px 10px` — 2.7 px wider than the viewport. The desktop
+  `header` rule (`src/style.css:10`) and the `src/hud.js` markup are untouched, and the item's
+  unverified touch-pan half is now `16b`.
+- checks: 331 → 333. `tools/checks/09-hud.js` adds the two phone-header checks — the rule set
+  and the width arithmetic for both rows (376.7 px on row 1, 360.6 px on row 2) — parsed from
+  `src/style.css` + `index.html`, the same evidence shape as the `--footer-h` check, since this
+  box has no browser to photograph the header with.
+- `preview.png` regenerates byte-identical (CSS-only change, no render path touched).
+
 ### Fixed — `docs/TODO.md` P2-15: footer content was clipped
 
 - The info panel's body row measured 24 px — one and a half lines at its 12 px font — so the

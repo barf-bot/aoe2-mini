@@ -346,6 +346,82 @@ check(propOf(mHeader, 'padding') === '2px 6px' && propOf(bHeader, 'padding') ===
   'ui: the responsive block trims the header padding the desktop rule declares',
   'media header{' + String(mHeader) + '} vs base header{' + String(bHeader) + '}');
 
+/* docs/TODO.md P2-16 (header half): the header is one unbreakable flex row on the desktop
+   (`src/style.css:10` has no flex-wrap), so at 390 px the report says stone, pop, age and
+   both buttons fell off the right edge -- the footer half of that entry was item 15. The
+   phone block now wraps it into two rows and the two checks below are the proof: no browser
+   on this box, so the widths are computed from src/style.css + index.html the way the
+   --footer-h check above is, not eyeballed.
+   The width model: the ui-monospace stack (the `html,body` font, which `button{font:inherit}`
+   and `.res b{font-variant-numeric:tabular-nums}` both reuse) advances 0.6em per character,
+   so a text run measures length x (font-size x 0.6 + letter-spacing); a box adds its own
+   padding and borders, and a flex row adds one `gap` between every pair of items. Row 1 with
+   the desktop button paddings (4px 14px, 4px 10px) measures 392.7 px -- 2.7 px over the
+   viewport, which is why the phone rules shrink them to 2px 8px. Row 2's values are the ones
+   the header ships -- with the longest name in AGES for the age cell, the one value
+   renderHud swaps in (`src/hud.js:24`) -- and a bigger runtime number cannot widen that row:
+   `flex:1 1 0;min-width:0` fixes every cell to one sixth of the line and `.res b`
+   ellipsizes what does not fit. */
+const PHONE_W = 390;
+const pxVal = (v) => +(((String(v).match(/(-?[0-9.]+)px/)) || [])[1]);
+const padX = (rule) => {                              // horizontal padding of a 1-4 value box
+  const p = (String(rule || '').match(/(?:^|;)\s*padding:\s*([^;]+)/) || [])[1];
+  if (p === undefined) return NaN;
+  const v = p.trim().split(/\s+/).map(parseFloat);
+  return v.length >= 2 ? v[1] : v[0];
+};
+const textW = (s, px, ls) => String(s).length * (px * 0.6 + (ls || 0));
+
+const headerMarkup = (html.match(/<header>([\s\S]*?)<\/header>/) || [])[1] || '';
+const brandMarkup = (headerMarkup.match(/<div class="brand">([\s\S]*?)<\/div>/) || [])[1] || '';
+const brandStrong = (brandMarkup.split('<small>')[0] || '').replace(/&nbsp;/g, ' ').replace(/\s+$/, '');
+const brandSmall = (brandMarkup.match(/<small>([^<]*)<\/small>/) || [])[1] || '';
+const btnLabel = (cls) => (headerMarkup.match(new RegExp('<button[^>]*class="' + cls + '"[^>]*>([^<]*)</button>')) || [])[1] || '';
+const cells = [...headerMarkup.matchAll(/<div class="res" id="(r_\w+)"><span>([^<]*)<\/span><b>([^<]*)<\/b><\/div>/g)]
+  .map((m) => ({ id: m[1], label: m[2], value: m[3] }));
+
+const mRes = ruleOf(mediaCss, '.res'), mSpan = ruleOf(mediaCss, '.res span'), mBold = ruleOf(mediaCss, '.res b');
+const bRes = ruleOf(baseCss, '.res');
+const mSave = ruleOf(mediaCss, 'header .save'), mMute = ruleOf(mediaCss, 'header .mute');
+check(cells.length === 6 && propOf(mHeader, 'flex-wrap') === 'wrap' &&
+      propOf(mSave, 'order') === '1' && propOf(mMute, 'order') === '2' &&
+      propOf(mRes, 'order') === '3' && propOf(mRes, 'flex') === '1 1 0' && propOf(mRes, 'min-width') === '0' &&
+      propOf(mSpan, 'font-size') === '9px' && propOf(mSpan, 'letter-spacing') === '0' &&
+      propOf(mBold, 'font-size') === '12px' && /(^|;)\s*text-overflow:\s*ellipsis/.test(mBold || ''),
+  'ui: the phone header wraps into two rows, buttons on row 1 and six cells on row 2',
+  'markup cells=' + cells.length + ' | header{flex-wrap:' + String(propOf(mHeader, 'flex-wrap')) + '}' +
+  ' save{order:' + String(propOf(mSave, 'order')) + ' padding:' + String(propOf(mSave, 'padding')) + '}' +
+  ' mute{order:' + String(propOf(mMute, 'order')) + ' padding:' + String(propOf(mMute, 'padding')) + '}' +
+  ' res{order:' + String(propOf(mRes, 'order')) + ' flex:' + String(propOf(mRes, 'flex')) +
+  ' min-width:' + String(propOf(mRes, 'min-width')) + ' gap:' + String(propOf(mRes, 'gap')) + '}' +
+  ' res span{font-size:' + String(propOf(mSpan, 'font-size')) + ' letter-spacing:' +
+  String(propOf(mSpan, 'letter-spacing')) + '} res b{font-size:' + String(propOf(mBold, 'font-size')) + '}');
+
+const rootPx = pxVal(propOf(ruleOf(baseCss, 'html,body'), 'font'));
+const btnPx = pxVal(propOf(ruleOf(baseCss, 'button'), 'font')) || rootPx;
+const brandPx = pxVal(propOf(ruleOf(baseCss, 'header .brand'), 'font-size')) || rootPx;
+const brandLS = pxVal(propOf(ruleOf(baseCss, 'header .brand'), 'letter-spacing')) || 0;
+const smallLS = pxVal(propOf(ruleOf(baseCss, 'header .brand small'), 'letter-spacing')) || 0;
+const brandGap = pxVal(propOf(ruleOf(baseCss, 'header .brand'), 'gap'));
+const btnBorder = (pxVal(propOf(ruleOf(baseCss, 'button'), 'border')) || 0) * 2;
+const headerPadX = padX(mHeader), headerGap = pxVal(propOf(mHeader, 'gap'));
+const labelPx = pxVal(propOf(mSpan, 'font-size')), labelLS = pxVal(propOf(mSpan, 'letter-spacing')) || 0;
+const valuePx = pxVal(propOf(mBold, 'font-size'));
+const cellPadX = padX(mRes), cellBorder = pxVal(propOf(bRes, 'border-left')) || 0, cellGap = pxVal(propOf(mRes, 'gap'));
+const widestAge = AoE2.AGES.reduce((a, b) => (b.length > a.length ? b : a), '');
+const cellW = (c) => textW(c.label, labelPx, labelLS) + cellGap +
+  textW(c.id === 'r_age' ? widestAge : c.value, valuePx) + cellPadX * 2 + cellBorder;
+
+const row1 = textW(brandStrong, brandPx, brandLS) + brandGap + textW(brandSmall, brandPx, smallLS) +
+  (textW(btnLabel('save'), btnPx) + padX(mSave) * 2 + btnBorder) +
+  (textW(btnLabel('mute'), btnPx) + padX(mMute) * 2 + btnBorder) +
+  headerPadX * 2 + headerGap * 2;
+const row2 = cells.reduce((sum, c) => sum + cellW(c), 0) + headerPadX * 2 + headerGap * (cells.length - 1);
+check(Number.isFinite(row1) && Number.isFinite(row2) && row1 <= PHONE_W && row2 <= PHONE_W,
+  'ui: each phone header row fits inside the 390px viewport',
+  'row1(brand+save+mute)=' + row1.toFixed(1) + 'px row2(' + cells.length + ' cells)=' + row2.toFixed(1) +
+  'px, viewport ' + PHONE_W + 'px (inner ' + (PHONE_W - headerPadX * 2) + 'px after ' + headerPadX + 'px padding)');
+
 /* ---- 11d. one write per change (docs/TODO.md P0-1) ------------------- */
 /* renderHud compares the markup against the string it last wrote (Game.dom.hudLast /
    .resultLast) instead of against el.innerHTML. A browser hands innerHTML back serialised

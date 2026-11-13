@@ -60,12 +60,20 @@ button .c{color:var(--dim);font-size:11px;margin-left:6px}
 .queue .bar{height:6px;background:#0d0f13;border-radius:3px;overflow:hidden;margin-top:4px}
 .queue .bar i{display:block;height:100%;background:var(--blue)}
 .hint{color:#6c7181;font-size:11px;padding:8px 12px}
-/* ≤720px (phone): trim the header padding, stack the footer's three panels inside
-   the same --footer-h the desktop rule declares, and let the flexible #stage keep the
-   freed rows for the map. Written last so it wins the cascade; the desktop rules
-   above are untouched and nothing is hidden there. */
+/* ≤720px (phone): wrap the header into two rows so all six resource cells and both buttons
+   stay on screen at 390 px (docs/TODO.md P2-16), stack the footer's three panels inside the
+   same --footer-h the desktop rule declares, and let the flexible #stage keep the freed rows
+   for the map. Written last so it wins the cascade; the desktop rules above are untouched
+   and nothing is hidden there. */
 @media (max-width:720px){
-  header{padding:2px 6px;gap:6px}
+  /* row 1: brand, then Save and Mute pushed to the right edge; row 2: the six .res cells,
+     each one sixth of the line (flex:1 1 0, so no value can widen it) at 9 px/12 px type. */
+  header{padding:2px 6px;gap:6px;flex-wrap:wrap}
+  header .save{order:1;align-self:center;margin-left:auto;padding:2px 8px}
+  header .mute{order:2;align-self:center;padding:2px 8px}
+  header .res{order:3;flex:1 1 0;min-width:0;padding:0 4px;gap:3px;white-space:nowrap;overflow:hidden}
+  header .res span{font-size:9px;letter-spacing:0}
+  header .res b{font-size:12px;overflow:hidden;text-overflow:ellipsis}
   footer{flex:0 0 var(--footer-h);height:var(--footer-h);flex-direction:column}
   .info{flex:0 0 22px;height:22px;padding:2px 8px;display:block}
   .info .body,.info .hp{display:none}
