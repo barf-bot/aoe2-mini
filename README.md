@@ -1,7 +1,7 @@
 # AoE2 Mini — Dark Age prototype
 
-A browser-playable Age of Empires II prototype in **one HTML file** — no build step,
-no framework, one PNG of unit art. Open `index.html` and play.
+A browser-playable Age of Empires II prototype as a plain static page — no build step,
+no framework, no dependencies, one PNG of unit art. Open `index.html` and play.
 
 **Live:** https://barf-bot.github.io/aoe2-mini/
 
@@ -29,40 +29,45 @@ no framework, one PNG of unit art. Open `index.html` and play.
 - Resource objects and ground tiles are still drawn procedurally; every unit and building
   frame is real ripped art vendored in `data/sprites/` (the farm building frame excepted —
   the rip ships no farm bitmap, so that cell keeps the old procedural art)
-- Straight-line movement with a walkability check — no A\* pathfinding around water yet
 - One simple AI opponent, no lobby/multiplayer
 
 ## Docs
 
 | File | What's in it |
 |---|---|
-| [`AGENTS.md`](AGENTS.md) | rules for working on the repo (single-file constraint, verification gate, editing rule) |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | file map with line ranges, the `Game` shape, sim/render/input models |
+| [`AGENTS.md`](AGENTS.md) | rules for working on the repo (no-build constraint, where code goes, verification gate) |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | file map, the `Game` shape, sim/render/input models |
 | [`docs/GAME_RULES.md`](docs/GAME_RULES.md) | the implemented ruleset — every stat, cost and rule, with line refs |
 | [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) | naming, formatting, the feature recipe, anti-rules |
+| [`docs/TODO.md`](docs/TODO.md) | known bugs in fix order, with causes and reproductions |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | prioritized next work, each with an exit condition |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | dated history of what shipped and what was fixed |
 
 Start with `AGENTS.md` if you're an agent picking the repo up cold.
 
-## Tools in this repo
+## What's in this repo
 
-| File | Purpose |
+| Path | Purpose |
 |---|---|
-| `index.html` | the entire game (markup, styles, engine, renderer) |
+| `index.html` | the markup and the ordered list of scripts |
+| `src/*.js`, `src/style.css` | the game: config, world, entities, sim, movement, economy, commands, ai, save, sound, render, hud, input, boot, main — see the file map in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | `assets/sprites.png` | the sprite atlas (1522×684): unit cells — villager idle/walk/farm_a/farm_b/chop_a/chop_b/mine_a/mine_b, militia and archer idle/walk/attack_a/attack_b, blue above red — above the building cells drawn at their footprints |
-| `data/units.json`, `data/buildings.json` | the vendored AoE2 stat tables (sources in [`data/README.md`](data/README.md)) — the only place unit/building/world numbers are authored |
+| `data/units.json`, `data/buildings.json`, `data/techs.json` | the vendored AoE2 stat tables (sources in [`data/README.md`](data/README.md)) — the only place unit/building/tech/world numbers are authored |
 | `data/sprites.json`, `data/sprites/` | the vendored sprite frames (ripped AoE2 art, recoloured per team) and the atlas manifest `tools/gen-atlas.js` composes the sheet from |
-| `tools/gen-atlas.js` | composes `assets/sprites.png` from `data/sprites.json` + `data/sprites/` and regenerates section 1's `SPRITE_SHEET`/`SPRITES`/`WORK_ANIM`/`BLD_SPRITES` |
-| `tools/check-stats.mjs` | renders section 1's `CFG`/`KINDS`/`BLD` from `data/` and fails with one line per field when `index.html` drifts (`--write` regenerates the blocks) |
-| `tools/headless-check.js` | extracts the `<script>` from the HTML, stubs the DOM, runs the simulation and asserts 137 invariants — currently **137/137 pass** |
+| `tools/headless-check.js` | runs every file in `tools/checks/` (each in its own process, against a stub DOM) and adds up the results — 282 invariants; pass a name fragment to run a subset, `-q` for failures only |
+| `tools/checks/` | the checks themselves, one independent file per topic (`node tools/checks/07-combat.js` runs one alone) |
+| `tools/lib/` | `load-game.js`, the loader every tool uses (runs the scripts `index.html` lists, in the same order the browser does), and `harness.js`, the stub DOM and fixtures every check file starts from |
+| `tools/check-stats.mjs` | renders `CFG`/`KINDS`/`BLD`/`TECHS` in `src/config.js` from `data/` and fails with one line per field when they drift (`--write` regenerates the blocks) |
+| `tools/gen-atlas.js` | composes `assets/sprites.png` from `data/sprites.json` + `data/sprites/` and regenerates the sprite tables in `src/config.js` |
 | `tools/render-preview.js` | boots the same code against a real canvas (`@napi-rs/canvas`) and writes `preview.png`, so the renderer is verified, not just assumed |
-| `tools/audit-line-refs.js` | checks that every `index.html:NNN` reference in the docs still points at the code it names, and that the documented section ranges match the real ones |
+| `tools/audit-line-refs.js` | checks that every `file:NNN` reference in the docs still points at the code it names, that the documented file map matches what `index.html` loads, and that the logic files stay DOM-free |
 | `preview.png` | a real frame of the game rendered headlessly |
 
 ```bash
-node tools/headless-check.js        # 137/137 checks passed
-node tools/check-stats.mjs          # verifies index.html against the vendored stat tables
+node tools/headless-check.js        # 282/282 checks passed
+node tools/check-stats.mjs          # verifies src/config.js against the vendored stat tables
+node tools/audit-line-refs.js       # verifies the docs against the code
+npm install --prefix tools          # once: the canvas backend the next two need
 node tools/render-preview.js        # rewrites preview.png
 node tools/gen-atlas.js             # composes assets/sprites.png from data/sprites/ and rewrites the tables
 ```
@@ -78,4 +83,4 @@ python3 -m http.server 8080   # then visit http://localhost:8080
 ## Deployment
 
 GitHub Pages publishes from the `main` branch root, so the repo root *is* the site.
-Push a change to `index.html` and the live site updates a few seconds later.
+Push a change and the live site updates a few seconds later.

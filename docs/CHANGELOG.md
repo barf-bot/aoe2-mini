@@ -3,7 +3,42 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions are the git
 commits on `main`.
 
-## [Unreleased] — 2026-11-12
+## [Unreleased] — 2026-11-13
+
+### Split the single file into `src/` — no behaviour change
+
+`index.html` was 3116 lines and `tools/headless-check.js` 3799; both had outgrown what a
+person or a model can hold at once. The code is byte-for-byte the same functions in new
+places: all 278 existing checks pass, `preview.png` and `assets/sprites.png` are unchanged.
+
+- **The game:** `index.html` keeps the markup and an ordered `<script src>` list; the code
+  is fifteen classic scripts in `src/` (`config`, `world`, `entities`, `sim`, `movement`,
+  `economy`, `commands`, `ai`, `save`, `sound`, `render`, `hud`, `input`, `boot`, `main`)
+  and the styles are `src/style.css`. Still no build step and no modules — the scripts share
+  one global scope, so the page works from disk and from Pages unchanged. The "one file"
+  constraint in `AGENTS.md` is replaced by "no build step".
+- **The tools:** `tools/lib/load-game.js` is the one loader (it reads the script list from
+  `index.html` and runs the files in order under their real names), replacing four copies
+  of extract-the-`<script>`-to-a-temp-file. `check-stats.mjs` and `gen-atlas.js` now
+  regenerate their blocks in `src/config.js`.
+- **The checks:** split by topic into `tools/checks/00…12-*.js`, each an independent file:
+  it requires `tools/lib/harness.js` (stub DOM, boot, shared fixtures), gets its own
+  freshly booted `Game` and runs alone or through the `headless-check.js` runner, which
+  runs them in parallel (~1 s). Two checks leaned on state an earlier section left behind
+  and now build it themselves (a finished house); `train: unit spawns` used to pass on
+  "+2 units" because the enemy AI happened to train in the same window — it now counts
+  the player's units, and the AI gets the direct coverage it never had in `12-ai.js`
+  (278 → 282 checks).
+- **CI:** `.github/workflows/check.yml` runs the checks, the stats check, the docs audit,
+  the atlas generator (must leave the tree unchanged) and the preview renderer on every
+  push and pull request.
+- **The docs audit:** `tools/audit-line-refs.js` follows `src/file.js:NNN` references,
+  checks the `ARCHITECTURE.md` file map against what `index.html` loads, and enforces the
+  DOM-free rule on the logic files. Its symbol check used to accept any shared word
+  (the stop-word list was never applied); it now applies one.
+- **Tooling:** `tools/package.json` pins `@napi-rs/canvas` and adds `npm run check`.
+
+## 2026-11-12
 
 ### Blacksmith tech tree (T1–T6) — plan `docs/plans/2026-11-12-blacksmith-tech-tree.md`
 

@@ -1,0 +1,38 @@
+name: check
+
+# Runs the verification suite on every push and pull request.
+# Note: Pages still publishes `main` straight from the branch, so a red run here does not
+# stop a deploy by itself -- protect `main` with this check (or switch Pages to deploy from
+# an Actions workflow) if that is wanted.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+      - name: Install the tools' dev dependency
+        run: npm ci --prefix tools
+      - name: Game checks
+        run: node tools/headless-check.js -q
+      - name: Config matches data/
+        run: node tools/check-stats.mjs
+      - name: Docs match the code
+        run: node tools/audit-line-refs.js
+      - name: Atlas and generated tables are up to date
+        run: |
+          node tools/gen-atlas.js
+          git diff --exit-code -- src/config.js assets/sprites.png
+      - name: Renderer runs
+        run: node tools/render-preview.js --out "$RUNNER_TEMP/preview.png"

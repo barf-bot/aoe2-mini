@@ -1,0 +1,73 @@
+:root{
+  --bg:#12141a; --panel:#1c1f28; --ink:#e9e3d3; --dim:#9aa0b0;
+  --gold:#c8a558; --gold-dk:#8a6f34; --blue:#5b8fd6; --red:#d1584f; --line:#333846;
+  --ok:#6fbf73; --bad:#d1584f;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font:13px/1.45 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:stretch;gap:14px;padding:6px 10px;
+  background:linear-gradient(#242837,#191c24);border-bottom:1px solid var(--line);
+  user-select:none;flex:0 0 auto}
+header .brand{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--gold);letter-spacing:.5px}
+header .brand small{color:var(--dim);font-weight:400;letter-spacing:0}
+.res{display:flex;align-items:center;gap:6px;padding:0 9px;border-left:1px solid var(--line)}
+.res b{font-variant-numeric:tabular-nums;font-size:14px}
+.res span{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+#r_food b{color:#e7b16a} #r_wood b{color:#9ec96f} #r_gold b{color:#f0d264} #r_stone b{color:#c6c8cf}
+#r_pop b{color:#9dc4f0} #r_age b{color:var(--gold)}
+header .save{align-self:center;margin-left:auto;padding:4px 14px}
+header .mute{align-self:center;padding:4px 10px}
+header .mute[aria-pressed="true"]{color:var(--dim);border-color:var(--line);opacity:.7}
+#stage{position:relative;flex:1 1 auto;min-height:0;background:#0d0f13}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair;touch-action:none}
+#minimap{position:absolute;right:8px;bottom:8px;width:168px;height:168px;
+  border:2px solid var(--line);border-radius:4px;background:#0b0d11;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+#toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);padding:6px 14px;border-radius:3px;
+  background:rgba(20,22,28,.92);border:1px solid var(--gold-dk);color:var(--gold);
+  opacity:0;transition:opacity .18s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1}
+#result{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;gap:16px;background:rgba(9,11,15,.78);text-align:center}
+#result.show{display:flex}
+#result h2{margin:0;font-size:46px;letter-spacing:8px;text-transform:uppercase}
+#result h2.win{color:var(--ok);text-shadow:0 0 24px rgba(111,191,115,.45)}
+#result h2.lose{color:var(--bad);text-shadow:0 0 24px rgba(209,88,79,.45)}
+#result p{margin:0;color:var(--dim)}
+footer{flex:0 0 74px;height:74px;display:flex;align-items:stretch;gap:0;
+  background:linear-gradient(#1f2330,#171a22);border-top:1px solid var(--line)}
+.info{flex:0 0 250px;height:100%;overflow:hidden;display:grid;row-gap:4px;
+  grid-template-rows:16px minmax(0,1fr) 6px;padding:8px 12px;
+  border-right:1px solid var(--line);font-size:12px;color:var(--dim)}
+.info h4{margin:0;height:16px;line-height:16px;font-size:13px;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.info .body{overflow:hidden}
+.info .hp{height:6px;border-radius:3px;background:#0d0f13;overflow:hidden}
+.info .hp i{display:block;height:100%;background:var(--ok)}
+.commands{flex:1 1 auto;height:100%;overflow:hidden;padding:8px;display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(92px,1fr));grid-auto-rows:26px;
+  gap:4px;align-content:start}
+button{font:inherit;color:var(--ink);background:linear-gradient(#2c313f,#20242f);
+  border:1px solid var(--line);border-radius:3px;padding:6px 10px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+button:disabled{opacity:.42;cursor:not-allowed}
+button.armed{border-color:var(--gold);color:#1a1a1a;background:linear-gradient(#d9b870,#b08c3f)}
+button .c{color:var(--dim);font-size:11px;margin-left:6px}
+.queue{flex:0 0 210px;height:100%;overflow:hidden;padding:8px;
+  border-left:1px solid var(--line);font-size:11px;color:var(--dim)}
+.queue .bar{height:6px;background:#0d0f13;border-radius:3px;overflow:hidden;margin-top:4px}
+.queue .bar i{display:block;height:100%;background:var(--blue)}
+.hint{color:#6c7181;font-size:11px;padding:8px 12px}
+/* ≤720px (phone): trim the header padding, stack the footer's three panels inside
+   the same 74px the desktop rule declares, and let the flexible #stage keep the
+   freed rows for the map. Written last so it wins the cascade; the desktop rules
+   above are untouched and nothing is hidden there. */
+@media (max-width:720px){
+  header{padding:2px 6px;gap:6px}
+  footer{flex:0 0 74px;height:74px;flex-direction:column}
+  .info{flex:0 0 22px;height:22px;padding:2px 8px;display:block}
+  .info .body,.info .hp{display:none}
+  .commands{flex:1 1 auto;height:auto;padding:2px 8px;grid-auto-rows:20px}
+  .queue{flex:0 0 18px;height:18px;padding:1px 8px}
+}

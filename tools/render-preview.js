@@ -9,9 +9,9 @@
 const fs = require('fs');
 const path = require('path');
 
+const { loadGame } = require('./lib/load-game');
+
 const ROOT = path.resolve(__dirname, '..');
-const HTML = path.join(ROOT, 'index.html');
-const HTML_SRC = fs.readFileSync(HTML, 'utf8');
 
 /* ---------- real canvas backend ---------- */
 function loadCanvas() {
@@ -157,11 +157,8 @@ if (napi) {
   global.window = { innerWidth: DIMS.view[0], innerHeight: DIMS.view[1],
     addEventListener() {}, requestAnimationFrame() { return 0; } };
 
-  const jsPath = path.join(__dirname, '.extracted-preview.js');
-  fs.writeFileSync(jsPath, HTML_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]);
-  const G = require(jsPath);
+  const G = loadGame();
   const Game = global.window.Game;
-  fs.unlinkSync(jsPath);
 
   const sheet = path.join(ROOT, 'assets', 'sprites.png');
   Promise.resolve(fs.existsSync(sheet) ? napi.loadImage(sheet) : null)
@@ -175,11 +172,8 @@ if (napi) {
   const doc = buildDom(null);
   global.document = doc;
   global.window = { innerWidth: 1200, innerHeight: 700, addEventListener() {}, requestAnimationFrame() { return 0; } };
-  const jsPath = path.join(__dirname, '.extracted-preview.js');
-  fs.writeFileSync(jsPath, HTML_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]);
-  const G = require(jsPath);
+  const G = loadGame();
   const Game = global.window.Game;
-  fs.unlinkSync(jsPath);
   for (let i = 0; i < Math.round(SECONDS * 30); i++) G.stepGame(Game, 1 / 30);
   G.renderFrame(Game);
   console.log('stub-canvas render OK (install @napi-rs/canvas in tools/node_modules for a PNG)');
