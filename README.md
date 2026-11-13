@@ -9,7 +9,9 @@ no framework, no dependencies, one PNG of unit art. Open `index.html` and play.
 
 ## What's in it
 
-- Procedural map: grass, water, forest, berry bushes, gold and stone deposits, plus fog of war
+- Procedural map: grass, water, forest, berry bushes, gold and stone deposits, drawn from the
+  palettes in `src/config.js:282-291`. No fog of war yet — every tile is visible from the
+  first frame (planned: `docs/ROADMAP.md` item 14)
 - A Town Center with villagers that harvest → carry → deposit → retarget when a tile empties
 - Buildings: house (population), farm (food field), barracks, lumber camp, mining camp, mill
   and archery range, all constructed over time with hp scaling

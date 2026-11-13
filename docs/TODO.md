@@ -29,11 +29,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P2 — smaller defects
 
-### 17. README says "fog of war", the game has none
-
-**Verified** — there is no fog, visibility or explored-tile code in `src/`. Remove the
-claim or put fog on `docs/ROADMAP.md`.
-
 ### 18. Minimap terrain may not update when a resource runs out
 
 **Unverified.** `Game.mmBase` (the cached terrain bitmap in `drawMinimap`,

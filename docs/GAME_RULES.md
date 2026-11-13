@@ -14,7 +14,7 @@ a bug.
 | Terrain | grass, water, forest, gold, stone, berry (`T` enum) |
 | Tile yields | tree 60 wood · gold 800 · stone 450 · berry 150 (`CFG.RES`) |
 | Berry clusters | one connected 6-tile cluster per Town Center, every bush 5–8 tiles from its own keep (`berryCluster`, `src/world.js:99`) — no scattered berries any more |
-| Fog | explored/revealed per tile, drawn dimmed outside vision |
+| Fog | not implemented yet — every tile is visible; fog of war is `docs/ROADMAP.md` item 14 |
 | Teams | Blue (player, team 0) vs Red (AI, team 1) |
 | Starting stockpile | 100 food, 100 wood, 50 gold, 50 stone (`CFG.START`) |
 

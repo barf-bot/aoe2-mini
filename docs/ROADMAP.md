@@ -94,6 +94,12 @@ that before starting anything below.
     (`fingerDown`, `src/input.js:78`) with `tools/checks/08-input.js` as its only proof — this box
     has no browser and no device. *Done when:* a finger-on-glass try confirms the pan tracks the
     fingers, stops at the map edge and leaves one-finger select alone.
+14. **Fog of war.** The game has none — every tile is visible from the first frame — and the
+    docs used to claim otherwise (`docs/TODO.md` P2-17, removed 2026-11-13). *Done when:* `Game`
+    carries per-tile explored and visible masks, the renderer dims everything outside vision and
+    stops drawing the units and buildings on hidden tiles, the masks survive a save and a load
+    (`src/save.js`), and the pair is asserted by checks in `tools/checks/13-render.js` and
+    `tools/checks/10-reset-save.js`.
 
 ## Phase 2 of the 2026-11-04 rules pass (designed, not yet planned)
 

@@ -5,6 +5,21 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P2-17: the docs promised fog of war the game doesn't have
+
+- `README.md:12` claimed a "procedural map … plus fog of war" and the map table
+  (`docs/GAME_RULES.md:17`) described per-tile explored/revealed state "drawn dimmed outside
+  vision" — there is no fog, visibility or explored-tile code in `src/`. The README bullet now
+  says what the renderer does instead (terrain drawn from the palettes at
+  `src/config.js:282-291`) and states that the whole map is visible from the first frame; the
+  rules row reads `not implemented yet` and points at the roadmap entry.
+- Fog of war becomes `docs/ROADMAP.md` item 14, so it is a planned feature with an exit
+  condition (explored/visible masks, dimmed rendering outside vision, a save/load round-trip and
+  the checks that prove them) instead of an unmet claim. The 2026-11-03 history entry
+  (`docs/CHANGELOG.md:961`) keeps its wording — history is not edited.
+- Docs only, so no code path and no check changed: `node tools/audit-line-refs.js` validates the
+  references the two edited docs cite, and `node tools/headless-check.js` stays at 338/338.
+
 ### Added — `docs/TODO.md` P2-16b: the camera pans with two fingers
 
 - `Game.touches` (id → the canvas point each finger last reported) and `Game.pan` (the point
