@@ -211,7 +211,7 @@ for every selection, caching the string in `Game.dom.hudLast` so a frame that ch
 nothing writes no `innerHTML` at all (comparing against `el.innerHTML` instead never
 matches: the browser serialises `disabled` as `disabled=""`), so the frame never resizes
 the map and the CSS can pin it to
-`height:74px` with every panel a fixed `overflow:hidden` box (the command panel is a
+`height:var(--footer-h)`, 94 px, with every panel a fixed `overflow:hidden` box (the
 row-based button grid). The game-over overlay is `resultHtml` (`src/hud.js:59`) written
 into `#result`, cached the same way as `Game.dom.resultLast`, and hidden again by its
 `show` class the moment `Game.result` goes back to null.

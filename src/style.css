@@ -1,7 +1,7 @@
 :root{
   --bg:#12141a; --panel:#1c1f28; --ink:#e9e3d3; --dim:#9aa0b0;
   --gold:#c8a558; --gold-dk:#8a6f34; --blue:#5b8fd6; --red:#d1584f; --line:#333846;
-  --ok:#6fbf73; --bad:#d1584f;
+  --ok:#6fbf73; --bad:#d1584f; --footer-h:94px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
@@ -35,21 +35,22 @@ header .mute[aria-pressed="true"]{color:var(--dim);border-color:var(--line);opac
 #result h2.win{color:var(--ok);text-shadow:0 0 24px rgba(111,191,115,.45)}
 #result h2.lose{color:var(--bad);text-shadow:0 0 24px rgba(209,88,79,.45)}
 #result p{margin:0;color:var(--dim)}
-footer{flex:0 0 74px;height:74px;display:flex;align-items:stretch;gap:0;
+footer{flex:0 0 var(--footer-h);height:var(--footer-h);display:flex;align-items:stretch;gap:0;
   background:linear-gradient(#1f2330,#171a22);border-top:1px solid var(--line)}
 .info{flex:0 0 250px;height:100%;overflow:hidden;display:grid;row-gap:4px;
   grid-template-rows:16px minmax(0,1fr) 6px;padding:8px 12px;
   border-right:1px solid var(--line);font-size:12px;color:var(--dim)}
 .info h4{margin:0;height:16px;line-height:16px;font-size:13px;color:var(--ink);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.info .body{overflow:hidden}
+.info .body{overflow:hidden;line-height:16px}
 .info .hp{height:6px;border-radius:3px;background:#0d0f13;overflow:hidden}
 .info .hp i{display:block;height:100%;background:var(--ok)}
 .commands{flex:1 1 auto;height:100%;overflow:hidden;padding:8px;display:grid;
   grid-template-columns:repeat(auto-fill,minmax(92px,1fr));grid-auto-rows:26px;
   gap:4px;align-content:start}
 button{font:inherit;color:var(--ink);background:linear-gradient(#2c313f,#20242f);
-  border:1px solid var(--line);border-radius:3px;padding:6px 10px;cursor:pointer}
+  border:1px solid var(--line);border-radius:3px;padding:6px 10px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
 button:disabled{opacity:.42;cursor:not-allowed}
 button.armed{border-color:var(--gold);color:#1a1a1a;background:linear-gradient(#d9b870,#b08c3f)}
@@ -60,12 +61,12 @@ button .c{color:var(--dim);font-size:11px;margin-left:6px}
 .queue .bar i{display:block;height:100%;background:var(--blue)}
 .hint{color:#6c7181;font-size:11px;padding:8px 12px}
 /* ≤720px (phone): trim the header padding, stack the footer's three panels inside
-   the same 74px the desktop rule declares, and let the flexible #stage keep the
+   the same --footer-h the desktop rule declares, and let the flexible #stage keep the
    freed rows for the map. Written last so it wins the cascade; the desktop rules
    above are untouched and nothing is hidden there. */
 @media (max-width:720px){
   header{padding:2px 6px;gap:6px}
-  footer{flex:0 0 74px;height:74px;flex-direction:column}
+  footer{flex:0 0 var(--footer-h);height:var(--footer-h);flex-direction:column}
   .info{flex:0 0 22px;height:22px;padding:2px 8px;display:block}
   .info .body,.info .hp{display:none}
   .commands{flex:1 1 auto;height:auto;padding:2px 8px;grid-auto-rows:20px}

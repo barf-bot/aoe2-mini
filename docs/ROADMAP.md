@@ -84,7 +84,7 @@ that before starting anything below.
     (`src/input.js:30`, `src/input.js:41`) answer mouse and touch from one path —
     `touch-action:none` on the canvas, one pointer per drag, and a 600 ms press-and-hold
     that issues the order a right-click would — while a `@media (max-width:720px)` block
-    (`src/style.css:66`) stacks the footer panels and trims the header on narrow widths. Cut
+    (`src/style.css:67`) stacks the footer panels and trims the header on narrow widths. Cut
     from this round: pinch-zoom, two-finger pan, virtual joystick, on-screen keyboard,
     gamepad, tablet split-view and minimap drag on touch.
 12. **Replay / seeded challenge** — the `mulberry32` seed is already a shareable handle on a

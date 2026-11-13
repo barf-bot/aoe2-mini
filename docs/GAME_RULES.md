@@ -369,7 +369,7 @@ three panels (`info` | `commands` | `queue`) in the same order for every state, 
 against `el.innerHTML`, which a browser hands back serialised with `disabled=""`, so the
 read never matches while a button is disabled and re-writing it every frame replaces the
 button under the pointer and the click is lost (docs/TODO.md P0-1) — so the frame the CSS
-pins (`footer{flex:0 0 74px;height:74px}`, every
+pins (`footer{flex:0 0 var(--footer-h);height:var(--footer-h)}`, 94 px, every
 panel a fixed-height `overflow:hidden` box) never changes size when the selection does —
 the info panel is a fixed title/body/bar grid, the command panel a row-based button grid.
 Choosing a placement (`Game.placing`) changes the info panel's content, never the state. A
@@ -379,8 +379,8 @@ group collapses to a `N units` title plus one `.sum` line of per-kind counts
 fraction.
 
 Below 720 px the frame reflows instead of shrinking: one `@media (max-width:720px)` block
-(`src/style.css:66`, written last so it wins the cascade) trims the header padding to `2px 6px`
-and turns the footer into a column, stacking the same three panels inside the same `74px` —
+(`src/style.css:67`, written last so it wins the cascade) trims the header padding to `2px 6px`
+and turns the footer into a column, stacking the same three panels inside the same `--footer-h` —
 info shows its title only, the command grid takes the room, the queue line stays one line —
 while `#stage` keeps every other row for the map. Nothing is hidden on desktop; the desktop
 rules above the block are what the responsive-layout checks (`tools/checks/09-hud.js`) compare the responsive ones against.

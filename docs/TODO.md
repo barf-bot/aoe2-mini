@@ -29,15 +29,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P2 — smaller defects
 
-### 15. Footer content is clipped
-
-**Verified** by screenshot at 1280×800: the third line of the info panel ("Order: build")
-is cut off, and long button labels ("Barracks 175 W", "Archery Range 175 W") wrap outside
-their buttons.
-
-- **Fix:** in `src/style.css`, either raise the fixed 74 px footer or shorten the content
-  (`infoHtml` in `src/hud.js`). `tools/checks/09-hud.js` pins `height:74px`.
-
 ### 16. Phone layout
 
 **Verified** at 390×780: the header resources run off the right edge (stone, pop, age and

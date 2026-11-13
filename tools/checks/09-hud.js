@@ -245,11 +245,45 @@ check(sums[0] === '<span class="sum">1 Villager, 1 Militia, 1 Archer</span>' &&
   sums.join('  ...  '));
 
 const footerRule = (styleCss.match(/(?:^|[\s};])footer\s*\{([^}]*)\}/) || [])[1];
-check(!!footerRule && footerRule.includes('height:74px') && !/min-height:74px/.test(styleCss),
-  'hud: the CSS declares one fixed footer height, not a min-height',
+const rootRule = (styleCss.match(/:root\s*\{([^}]*)\}/) || [])[1];
+const footerVar = ((rootRule || '').match(/--footer-h:\s*([^;]+);/) || [])[1];
+check(!!footerRule && !!footerVar && footerRule.includes('height:var(--footer-h)') &&
+      footerRule.includes('flex:0 0 var(--footer-h)') && !/min-height/.test(footerRule) &&
+      !/min-height:74px/.test(styleCss),
+  'hud: the CSS declares one footer height in --footer-h, not a min-height',
   footerRule === undefined ? 'no footer{…} rule in the stylesheet'
-    : 'footer{' + footerRule.replace(/\s+/g, ' ').trim().slice(0, 90) + '} | min-height:74px=' +
-      /min-height:74px/.test(styleCss));
+    : '--footer-h=' + footerVar + ' footer{' + footerRule.replace(/\s+/g, ' ').trim().slice(0, 90) +
+      '} | footer min-height=' + /min-height/.test(footerRule));
+
+/* docs/TODO.md P2-15: the footer measured 74 px, which left the .info body row 24 px
+   (74 − 2·8 padding − 16 h4 − 6 hp − 2·4 row-gap) — one and a half lines at the 12 px
+   font, so the third line of infoHtml ("Order: build") was cut. The declared height is
+   now derived from what the panel needs: three body lines at the .body line-height plus
+   the fixed rows, the gaps and the padding. Parsed, not eyeballed: no browser here. */
+const infoRule = (styleCss.match(/(?:^|[\s};])\.info\s*\{([^}]*)\}/) || [])[1];
+const bodyRule = (styleCss.match(/(?:^|[\s};])\.info \.body\s*\{([^}]*)\}/) || [])[1];
+const pxOf = (rule, name) => +(((rule || '').match(new RegExp('(?:^|;)\\s*' + name + ':\\s*(-?[0-9.]+)px')) || [])[1]);
+const infoRows = ((infoRule || '').match(/grid-template-rows:\s*([^;]+)/) || [])[1];
+const fixedRows = (infoRows || '').match(/-?[0-9.]+px/g) || [];
+const padY = pxOf(infoRule, 'padding'), gapY = pxOf(infoRule, 'row-gap'), lineH = pxOf(bodyRule, 'line-height');
+const fixedH = fixedRows.reduce((s, v) => s + parseFloat(v), 0);
+const needH = padY * 2 + fixedH + gapY * 2 + lineH * 3;
+check(!!infoRule && !!bodyRule && /(^|;)\s*height:\s*100%/.test(infoRule || '') &&
+      /minmax\(0,\s*1fr\)/.test(infoRows || '') && fixedRows.length === 2 &&
+      [padY, gapY, lineH].every(Number.isFinite) && footerVar === needH + 'px',
+  'hud: the footer is tall enough for the three info lines infoHtml can render',
+  infoRule === undefined || bodyRule === undefined ? 'no .info{…} / .info .body{…} rule to measure'
+    : '2·' + padY + ' padding + ' + fixedH + ' fixed rows (h4+hp) + 2·' + gapY + ' row-gap + 3·' + lineH +
+      ' body lines = ' + needH + 'px, --footer-h=' + String(footerVar) + ' rows=' + String(infoRows));
+
+const btnRule = (styleCss.match(/(?:^|[\s};])button\s*\{([^}]*)\}/) || [])[1];
+check(/(^|;)\s*white-space:\s*nowrap/.test(btnRule || '') &&
+      /(^|;)\s*overflow:\s*hidden/.test(btnRule || '') &&
+      /(^|;)\s*text-overflow:\s*ellipsis/.test(btnRule || ''),
+  'ui: buttons clip a long label with an ellipsis instead of wrapping over the row',
+  btnRule === undefined ? 'no button{…} rule in the stylesheet'
+    : 'button{' + btnRule.replace(/\s+/g, ' ').trim().slice(0, 120) + '}');
+
 const viewRule = (styleCss.match(/(?:^|[\s};])#view\s*\{([^}]*)\}/) || [])[1];
 check(!!viewRule && /touch-action:\s*none/.test(viewRule),
   'ui: the canvas declares touch-action:none so a touch drag cannot scroll the page',
@@ -284,8 +318,8 @@ check(painted.join(' ') === 'units|html=hudHtml group|html=hudHtml building|html
 /* ---- 11c. responsive layout (this plan, T3) ---- */
 /* The phone layout is one media block written last so it wins the cascade, and the
    checks read it as text naming the desktop rules it overrides: drift on either
-   side shows up in the failure. §11b's `hud: the CSS declares one fixed footer
-   height` keeps proving the desktop footer itself never moved. */
+   side shows up in the failure. §11b's `hud: the CSS declares one footer height in
+   --footer-h` keeps proving the desktop footer itself never moved. */
 const mediaAt = styleCss.indexOf('@media (max-width:720px){');
 check(styleCss.indexOf('footer{') >= 0 && mediaAt > styleCss.indexOf('footer{'),
   'ui: the CSS ships a max-width:720px block after the desktop rules',
@@ -299,10 +333,10 @@ const propOf = (rule, name) => ((rule || '').match(new RegExp('(?:^|;)\\s*' + na
 
 const mFooter = ruleOf(mediaCss, 'footer'), bFooter = ruleOf(baseCss, 'footer');
 check(/(^|;)\s*flex-direction:\s*column/.test(mFooter || '') &&
-      /(^|;)\s*height:\s*74px/.test(mFooter || '') &&
+      /(^|;)\s*height:\s*var\(--footer-h\)/.test(mFooter || '') &&
       propOf(mFooter, 'height') === propOf(bFooter, 'height') &&
       /\B\.info\s*\{/.test(mediaCss) + /\B\.commands\s*\{/.test(mediaCss) + /\B\.queue\s*\{/.test(mediaCss) === 3,
-  'ui: the responsive footer stacks the three panels and keeps the 74px height',
+  'ui: the responsive footer stacks the three panels and keeps the shared --footer-h height',
   'media footer{' + String(mFooter) + '} vs base footer{' + String(bFooter) + '} panels=' +
   ['.info', '.commands', '.queue'].filter((s) => /\S/.test(ruleOf(mediaCss, s) || '')).join(','));
 

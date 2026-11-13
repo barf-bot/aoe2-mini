@@ -5,6 +5,24 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P2-15: footer content was clipped
+
+- The info panel's body row measured 24 px — one and a half lines at its 12 px font — so the
+  third line (`Order: build`) was cut off. `:root` (`src/style.css:4`) gains
+  `--footer-h:94px` — 2·8 padding + 16 h4 + 2·4 row-gap + 6 hp + 3·16 body lines — and both
+  footer rules (`src/style.css:38` and the 720 px block) now read `flex:0 0 var(--footer-h);
+  height:var(--footer-h)`, so the desktop and phone declarations cannot drift apart again.
+  `.info .body` (`src/style.css:45`) declares the `line-height:16px` the sum assumes instead of
+  leaving it to the browser default, so the row holds exactly the three lines `infoHtml` fills.
+- `button` (`src/style.css:53`) gains `white-space:nowrap;overflow:hidden;text-overflow:ellipsis`
+  so `Barracks 175 W` truncates inside its 26 px row instead of wrapping over it; no label
+  string in `commandsHtml` changed.
+- checks: 329 → 331. `tools/checks/09-hud.js` replaces the literal `height:74px` pins in both
+  footer rules with `var(--footer-h)` and adds two checks: the footer height equals the `.info`
+  padding + rows + gaps + 3 body lines (the symptom's maths, parsed from the stylesheet — no
+  browser on this box), and the button clip rule.
+- `preview.png` regenerates byte-identical (CSS-only change, no render path touched).
+
 ### Fixed — `docs/TODO.md` P2-14: age up went one age too far
 
 - `AGES` (`src/config.js:272`) loses its fourth entry: the game ends at Castle Age, which is
