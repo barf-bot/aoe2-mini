@@ -640,4 +640,52 @@ uiCheck('boot: opening the page with an empty slot gives the standard settlement
   ]);
 });
 
+/* The garrison cases of §13 (this plan, T4): the link needs no schema change —
+ *  `encodeUnit` (src/save.js:55) and `decodeState`'s
+   `Object.assign({}, u)` copy every key, so `garrisonedIn` rides along with the unit and
+   CFG.VERSION stays 2. These two cases are the claim, stated: a garrisoned pair comes
+   back inside the same building with the same population line, and a garrison walk that
+   was still in progress is still in progress after the round trip. */
+saveCheck('save: units inside a building come back garrisoned with the same population line', () => {
+  return withStorage(() => {
+    const st = AoE2.createState();
+    const b = builtAt(st, 'barracks', 30);
+    const ids = st.units.filter((u) => u.team === 0 && u.kind === 'villager').slice(0, 2).map((u) => u.id);
+    const took = AoE2.garrisonUnits(st, ids, b);
+    const pop = AoE2.popUsed(st, 0) + '/' + AoE2.popCap(st, 0);
+    const [raw, env] = saveOf(st, 1000);
+    AoE2.resetGame(st);                                   // wipe, then read the slot back
+    const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, st);
+    const back = ids.map((id) => String((st.units.find((u) => u.id === id) || {}).garrisonedIn));
+    const saved = env.state.units.filter((u) => ids.indexOf(u.id) >= 0).map((u) => String(u.garrisonedIn));
+    return [took.length === 2 && okLoad === true && back.join(',') === String(b.id) + ',' + String(b.id) &&
+      saved.join(',') === String(b.id) + ',' + String(b.id) &&
+      AoE2.popUsed(st, 0) + '/' + AoE2.popCap(st, 0) === pop,
+      'took=' + took.length + ' loaded=' + okLoad + ' b=' + b.id + ' restored=' + back.join(',') +
+      ' json=' + saved.join(',') + ' pop ' + pop + ' -> ' +
+      AoE2.popUsed(st, 0) + '/' + AoE2.popCap(st, 0) + ' rawBytes=' + raw.length];
+  });
+});
+saveCheck('save: a pending garrison walk survives the round trip', () => {
+  return withStorage(() => {
+    const st = AoE2.createState();
+    const b = builtAt(st, 'barracks', 31);
+    const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+    const took = AoE2.garrisonUnits(st, [v.id], b);
+    const order = JSON.stringify(v.order);
+    const [raw, env] = saveOf(st, 1000);
+    AoE2.resetGame(st);
+    const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, st);
+    const u2 = st.units.find((x) => x.id === v.id);
+    const keysOk = Object.keys(env.state).join(',') === SAVE_FIELDS.join(',');
+    return [took.length === 1 && okLoad === true && !!u2 && u2.garrisonedIn === b.id &&
+      JSON.stringify(u2.order) === order && order.indexOf('"garrison":' + b.id) >= 0 &&
+      env.version === AoE2.CFG.VERSION && AoE2.CFG.VERSION === dataUnits.cfg.VERSION && keysOk,
+      'took=' + took.length + ' loaded=' + okLoad + ' order=' + order +
+      ' restored=' + (u2 ? JSON.stringify(u2.order) + ' in ' + String(u2.garrisonedIn) : 'absent') +
+      ' version=' + env.version + '/' + AoE2.CFG.VERSION + ' (data ' + dataUnits.cfg.VERSION + ')' +
+      ' keysMatch=' + keysOk];
+  });
+});
+
 report();
