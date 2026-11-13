@@ -1,6 +1,6 @@
 # Tower upgrade chain (Watch Tower → Guard Tower → Keep)
 
-Status: planned
+Status: in progress
 
 ## Design
 
@@ -103,7 +103,7 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
 
 ## Tasks
 
-- [ ] T1: the `guard_tower` and `keep` rows — data, the `upgradesTo` link, the generated `BLD`
+- [x] T1: the `guard_tower` and `keep` rows — data, the `upgradesTo` link, the generated `BLD`
   - files: `data/buildings.json` (two rows appended after `barricade` — the file's arrival
     order; `buildings.watch_tower.upgradesTo` and `buildings.guard_tower.upgradesTo`;
     `source.authored` gains `buildings.watch_tower.upgradesTo`,

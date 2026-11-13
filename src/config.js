@@ -236,12 +236,26 @@ const BLD = {
     cost: { wood: 35, stone: 125 }, time: 80, pop: 0,
     trains: [],
     attack: 5, meleeArmor: 1, pierceArmor: 7, lineOfSight: 10, range: 8, reload: 2, accuracy: 100, garrisonCapacity: 5, age: 1, noSprite: true,
+    upgradesTo: 'guard_tower',
   },
   barricade: {
     label: 'Barricade', hp: 150, w: 1, h: 1,
     cost: { wood: 3 }, time: 7, pop: 0,
     trains: [],
     attack: 0, meleeArmor: 2, pierceArmor: 5, lineOfSight: 2, range: 0, reload: 0, accuracy: 0, garrisonCapacity: 0, age: 1, noSprite: true,
+  },
+  guard_tower: {
+    label: 'Guard Tower', hp: 1500, w: 1, h: 1,
+    cost: { wood: 35, stone: 125 }, time: 80, pop: 0,
+    trains: [],
+    attack: 7, meleeArmor: 2, pierceArmor: 8, lineOfSight: 10, range: 8, reload: 2, accuracy: 100, garrisonCapacity: 5, age: 1, noSprite: true,
+    upgradesTo: 'keep',
+  },
+  keep: {
+    label: 'Keep', hp: 2250, w: 1, h: 1,
+    cost: { wood: 35, stone: 125 }, time: 80, pop: 0,
+    trains: [],
+    attack: 8, meleeArmor: 3, pierceArmor: 9, lineOfSight: 10, range: 8, reload: 2, accuracy: 100, garrisonCapacity: 5, age: 2, noSprite: true,
   },
 };
 

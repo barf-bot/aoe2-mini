@@ -6,11 +6,12 @@
       "https://raw.githubusercontent.com/HSZemi/aoe2dat/master/data/units_buildings_techs.json"
     ],
     "fetched": "2026-11-11",
-    "rule": "Table numbers are copied, never retuned. label/w/h/pop/field/trains are authored here (listed in authored[]) because the table carries no footprint or population-provided column. blacksmith is the building that shared id 103 / internal_name BLAC row actually names; lumber_camp keeps the same numbers it used while borrowing the row. The id 72 / internal_name WALL row is published as barricade: 'Barricade' is the authored label for the wooden wall segment, and its 1x1 footprint and age: 1 gate are authored, not table columns. Every row now carries an explicit age, authored from AoE2 (age is no column of the table): the five Dark Age rows town_center, house, farm, lumber_camp, mining_camp are age 0, the seven Feudal rows barracks (the table's own internal_name is 'Barracks Age1'), mill, archery_range, blacksmith, market, watch_tower, barricade are age 1.",
+    "rule": "Table numbers are copied, never retuned. label/w/h/pop/field/trains are authored here (listed in authored[]) because the table carries no footprint or population-provided column. blacksmith is the building that shared id 103 / internal_name BLAC row actually names; lumber_camp keeps the same numbers it used while borrowing the row. The id 72 / internal_name WALL row is published as barricade: 'Barricade' is the authored label for the wooden wall segment, and its 1x1 footprint and age: 1 gate are authored, not table columns. The id 234 / internal_name WCTW2 row is published as guard_tower and the id 235 / internal_name WCTW3 row as keep: 'Guard Tower' and 'Keep' are the authored labels for the Watch Tower's two upper tiers, their age gates are authored (the table carries no age column) and upgradesTo is authored because the table carries no upgrade column. Every row now carries an explicit age, authored from AoE2 (age is no column of the table): the five Dark Age rows town_center, house, farm, lumber_camp, mining_camp are age 0, the eight Feudal rows barracks (the table's own internal_name is 'Barracks Age1'), mill, archery_range, blacksmith, market, watch_tower, guard_tower, barricade are age 1, the one Castle Age row keep is age 2.",
     "authored": [
       "buildings.*.label", "buildings.*.w", "buildings.*.h", "buildings.*.pop",
       "buildings.*.field", "buildings.*.trains",
-      "buildings.*.age", "buildings.*.noSprite", "buildings.market.trade"
+      "buildings.*.age", "buildings.*.noSprite", "buildings.market.trade",
+      "buildings.watch_tower.upgradesTo", "buildings.guard_tower.upgradesTo"
     ]
   },
   "buildings": {
@@ -248,6 +249,7 @@
       "reload": 2,
       "accuracy": 100,
       "garrisonCapacity": 5,
+      "upgradesTo": "guard_tower",
       "age": 1,
       "noSprite": true
     },
@@ -271,6 +273,51 @@
       "accuracy": 0,
       "garrisonCapacity": 0,
       "age": 1,
+      "noSprite": true
+    },
+    "guard_tower": {
+      "id": 234,
+      "internalName": "WCTW2",
+      "label": "Guard Tower",
+      "hp": 1500,
+      "cost": { "wood": 35, "stone": 125 },
+      "time": 80,
+      "w": 1,
+      "h": 1,
+      "pop": 0,
+      "trains": [],
+      "attack": 7,
+      "meleeArmor": 2,
+      "pierceArmor": 8,
+      "lineOfSight": 10,
+      "range": 8,
+      "reload": 2,
+      "accuracy": 100,
+      "garrisonCapacity": 5,
+      "upgradesTo": "keep",
+      "age": 1,
+      "noSprite": true
+    },
+    "keep": {
+      "id": 235,
+      "internalName": "WCTW3",
+      "label": "Keep",
+      "hp": 2250,
+      "cost": { "wood": 35, "stone": 125 },
+      "time": 80,
+      "w": 1,
+      "h": 1,
+      "pop": 0,
+      "trains": [],
+      "attack": 8,
+      "meleeArmor": 3,
+      "pierceArmor": 9,
+      "lineOfSight": 10,
+      "range": 8,
+      "reload": 2,
+      "accuracy": 100,
+      "garrisonCapacity": 5,
+      "age": 2,
       "noSprite": true
     }
   }

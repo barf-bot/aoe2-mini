@@ -110,6 +110,8 @@ function bldValue(b) {
   if (b.noSprite !== undefined) v.noSprite = typeof b.noSprite === 'boolean'
     ? b.noSprite : fail(`${where}.noSprite must be true/false`);
   if (b.trade !== undefined) v.trade = tradeValue(b.trade, `${where}.trade`);
+  if (b.upgradesTo !== undefined) v.upgradesTo = typeof b.upgradesTo === 'string' && b.upgradesTo in bldsDoc.buildings
+    ? b.upgradesTo : fail(`${where}.upgradesTo must be a building in data/buildings.json`);
   return v;
 }
 
@@ -172,6 +174,7 @@ function renderBLD() {
       `    ${extras.map((k) => `${k}: ${v[k]}`).join(', ')},`,
     ];
     if (v.trade) lines.push(`    trade: { sell: ${v.trade.sell}, buy: ${v.trade.buy} },`);
+    if (v.upgradesTo) lines.push(`    upgradesTo: '${v.upgradesTo}',`);
     lines.push('  },');
     return lines.join('\n');
   }).join('\n');
