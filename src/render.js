@@ -162,14 +162,14 @@ function drawUnits(Game, view) {
     if (atlas && frame) {
       // The atlas cell, mirrored when the unit walks left and bobbing 1px on its
       // 8 Hz walk clock (8 steps/s) only while walking; standing and working
-      // frames hold still -- the a/b work cells are their own animation. Drawn
-      // at integer pixels so the 24px art stays crisp instead of softening.
+      // frames hold still -- the a/b work cells are their own animation. The cell
+      // is placed at integer pixels by its feet anchor (ax/ay), not its centre.
       const bob = anim === 'walk' ? Math.floor(u.anim * 8) % 2 : 0;
       c.save();
       c.translate(Math.round(x), Math.round(y) + bob);
       if (u.face < 0) c.scale(-1, 1);
       c.drawImage(atlas, frame.sx, frame.sy, frame.sw, frame.sh,
-        -frame.dw / 2, -frame.dh / 2, frame.dw, frame.dh);
+        -frame.ax, -frame.ay, frame.dw, frame.dh);
       c.restore();
     } else if (u.kind === 'villager') {
       c.fillStyle = '#2b2b2b'; c.beginPath(); c.arc(x, y, 6.5, 0, 6.283); c.fill();

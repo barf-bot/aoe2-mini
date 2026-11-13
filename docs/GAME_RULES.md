@@ -111,10 +111,14 @@ a bug.
   to units only, never to built buildings' attacks).
 - Population used counts **villagers only**, per AoE2 convention.
 - Art: all three kinds render from the unit atlas (`SPRITE_SHEET` 1522×684 at
-  `src/config.js:73`), the frames ripped from the AoE2 art and recoloured per team, drawn at
-  the size the manifest authors (villager 20×20, militia 22×22, archer 20×20) and mirrored
-  when the unit walks left; `tools/gen-atlas.js` regenerates the PNG from
-  `data/sprites.json`, and `unitAnim` (`src/render.js:134`) picks the cell from the unit's order.
+  `src/config.js:73`), the frames ripped from the AoE2 art and recoloured per team.
+  Each frame now draws at its own proportions, times the one scale
+  `data/sprites.json` authors per kind (`draw.idleTiles`: a kind's idle frame draws
+  1.4 tiles tall, so a 28×46 cell measures 19×31 instead of a squashed 20×20), and
+  is placed with its feet anchor (`ax`/`ay`) on the unit — see `drawUnits`
+  (`src/render.js:150`). The sprite is mirrored when the unit walks left,
+  `tools/gen-atlas.js` regenerates the PNG from `data/sprites.json`, and `unitAnim`
+  picks the cell from the unit's order.
 
 ## Buildings (`BLD`)
 

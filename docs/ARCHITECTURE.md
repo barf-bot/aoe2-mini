@@ -185,9 +185,11 @@ its animation cells and `spriteFor(kind, team, anim)` (`src/config.js:130`) reso
 `bldSpriteFor(kind, team)` (`src/config.js:164`) resolves those, each cell drawn at the
 building's exact footprint. `unitAnim(u)` (`src/render.js:134`) decides which animation a
 unit plays from its order — villagers farm/chop/mine (a/b frames per harvested resource)
-plus idle/walk, militia and archer idle/walk plus attack_a/attack_b — and `drawUnits`
-(`src/render.js:150`) blits the cell at integer pixels with `drawImage` and mirrors it with
-`scale(-1, 1)` when `u.face` is `-1`.
+plus idle/walk, militia and archer idle/walk plus attack_a/attack_b. `drawUnits`
+(`src/render.js:150`) blits the cell at integer pixels with `drawImage`, placing the
+cell's feet anchor (`ax`/`ay`, measured from the frame's opaque box by
+`tools/gen-atlas.js`) on the unit and mirroring it with `scale(-1, 1)` when `u.face`
+is `-1`.
 The 1px walk bob applies only to walk cells; work/swing animations animate through their
 own a/b frames. The old team-coloured disc/square drawing stays as the
 fallback whenever no atlas is loaded. On top of the sprite: selection ring, health bar and

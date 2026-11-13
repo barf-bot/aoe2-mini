@@ -25,22 +25,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P1 — wrong behaviour you notice within a minute
 
-### 7. Villagers are tiny and distorted
-
-**Verified.** Every unit frame is drawn into a fixed box (20×20, militia 22×22)
-regardless of the source frame size. The villager farm frame is 146×86 with a lot of empty
-space, so the figure ends up a few pixels tall; the 28×46 idle frame is stretched wide.
-
-- **Cause:** `tools/gen-atlas.js` writes one `dw`/`dh` per kind into `SPRITES`
-  (`src/config.js`, generated). `drawUnits` in `src/render.js` centres the box on the unit.
-- **Fix:** in `tools/gen-atlas.js`, use one scale per kind (for example: idle frame height
-  → about 1.4 tiles) and set `dw = sw × scale`, `dh = sh × scale` for every frame of that
-  kind. Add a per-frame anchor so the feet stay on the same pixel across animations, and
-  draw from the anchor in `drawUnits`. Regenerate with `node tools/gen-atlas.js`; do not
-  hand-edit `src/config.js`.
-- **Done when:** for every frame `dw / dh` equals `sw / sh` within 2 %, and all frames of
-  one kind share one scale. Look at `preview.png` before committing.
-
 ### 8. Construction looks like nothing is happening
 
 **Verified** by screenshot: a site is a faint square with a 4 px bar, and the builder shows

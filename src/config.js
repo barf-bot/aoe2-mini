@@ -59,15 +59,15 @@ const KINDS = {
  * data/sprites/ are the art source (ripped AoE2 graphics, recoloured per team
  * from TEAM), tools/gen-atlas.js composes the sheet and rewrites the blocks
  * under their GENERATED FROM banners. sx/sy/sw/sh = the cell inside the sheet,
- * dw/dh = the size the cell is drawn on screen: for units the size authored in
- * the manifest, for buildings the footprint in px (b.w*TILE x b.h*TILE).
- * SPRITES maps kind -> animation -> [Blue, Red]; the columns run left to right
- * with row 0 = Blue and row 1 = Red, exactly like TEAM. Which cell a unit plays
- * is unitAnim(u) (src/render.js): villagers have civilian idle/walk plus the
- * two-frame work animations WORK_ANIM names per resource, militia idle/walk
- * plus attack_a/attack_b swings. New unit kinds or animations must add frames
- * to the manifest or the `sprites: every registered anim x team has a unique
- * in-sheet cell` check fails.
+ * dw/dh = the size it draws at -- for units the frame's own proportions at the
+ * one scale the manifest authors per kind (draw.idleTiles, the height its idle
+ * frame draws at in tiles), for buildings the footprint b.w*TILE x b.h*TILE --
+ * and ax/ay = the pixel of that box that is the unit's feet, which is what
+ * drawUnits (src/render.js) puts on the unit so no pose shifts it. SPRITES
+ * maps kind -> animation -> [Blue, Red] with row 0 = Blue and row 1 = Red,
+ * exactly like TEAM; unitAnim(u) picks the cell. New unit kinds or animations
+ * must add frames to the manifest or the `sprites: every registered anim x
+ * team has a unique in-sheet cell` check fails.
  */
 // GENERATED FROM data/sprites.json
 const SPRITE_SHEET = {
@@ -76,42 +76,42 @@ const SPRITE_SHEET = {
 // GENERATED FROM data/sprites.json
 const SPRITES = {
   archer: {
-    attack_a: [{ sx: 0, sy: 0, sw: 58, sh: 70, dw: 20, dh: 20 },
-              { sx: 0, sy: 86, sw: 58, sh: 70, dw: 20, dh: 20 }],
-    attack_b: [{ sx: 58, sy: 0, sw: 58, sh: 70, dw: 20, dh: 20 },
-              { sx: 58, sy: 86, sw: 58, sh: 70, dw: 20, dh: 20 }],
-    idle: [{ sx: 116, sy: 0, sw: 49, sh: 51, dw: 20, dh: 20 },
-          { sx: 116, sy: 86, sw: 49, sh: 51, dw: 20, dh: 20 }],
-    walk: [{ sx: 165, sy: 0, sw: 53, sh: 54, dw: 20, dh: 20 },
-          { sx: 165, sy: 86, sw: 53, sh: 54, dw: 20, dh: 20 }],
+    attack_a: [{ sx: 0, sy: 0, sw: 58, sh: 70, dw: 35, dh: 42, ax: 16, ay: 41 },
+              { sx: 0, sy: 86, sw: 58, sh: 70, dw: 35, dh: 42, ax: 16, ay: 41 }],
+    attack_b: [{ sx: 58, sy: 0, sw: 58, sh: 70, dw: 35, dh: 42, ax: 16, ay: 38 },
+              { sx: 58, sy: 86, sw: 58, sh: 70, dw: 35, dh: 42, ax: 16, ay: 38 }],
+    idle: [{ sx: 116, sy: 0, sw: 49, sh: 51, dw: 30, dh: 31, ax: 15, ay: 31 },
+          { sx: 116, sy: 86, sw: 49, sh: 51, dw: 30, dh: 31, ax: 15, ay: 31 }],
+    walk: [{ sx: 165, sy: 0, sw: 53, sh: 54, dw: 32, dh: 33, ax: 15, ay: 30 },
+          { sx: 165, sy: 86, sw: 53, sh: 54, dw: 32, dh: 33, ax: 15, ay: 30 }],
   },
   militia: {
-    attack_a: [{ sx: 218, sy: 0, sw: 64, sh: 67, dw: 22, dh: 22 },
-              { sx: 218, sy: 86, sw: 64, sh: 67, dw: 22, dh: 22 }],
-    attack_b: [{ sx: 282, sy: 0, sw: 64, sh: 67, dw: 22, dh: 22 },
-              { sx: 282, sy: 86, sw: 64, sh: 67, dw: 22, dh: 22 }],
-    idle: [{ sx: 346, sy: 0, sw: 37, sh: 50, dw: 22, dh: 22 },
-          { sx: 346, sy: 86, sw: 37, sh: 50, dw: 22, dh: 22 }],
-    walk: [{ sx: 383, sy: 0, sw: 36, sh: 50, dw: 22, dh: 22 },
-          { sx: 383, sy: 86, sw: 36, sh: 50, dw: 22, dh: 22 }],
+    attack_a: [{ sx: 218, sy: 0, sw: 64, sh: 67, dw: 39, dh: 41, ax: 21, ay: 36 },
+              { sx: 218, sy: 86, sw: 64, sh: 67, dw: 39, dh: 41, ax: 21, ay: 36 }],
+    attack_b: [{ sx: 282, sy: 0, sw: 64, sh: 67, dw: 39, dh: 41, ax: 25, ay: 35 },
+              { sx: 282, sy: 86, sw: 64, sh: 67, dw: 39, dh: 41, ax: 25, ay: 35 }],
+    idle: [{ sx: 346, sy: 0, sw: 37, sh: 50, dw: 23, dh: 31, ax: 15, ay: 30 },
+          { sx: 346, sy: 86, sw: 37, sh: 50, dw: 23, dh: 31, ax: 15, ay: 30 }],
+    walk: [{ sx: 383, sy: 0, sw: 36, sh: 50, dw: 22, dh: 31, ax: 13, ay: 29 },
+          { sx: 383, sy: 86, sw: 36, sh: 50, dw: 22, dh: 31, ax: 13, ay: 29 }],
   },
   villager: {
-    chop_a: [{ sx: 419, sy: 0, sw: 82, sh: 71, dw: 20, dh: 20 },
-            { sx: 419, sy: 86, sw: 82, sh: 71, dw: 20, dh: 20 }],
-    chop_b: [{ sx: 501, sy: 0, sw: 82, sh: 71, dw: 20, dh: 20 },
-            { sx: 501, sy: 86, sw: 82, sh: 71, dw: 20, dh: 20 }],
-    farm_a: [{ sx: 583, sy: 0, sw: 146, sh: 86, dw: 20, dh: 20 },
-            { sx: 583, sy: 86, sw: 146, sh: 86, dw: 20, dh: 20 }],
-    farm_b: [{ sx: 729, sy: 0, sw: 146, sh: 86, dw: 20, dh: 20 },
-            { sx: 729, sy: 86, sw: 146, sh: 86, dw: 20, dh: 20 }],
-    idle: [{ sx: 875, sy: 0, sw: 28, sh: 46, dw: 20, dh: 20 },
-          { sx: 875, sy: 86, sw: 28, sh: 46, dw: 20, dh: 20 }],
-    mine_a: [{ sx: 903, sy: 0, sw: 73, sh: 76, dw: 20, dh: 20 },
-            { sx: 903, sy: 86, sw: 73, sh: 76, dw: 20, dh: 20 }],
-    mine_b: [{ sx: 976, sy: 0, sw: 73, sh: 76, dw: 20, dh: 20 },
-            { sx: 976, sy: 86, sw: 73, sh: 76, dw: 20, dh: 20 }],
-    walk: [{ sx: 1049, sy: 0, sw: 31, sh: 48, dw: 20, dh: 20 },
-          { sx: 1049, sy: 86, sw: 31, sh: 48, dw: 20, dh: 20 }],
+    chop_a: [{ sx: 419, sy: 0, sw: 82, sh: 71, dw: 55, dh: 48, ax: 35, ay: 36 },
+            { sx: 419, sy: 86, sw: 82, sh: 71, dw: 55, dh: 48, ax: 35, ay: 36 }],
+    chop_b: [{ sx: 501, sy: 0, sw: 82, sh: 71, dw: 55, dh: 48, ax: 32, ay: 48 },
+            { sx: 501, sy: 86, sw: 82, sh: 71, dw: 55, dh: 48, ax: 32, ay: 48 }],
+    farm_a: [{ sx: 583, sy: 0, sw: 146, sh: 86, dw: 98, dh: 58, ax: 54, ay: 34 },
+            { sx: 583, sy: 86, sw: 146, sh: 86, dw: 98, dh: 58, ax: 54, ay: 34 }],
+    farm_b: [{ sx: 729, sy: 0, sw: 146, sh: 86, dw: 98, dh: 58, ax: 56, ay: 39 },
+            { sx: 729, sy: 86, sw: 146, sh: 86, dw: 98, dh: 58, ax: 56, ay: 39 }],
+    idle: [{ sx: 875, sy: 0, sw: 28, sh: 46, dw: 19, dh: 31, ax: 11, ay: 30 },
+          { sx: 875, sy: 86, sw: 28, sh: 46, dw: 19, dh: 31, ax: 11, ay: 30 }],
+    mine_a: [{ sx: 903, sy: 0, sw: 73, sh: 76, dw: 49, dh: 51, ax: 31, ay: 40 },
+            { sx: 903, sy: 86, sw: 73, sh: 76, dw: 49, dh: 51, ax: 31, ay: 40 }],
+    mine_b: [{ sx: 976, sy: 0, sw: 73, sh: 76, dw: 49, dh: 51, ax: 29, ay: 40 },
+            { sx: 976, sy: 86, sw: 73, sh: 76, dw: 49, dh: 51, ax: 29, ay: 40 }],
+    walk: [{ sx: 1049, sy: 0, sw: 31, sh: 48, dw: 21, dh: 32, ax: 12, ay: 32 },
+          { sx: 1049, sy: 86, sw: 31, sh: 48, dw: 21, dh: 32, ax: 12, ay: 32 }],
   },
 };
 
@@ -142,22 +142,22 @@ function spriteFor(kind, team, anim) {
  * set ships no farm bitmap (see data/README.md). */
 // GENERATED FROM data/sprites.json
 const BLD_SPRITES = {
-  archery_range: [{ sx: 0, sy: 172, sw: 307, sh: 253, dw: 44, dh: 44 },
-                 { sx: 0, sy: 428, sw: 307, sh: 253, dw: 44, dh: 44 }],
-  barracks: [{ sx: 307, sy: 172, sw: 316, sh: 256, dw: 44, dh: 44 },
-            { sx: 307, sy: 428, sw: 316, sh: 256, dw: 44, dh: 44 }],
-  farm: [{ sx: 623, sy: 172, sw: 44, sh: 44, dw: 44, dh: 44 },
-        { sx: 623, sy: 428, sw: 44, sh: 44, dw: 44, dh: 44 }],
-  house: [{ sx: 667, sy: 172, sw: 177, sh: 126, dw: 44, dh: 44 },
-         { sx: 667, sy: 428, sw: 177, sh: 126, dw: 44, dh: 44 }],
-  lumber_camp: [{ sx: 844, sy: 172, sw: 163, sh: 137, dw: 22, dh: 22 },
-               { sx: 844, sy: 428, sw: 163, sh: 137, dw: 22, dh: 22 }],
-  mill: [{ sx: 1007, sy: 172, sw: 218, sh: 216, dw: 44, dh: 44 },
-        { sx: 1007, sy: 428, sw: 218, sh: 216, dw: 44, dh: 44 }],
-  mining_camp: [{ sx: 1225, sy: 172, sw: 176, sh: 110, dw: 22, dh: 22 },
-               { sx: 1225, sy: 428, sw: 176, sh: 110, dw: 22, dh: 22 }],
-  town_center: [{ sx: 1401, sy: 172, sw: 121, sh: 163, dw: 66, dh: 66 },
-               { sx: 1401, sy: 428, sw: 121, sh: 163, dw: 66, dh: 66 }],
+  archery_range: [{ sx: 0, sy: 172, sw: 307, sh: 253, dw: 44, dh: 44, ax: 22, ay: 44 },
+                 { sx: 0, sy: 428, sw: 307, sh: 253, dw: 44, dh: 44, ax: 22, ay: 44 }],
+  barracks: [{ sx: 307, sy: 172, sw: 316, sh: 256, dw: 44, dh: 44, ax: 22, ay: 44 },
+            { sx: 307, sy: 428, sw: 316, sh: 256, dw: 44, dh: 44, ax: 22, ay: 44 }],
+  farm: [{ sx: 623, sy: 172, sw: 44, sh: 44, dw: 44, dh: 44, ax: 22, ay: 44 },
+        { sx: 623, sy: 428, sw: 44, sh: 44, dw: 44, dh: 44, ax: 22, ay: 44 }],
+  house: [{ sx: 667, sy: 172, sw: 177, sh: 126, dw: 44, dh: 44, ax: 21, ay: 43 },
+         { sx: 667, sy: 428, sw: 177, sh: 126, dw: 44, dh: 44, ax: 21, ay: 43 }],
+  lumber_camp: [{ sx: 844, sy: 172, sw: 163, sh: 137, dw: 22, dh: 22, ax: 11, ay: 22 },
+               { sx: 844, sy: 428, sw: 163, sh: 137, dw: 22, dh: 22, ax: 11, ay: 22 }],
+  mill: [{ sx: 1007, sy: 172, sw: 218, sh: 216, dw: 44, dh: 44, ax: 22, ay: 44 },
+        { sx: 1007, sy: 428, sw: 218, sh: 216, dw: 44, dh: 44, ax: 22, ay: 44 }],
+  mining_camp: [{ sx: 1225, sy: 172, sw: 176, sh: 110, dw: 22, dh: 22, ax: 11, ay: 22 },
+               { sx: 1225, sy: 428, sw: 176, sh: 110, dw: 22, dh: 22, ax: 11, ay: 22 }],
+  town_center: [{ sx: 1401, sy: 172, sw: 121, sh: 163, dw: 66, dh: 66, ax: 33, ay: 66 },
+               { sx: 1401, sy: 428, sw: 121, sh: 163, dw: 66, dh: 66, ax: 33, ay: 66 }],
 };
 
 /** The atlas cell for one built building kind, per team; null when unknown. */

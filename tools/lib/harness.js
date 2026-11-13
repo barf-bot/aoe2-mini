@@ -21,11 +21,13 @@ const SCRIPT_FILES = gameLoader.scriptFiles(HTML);   // the <script src> list, i
 const scriptSrc = gameLoader.scriptSource(HTML);     // every game script, concatenated
 const styleCss = gameLoader.styleSource(HTML);       // the linked stylesheet(s)
 
-// The stat tables src/config.js is generated from (tools/check-stats.mjs
-// proves the two agree). The checks below read them instead of re-typing numbers,
-// so the harness can never pass on a stale literal.
+// The data tables src/config.js is generated from (tools/check-stats.mjs proves
+// the stat tables agree, tools/gen-atlas.js the sprite tables). The checks below
+// read them instead of re-typing numbers, so the harness can never pass on a
+// stale literal.
 const dataUnits = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'data', 'units.json'), 'utf8'));
 const dataBuildings = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'data', 'buildings.json'), 'utf8'));
+const dataSprites = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'data', 'sprites.json'), 'utf8'));
 
 const results = [];
 const ok = (name, detail) => { results.push([true, name, String(detail)]); };
@@ -347,7 +349,7 @@ const bootFixture = (raw, fn, extra) => {
 module.exports = {
   AoE2, DIMS, DIRS8H, DT, Game, HTML, HTML_DIR, SCRIPT_FILES,
   TOOLS_DIR, bad, blueVill, bootFixture, builtAt, check, cp, dataBuildings,
-  dataUnits, doc, domHtml, fakeStorage, finishedHouse, flatState, freeSpotAround, fs, fundedGame, gameLoader,
+  dataSprites, dataUnits, doc, domHtml, fakeStorage, finishedHouse, flatState, freeSpotAround, fs, fundedGame, gameLoader,
   html, makeAudioStub, makeDoc, napiImage, ok, pad, path, rafQueue,
   report, results, scriptSrc, setTile, siteAt, solidTile, stepRender, stubCtx,
   stubEl, stubVoices, styleCss, tIdx, tOf, tc, tileCentre, uiCheck,

@@ -9,9 +9,10 @@
        (or point ASSET_DIR at a different folder) and re-run; src/config.js holds
        no pixels, and the procedural pixel grids this file used to draw units
        with are gone.
-     - data/sprites.json is the manifest: kind -> animation -> the blue/red
-       files, the size each unit kind is drawn at, and WORK_ANIM. It is the only
-       place the atlas layout is authored.
+    - data/sprites.json is the manifest: kind -> animation -> the blue/red
+      files, the size each unit kind is drawn at (the height its idle frame
+      draws at, in tiles -- one scale per kind, applied to every frame of that
+      kind), and WORK_ANIM. It is the only place the atlas layout is authored.
      - src/config.js's SPRITE_SHEET, SPRITES, WORK_ANIM and BLD_SPRITES are
        generated from the manifest between their `// GENERATED FROM
        data/sprites.json` banners -- the same scheme tools/check-stats.mjs uses
@@ -20,8 +21,9 @@
        the tables cover every KINDS/BLD kind x team.
    usage: node tools/gen-atlas.js [--out assets/sprites.png]
    exits non-zero when a manifest file is missing, a kind in the game has no
-   art, a blue/red pair is mis-sized, the written PNG does not decode at the
-   table's size or any cell is empty; the sha256 it prints is stable.
+   art, a blue/red pair is mis-sized, a kind has no draw scale or no idle frame
+   to scale from, the written PNG does not decode at the table's size or any
+   cell is empty; the sha256 it prints is stable.
    ========================================================================= */
 'use strict';
 
@@ -94,6 +96,41 @@ async function pairFor(kind, what, files) {
   return { blue, red, w: blue.w, h: blue.h };
 }
 
+/** The one scale a kind's frames draw at: `draw.idleTiles` (how tall the kind's
+ *  idle frame is drawn, in CFG.TILE pixels each) divided by that idle frame's
+ *  own pixel height. Every frame of the kind then gets dw = sw x scale and
+ *  dh = sh x scale, so a frame keeps its proportions and the kind keeps one
+ *  size across its animations -- the old single fixed box per kind (20x20,
+ *  militia 22x22) squashed the villager's 146x86 farm frame to a blob and
+ *  stretched its 28x46 idle frame wide. */
+function scaleFor(kind, pairs) {
+  const tiles = M.units[kind].draw && M.units[kind].draw.idleTiles;
+  if (typeof tiles !== 'number' || tiles <= 0) {
+    fail(`data/sprites.json: units.${kind}.draw.idleTiles must be a positive number of tiles`);
+  }
+  if (!pairs.idle) fail(`data/sprites.json: units.${kind} has no idle frame to scale from`);
+  return tiles * G.CFG.TILE / pairs.idle.h;
+}
+
+/** The pixel of a cell's art that is the figure's feet: the bottom of the
+ *  opaque bounding box, centred horizontally, carried into the drawn box (the
+ *  art maps sw/sh -> dw/dh). Written next to sx/sy/sw/sh as ax/ay, it is the
+ *  point drawUnits puts on the unit, so no animation lifts the figure off the
+ *  ground or slides it sideways. Answers null for a fully transparent cell. */
+function feetAnchor(d, w, h, dw, dh) {
+  let x0 = w, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (d[(y * w + x) * 4 + 3] === 0) continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y > y1) y1 = y;
+    }
+  }
+  if (x1 < 0) return null;
+  return { ax: Math.round((x0 + x1) * dw / (2 * w)), ay: Math.min(dh, Math.round((y1 + 1) * dh / h)) };
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const arg = (name, dflt) => { const i = argv.indexOf('--' + name); return i === -1 ? dflt : argv[i + 1]; };
@@ -118,11 +155,18 @@ async function main() {
   const SPRITES = {};
   const unitAnims = [];                                  // ordered anim pairs, one row
   for (const kind of Object.keys(M.units)) {
+    const spec = M.units[kind];
+    const anims = Object.keys(spec.anims);
+    const pairs = {};                                    // anim -> the measured frame pair
+    for (const anim of anims) pairs[anim] = await pairFor(kind, anim, spec.anims[anim]);
+    const scale = scaleFor(kind, pairs);                 // one scale, from the idle frame
     SPRITES[kind] = {};
-    for (const anim of Object.keys(M.units[kind].anims)) {
-      const pair = await pairFor(kind, anim, M.units[kind].anims[anim]);
-      SPRITES[kind][anim] = [pair, pair];                 // cells filled once laid out
-      unitAnims.push({ kind, anim, pair, dw: M.units[kind].draw.w, dh: M.units[kind].draw.h });
+    for (const anim of anims) {
+      const pair = pairs[anim];
+      const dw = Math.max(1, Math.round(pair.w * scale));
+      const dh = Math.max(1, Math.round(pair.h * scale));
+      SPRITES[kind][anim] = [pair, pair];                // cells filled once laid out
+      unitAnims.push({ kind, anim, pair, dw, dh });
     }
   }
   const bldEntries = Object.keys(M.buildings).map((kind) => ({
@@ -171,7 +215,8 @@ async function main() {
   for (const c of cells) g.drawImage(c.img, c.frame.sx, c.frame.sy);
   const png = canvas.toBuffer('image/png');
 
-  /* --- verify what we wrote: size + per-cell alpha, from the file --------- */
+  /* --- verify what we wrote: size + per-cell alpha, read back from the file;
+   *     the same pixels give every cell its feet anchor (ax/ay) ------------ */
   const decoded = await napi.loadImage(png);
   if (decoded.width !== sheetW || decoded.height !== sheetH) {
     fail(`decoded ${decoded.width}x${decoded.height}, table says ${sheetW}x${sheetH}`);
@@ -186,8 +231,11 @@ async function main() {
     let opaque = 0;
     for (let i = 3; i < d.length; i += 4) if (d[i] > 0) opaque++;
     if (opaque === 0) empty++;
+    const feet = feetAnchor(d, c.frame.sw, c.frame.sh, c.frame.dw, c.frame.dh);
+    if (feet) { c.frame.ax = feet.ax; c.frame.ay = feet.ay; }
     lines.push(`  ${c.label.padEnd(26)} cell ${c.frame.sx},${c.frame.sy} ${c.frame.sw}x${c.frame.sh}`
-      + `  opaque ${opaque}/${c.frame.sw * c.frame.sh}px  draws at ${c.frame.dw}x${c.frame.dh}`);
+      + `  opaque ${opaque}/${c.frame.sw * c.frame.sh}px  draws at ${c.frame.dw}x${c.frame.dh}`
+      + ` anchor ${c.frame.ax},${c.frame.ay}`);
   }
   if (empty) fail(`${empty} cell(s) decoded fully transparent\n` + lines.join('\n'));
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
@@ -195,7 +243,7 @@ async function main() {
 
   /* --- regenerate the sprite tables in src/config.js from the same data --- */
   const cellStr = (c) => `{ sx: ${c.sx}, sy: ${c.sy}, sw: ${c.sw}, sh: ${c.sh}, `
-    + `dw: ${c.dw}, dh: ${c.dh} }`;
+    + `dw: ${c.dw}, dh: ${c.dh}, ax: ${c.ax}, ay: ${c.ay} }`;
   const renderSPRITES = () => 'const SPRITES = {\n' + Object.keys(SPRITES).map((kind) =>
     `  ${kind}: {\n` + Object.keys(SPRITES[kind]).map((anim) =>
       `    ${anim}: [${cellStr(SPRITES[kind][anim][0])},\n`

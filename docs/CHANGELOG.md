@@ -28,6 +28,29 @@ commits on `main`.
   `tools/checks/10-reset-save.js` / `tools/checks/11-sound.js` — now pass the unit they are
   placing instead of relying on the fixed answer (both failed before the fix, pass after).
 
+### Fixed — `docs/TODO.md` P1-7: villagers are tiny and distorted
+
+- `tools/gen-atlas.js` wrote one fixed draw box per kind into `SPRITES` (20×20,
+  militia 22×22) whatever the source frame was, so the villager's 146×86 farm frame
+  collapsed to a blob and its 28×46 idle frame was stretched wide (worst aspect
+  error across the table: 64.3 %). Every cell now draws at the frame's own
+  proportions: `data/sprites.json` authors one scale per kind — `draw.idleTiles`, the
+  height that kind's idle frame gets, in tiles (1.4) — and the tool sets
+  `dw = sw × scale`, `dh = sh × scale` for every frame of the kind, which puts the
+  worst deviation at 1.6 %.
+- Each cell also carries `ax`/`ay`: the pixel of the drawn box that is the figure's
+  feet, measured from the cell's own opaque bounding box, so switching animations
+  neither lifts the figure off the ground nor slides it. `drawUnits`
+  (`src/render.js:150`) blits with that anchor on the unit instead of centring the
+  box — the same offset is correct mirrored, since the destination rect is placed in
+  the translated space either way. `assets/sprites.png` is byte-identical: the cells
+  still sit at their native frame size, only the draw metadata changed.
+- checks: `tools/checks/02-sprites.js` gains the aspect-ratio and the
+  one-scale-per-kind-plus-anchor assertions (11 → 13), and `tools/checks/13-render.js`
+  gains section 16c, which renders a frame and reads the `drawImage` destination back
+  for the villager and the militia facing both ways (8 → 9); both failed before the
+  fix and pass after (304 → 307 in the suite).
+
 ### Fixed — `docs/TODO.md` P1-5: units walk in zigzags
 
 - `findPath` (`src/movement.js:63`) priced a diagonal step and a straight one both at 1

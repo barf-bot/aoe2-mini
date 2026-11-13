@@ -1,6 +1,7 @@
 'use strict';
-/* checks/13-render.js -- canvas draw calls: where the placement ghost is painted.
-   Runs on its own (`node tools/checks/13-render.js`) against a freshly booted game. */
+/* checks/13-render.js -- canvas draw calls: where the placement ghost is painted and
+   where unit sprites are blitted. Runs on its own (`node tools/checks/13-render.js`)
+   against a freshly booted game. */
 
 const {
   AoE2, bootFixture, check, freeSpotAround, report,
@@ -91,6 +92,45 @@ bootFixture(undefined, (doc, st) => {
   ghostCase(st, 'render: an age-gated kind is red while its age is locked', 'market', free.tx, free.ty, RED);
   st.age = 1;
   ghostCase(st, 'render: the same kind is green once its age is reached', 'market', free.tx, free.ty, GREEN);
+});
+
+/* ---- 16c. render: units are blitted from their anchor (docs/TODO.md P1-7) - */
+/* A cell's ax/ay is the art pixel that is the figure's feet, and it is the only
+   correct place to put the drawImage destination: centring the drawn box (the old
+   behaviour, one fixed 20x20 box per kind) left the figure standing wherever its
+   frame padding happened to be. Mirroring a leftward unit keeps the same
+   relationship -- the destination rect is placed in the translated space either
+   way, so dx = -ax for both facings -- so the feet stay on the unit. */
+const paintedSprite = (st, u, face) => {
+  u.face = face;
+  u.anim = 0;                                       // no walk bob: the frame holds its cell
+  u.order = { kind: 'idle' };
+  st.cam = { x: u.x, y: u.y };                      // the unit at the view origin
+  st.view.ctx.clearOps();
+  AoE2.renderFrame(st);
+  const f = AoE2.spriteFor(u.kind, u.team, 'idle');
+  const hit = st.view.ctx.ops.find((o) => o[0] === 'drawImage' && o[1][1] === f.sx && o[1][2] === f.sy);
+  return hit ? { src: [hit[1][1], hit[1][2], hit[1][3], hit[1][4]].join(),
+    dest: [hit[1][5], hit[1][6]].join(), size: [hit[1][7], hit[1][8]].join() } : null;
+};
+
+bootFixture(undefined, (doc, st) => {
+  AoE2.setAtlas(st, { tag: 'probe-atlas' });        // the sheet to blit, no canvas backend needed
+  const bad = [];
+  for (const kind of ['villager', 'militia']) {
+    for (const face of [1, -1]) {
+      const u = st.units.find((z) => z.kind === kind && z.team === 0);
+      if (!u) { bad.push(`${kind}: no unit of this kind in the starting village`); continue; }
+      const got = paintedSprite(st, u, face);
+      const f = AoE2.spriteFor(kind, 0, 'idle');
+      if (!got) bad.push(`${kind} facing ${face}: its idle cell was not blitted at all`);
+      else if (got.dest !== [-f.ax, -f.ay].join() || got.size !== [f.dw, f.dh].join())
+        bad.push(`${kind} facing ${face}: cell ${got.src} blitted at ${got.dest} size ${got.size}, `
+          + `want ${[-f.ax, -f.ay].join()} size ${[f.dw, f.dh].join()}`);
+    }
+  }
+  check(bad.length === 0, 'render: every unit is blitted with its cell feet anchor on its position (both facings)',
+    bad.length ? bad.join(' | ') : 'villager and militia, facing right and left, drawn at their cell size');
 });
 
 report();

@@ -3,7 +3,7 @@
    Runs on its own (`node tools/checks/02-sprites.js`) against a freshly booted game. */
 
 const {
-  AoE2, Game, bad, check, napiImage, ok, report,
+  AoE2, Game, bad, check, dataSprites, napiImage, ok, report,
 } = require('../lib/harness');
 
 /* ---- 5b. sprite frame table ----------------------------------------- */
@@ -53,6 +53,66 @@ if (!spriteErr && rects.size !== cellCount) spriteErr = 'overlapping/duplicate c
 check(!spriteErr, 'sprites: every registered anim x team has a unique in-sheet cell',
   spriteErr ? 'bad: ' + spriteErr
     : cellCount + ' cells inside the ' + sheet.w + 'x' + sheet.h + ' sheet');
+
+/* ---- 5b1b. drawn size and anchor (docs/TODO.md P1-7) ------------------ */
+/* Every frame used to be drawn into one fixed box per kind (20x20, militia
+   22x22) whatever the source frame was: the villager 146x86 farm frame became
+   a blob and its 28x46 idle frame was stretched wide. Two rules now, both
+   authored in data/sprites.json -- a cell keeps its frame aspect ratio (dw/dh
+   == sw/sh within 2 %) and every cell of a kind uses the one scale that file
+   declares for the kind (the height its idle frame draws at, in tiles) -- plus
+   ax/ay per frame, the pixel inside the drawn box that is the unit's feet, so
+   swapping animations never lifts the figure off the ground. drawUnits
+   (src/render.js:150) draws from that anchor; 13-render checks the call. */
+let aspectWorst = 0, aspectWorstAt = '';
+for (const kind of Object.keys(AoE2.SPRITES)) {
+  for (const anim of Object.keys(AoE2.SPRITES[kind] || {})) {
+    (AoE2.SPRITES[kind][anim] || []).forEach((f) => {
+      if (!f || !f.sw || !f.sh || !f.dw || !f.dh) return;      // 5b reports malformed cells
+      const err = Math.abs(f.dw / f.dh - f.sw / f.sh) / (f.sw / f.sh);
+      if (err > aspectWorst) {
+        aspectWorst = err;
+        aspectWorstAt = `${kind}.${anim} draws ${f.dw}x${f.dh} from a ${f.sw}x${f.sh} cell`;
+      }
+    });
+  }
+}
+check(aspectWorst <= 0.02, 'sprites: every unit cell keeps its source frame aspect ratio (within 2 %)',
+  aspectWorstAt ? (aspectWorst * 100).toFixed(1) + '% off: ' + aspectWorstAt
+    : 'worst deviation ' + (aspectWorst * 100).toFixed(1) + '%');
+
+let scaleErr = [];
+for (const kind of Object.keys(AoE2.SPRITES)) {
+  const spec = (dataSprites.units || {})[kind] || {};
+  const tiles = (spec.draw || {}).idleTiles;
+  const idle = (AoE2.SPRITES[kind] || {}).idle;
+  if (typeof tiles !== 'number' || tiles <= 0) {
+    scaleErr.push(`${kind}: data/sprites.json declares no draw.idleTiles to scale from`); continue;
+  }
+  if (!idle || !idle[0] || !idle[0].sh) { scaleErr.push(`${kind}: no idle cell to measure from`); continue; }
+  const scale = tiles * AoE2.CFG.TILE / idle[0].sh;             // the kind's one scale, off its idle frame
+  for (const anim of Object.keys(AoE2.SPRITES[kind])) {
+    (AoE2.SPRITES[kind][anim] || []).forEach((f, team) => {
+      if (!f || !f.sw || !f.sh || scaleErr.length > 2) return;
+      const dw = Math.round(f.sw * scale), dh = Math.round(f.sh * scale);
+      if (f.dw !== dw || f.dh !== dh) {
+        scaleErr.push(`${kind}.${anim}/${AoE2.TEAM[team].name}: draws ${f.dw}x${f.dh}, the authored `
+          + `${tiles}-tile scale (${scale.toFixed(4)}x) gives ${dw}x${dh}`);
+      } else if (!Number.isInteger(f.ax) || !Number.isInteger(f.ay) || f.ax < 0 || f.ax > f.dw
+          || f.ay <= 0 || f.ay > f.dh) {
+        scaleErr.push(`${kind}.${anim}/${AoE2.TEAM[team].name}: anchor ${f.ax},${f.ay} is not a pixel `
+          + `inside the ${f.dw}x${f.dh} drawn box`);
+      } else if (f.ay * 2 < f.dh) {
+        scaleErr.push(`${kind}.${anim}/${AoE2.TEAM[team].name}: anchor ${f.ay}/${f.dh} is above the `
+          + 'middle of the box, so it is not the feet');
+      }
+    });
+  }
+}
+check(scaleErr.length === 0,
+  'sprites: one authored scale per kind plus a feet anchor on every unit cell',
+  scaleErr.length ? scaleErr.join(' | ')
+    : Object.keys(AoE2.SPRITES).length + ' kinds scaled from data/sprites.json, every cell anchored');
 
 /* ---- 5b2. animation selection ---------------------------------------- */
 // Which cell a unit actually plays (task 2): the pure unitAnim(u). Villagers
