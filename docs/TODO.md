@@ -21,18 +21,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P0 — the game cannot be played with the mouse
 
-### 2. The placement preview is invisible
-
-**Verified.** With `Game.placing = 'house'` and the camera at (338, 900) no ghost is drawn
-anywhere near the cursor.
-
-- **Cause:** `drawGhost` in `src/render.js` draws at `tx * CFG.TILE, ty * CFG.TILE` — world
-  coordinates. Every other draw function subtracts `Game.cam.x / .y`. The ghost is only in
-  the right place when the camera sits at 0,0.
-- **Fix:** subtract the camera like `drawBuildings` does.
-- **Done when:** a check with a non-zero camera records the `fillRect` arguments on the
-  stub context and they equal the cursor tile minus the camera.
-
 ### 3. A building placed on an invalid spot silently appears somewhere else
 
 **Verified.** 50 of 176 placements (11 kinds × 8 offsets × 1 or 4 villagers) ended on a

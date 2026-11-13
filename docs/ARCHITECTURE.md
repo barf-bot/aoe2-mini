@@ -233,10 +233,13 @@ generators read the tables without a DOM.
   `textContent` accessor and an `innerHTML` accessor that stores `domHtml(value)` — what a
   browser hands back, with upper-cased tag names and `disabled=""` — and counts the writes
   in `_htmlSets`, so a check can tell one write from a per-frame rebuild; cached per id,
-  2D context that swallows every draw call), boots the game and exports the booted `Game`,
+  2D context that counts every draw call and records the arguments too — `ops` holds
+  `[method, args, styles]` up to a cap and `clearOps()` empties it, so a check can read
+  back the exact rectangle a frame painted instead of only that something was drawn),
+  boots the game and exports the booted `Game`,
   the `AoE2` surface, `check`/`report` and the fixtures more than one file needs. So every
   file gets a fresh game, the files are **independent** — order does not matter and
-  `node tools/checks/07-combat.js` runs one alone — and together they assert 283
+  `node tools/checks/07-combat.js` runs one alone — and together they assert 286
   invariants. It never opens a browser. Node has no `Image`, so the harness defines one
   (§2b) whose `src` setter
   decodes the real sheet — caveat measured on `@napi-rs/canvas` 1.1.0: an `Image` built

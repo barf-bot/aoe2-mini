@@ -5,6 +5,18 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P0-2: the placement preview is invisible
+
+- `drawGhost` in `src/render.js` painted the ghost at `tx * CFG.TILE` — world coordinates —
+  while every other draw function subtracts `Game.cam`, so the preview only sat on the
+  cursor while the camera was at 0,0 and disappeared as soon as it moved (verified: with
+  `Game.placing = 'house'` and the camera at (338, 900) nothing was drawn near the
+  pointer). It now converts the cursor's tile to view space the way `drawBuildings` does.
+  The stub 2D context in `tools/lib/harness.js` records the arguments of every draw call
+  (`ops` / `clearOps()`) instead of only counting them — a counted `fillRect` passed
+  wherever it was painted — and `tools/checks/13-render.js` compares the recorded ghost
+  rectangles against the cursor tile at three cameras (283 → 286 checks).
+
 ### Fixed — `docs/TODO.md` P0-1: footer buttons ignore real mouse clicks
 
 - `renderHud` now compares the footer and result markup against the string it last wrote

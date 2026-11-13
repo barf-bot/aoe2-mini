@@ -241,14 +241,16 @@ function drawGhost(Game, view) {
   const c = view.ctx;
   if (!c || !Game.placing || !Game.cursor) return;
   const def = BLD[Game.placing];
-  const tx = Math.floor(Game.cursor.x / CFG.TILE), ty = Math.floor(Game.cursor.y / CFG.TILE);
+  const TS = CFG.TILE, cam = Game.cam;                 // view space, like drawBuildings
+  const tx = Math.floor(Game.cursor.x / TS), ty = Math.floor(Game.cursor.y / TS);
   const ok = siteFree(Game, tx, ty, def.w, def.h);
+  const x = tx * TS - cam.x, y = ty * TS - cam.y;
   c.globalAlpha = .6;
   c.fillStyle = ok ? 'rgba(111,191,115,.6)' : 'rgba(209,88,79,.6)';
-  c.fillRect(tx * CFG.TILE, ty * CFG.TILE, def.w * CFG.TILE, def.h * CFG.TILE);
+  c.fillRect(x, y, def.w * TS, def.h * TS);
   c.globalAlpha = 1;
   c.strokeStyle = ok ? '#6fbf73' : '#d1584f';
-  c.strokeRect(tx * CFG.TILE + .5, ty * CFG.TILE + .5, def.w * CFG.TILE - 1, def.h * CFG.TILE - 1);
+  c.strokeRect(x + .5, y + .5, def.w * TS - 1, def.h * TS - 1);
 }
 
 function drawDragBox(Game, view) {

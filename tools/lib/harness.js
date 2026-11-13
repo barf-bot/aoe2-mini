@@ -41,12 +41,25 @@ function report() {
 function pad(s, n) { return s.length >= n ? s : s + ' '.repeat(n - s.length); }
 
 /* ---- 2. stub DOM ------------------------------------------------------ */
+/* The 2D context a stub canvas hands back: every call is counted in `calls` *and*
+   recorded in `ops` as [method, args, fillStyle, strokeStyle, globalAlpha], up to
+   OPS_CAP (then it stops, so a long run cannot grow it without bound). `clearOps()`
+   empties it, which is how a check inspects exactly one frame: counting alone could
+   not tell a rectangle painted at the cursor from one painted at 0,0, which is how
+   the placement ghost slipped past every render check (docs/TODO.md P0-2). */
+const OPS_CAP = 8000;
 function stubCtx(canvas) {
-  const store = { canvas, calls: 0 };
+  const store = { canvas, calls: 0, ops: [], fillStyle: '', strokeStyle: '', globalAlpha: 1 };
+  store.clearOps = () => { store.ops.length = 0; };
+  const method = (k) => (...args) => {
+    store.calls++;
+    if (store.ops.length < OPS_CAP) store.ops.push([k, args, store.fillStyle, store.strokeStyle, store.globalAlpha]);
+    return { width: 10 };
+  };
   return new Proxy(store, {
     get(t, k) {
       if (k in t) return t[k];
-      t[k] = () => { t.calls++; return { width: 10 }; };
+      t[k] = method(k);
       return t[k];
     },
     set(t, k, v) { t[k] = v; return true; },
