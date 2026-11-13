@@ -514,5 +514,37 @@ const gOut = (() => {
 check(gOut.err === null && gOut.left === 1 && gOut.targetable === true && gOut.found === gOut.m0Id &&
       gOut.after === gOut.before - Math.max(1, 10 - gOut.armour),
   'combat: after leaveBuilding he is hittable again', JSON.stringify(gOut));
+/* The fifth weapon path the plan's rule left out: `stepBuildingAttacks`
+   (src/sim.js:136) picked its victim with its own copy of the predicate instead of
+   `targetableAsEnemy`, so an enemy Watch Tower three tiles off the barracks kept
+   shooting the militia sheltered inside it — the one case the plan calls
+   "arrows and melee pass over the building". The world holds exactly one candidate
+   (`st.units = []`, then the one militia), so the arrow is either his or the tower
+   held fire, and the tower's `cd` says which: a shot sets it to the row's reload,
+   finding nobody leaves it at 0. */
+const gTower = (() => {
+  const st = flatState();
+  const b = builtAt(st, 'barracks', 34);
+  const ring = AoE2.standingSpots(st, b, 1);
+  if (!ring.length) return { err: 'no standing spot beside the barracks' };
+  st.units = [];
+  const u = AoE2.makeUnit(st, 'militia', 0, ring[0].x, ring[0].y);
+  const tw = AoE2.makeBuilding(st, 'watch_tower', 1, b.tx + 3, b.ty);
+  tw.built = 1; tw.hp = tw.maxHp;
+  const shot = () => {
+    st.projectiles.length = 0; tw.cd = 0;
+    AoE2.stepBuildingAttacks(st, DT);
+    return { n: st.projectiles.length, his: st.projectiles.some((p) => p.t === u), cd: tw.cd };
+  };
+  const g = mCall(AoE2.garrisonUnits, st, [u.id], b);
+  const linked = !g.err && g.v.length === 1 && u.garrisonedIn === b.id;   // read before Leave clears it
+  const inside = g.err ? null : shot();
+  const left = g.err ? null : mCall(AoE2.leaveBuilding, st, b);
+  const outside = !g.err && !left.err ? shot() : null;
+  return { err: g.err || (!g.err && left.err) || null, linked, inside, outside };
+})();
+check(gTower.err === null && gTower.linked && !!gTower.inside && gTower.inside.n === 0 &&
+      gTower.inside.cd === 0 && !!gTower.outside && gTower.outside.n === 1 && gTower.outside.his,
+  'combat: a tower cannot shoot a unit garrisoned in his own building', JSON.stringify(gTower));
 
 report();

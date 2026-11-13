@@ -140,7 +140,7 @@ function stepBuildingAttacks(Game, dt) {
     if (b.cd > 0) continue;
     let best = null, bd = Infinity;
     for (const u of Game.units) {
-      if (u.dead || u.team === b.team) continue;
+      if (!targetableAsEnemy(u, b.team)) continue;
       const d = Math.hypot(u.x - b.x, u.y - b.y);
       if (d <= BLD[b.kind].lineOfSight * CFG.TILE && d < bd) { bd = d; best = u; }
     }
@@ -321,8 +321,8 @@ function attackableAsEnemy(b, team) {
 /** The rule for pointing a weapon at an enemy unit, written once (the unit sibling of
  *  attackableAsEnemy above, docs/plans/2026-11-13-garrison.md T2): a dead unit and a unit
  *  of the shooter's own team are never targets, and neither is a unit inside a building —
- *  garrisoned, he cannot be picked, ordered or hit. autoAcquire, orderForUnit, issueOrder
- *  and ai's nearestEnemy read this one instead of re-typing the predicate. */
+ *  garrisoned, he cannot be picked, ordered or hit. autoAcquire, stepBuildingAttacks,
+ *  orderForUnit, issueOrder and ai's nearestEnemy read this one instead of re-typing it. */
 function targetableAsEnemy(u, team) {
   return !!u && !u.dead && u.team !== team && !u.garrisonedIn;
 }
