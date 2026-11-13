@@ -6,20 +6,20 @@
      - ASSET_DIR (data/sprites) is the game's entire art library: one PNG per
        frame x team, vendored from the ripped AoE2 graphics documented in
        data/README.md. It is the single asset source -- replace the files there
-       (or point ASSET_DIR at a different folder) and re-run; index.html holds
+       (or point ASSET_DIR at a different folder) and re-run; src/config.js holds
        no pixels, and the procedural pixel grids this file used to draw units
        with are gone.
      - data/sprites.json is the manifest: kind -> animation -> the blue/red
        files, the size each unit kind is drawn at, and WORK_ANIM. It is the only
        place the atlas layout is authored.
-     - index.html's SPRITE_SHEET, SPRITES, WORK_ANIM and BLD_SPRITES are
+     - src/config.js's SPRITE_SHEET, SPRITES, WORK_ANIM and BLD_SPRITES are
        generated from the manifest between their `// GENERATED FROM
        data/sprites.json` banners -- the same scheme tools/check-stats.mjs uses
        for CFG/KINDS/BLD -- so the table the game renders from can never
        disagree with the sheet on disk. tools/headless-check.js re-checks that
        the tables cover every KINDS/BLD kind x team.
    usage: node tools/gen-atlas.js [--out assets/sprites.png]
-   exits non-zero when a manifest file is missing, a kind in index.html has no
+   exits non-zero when a manifest file is missing, a kind in the game has no
    art, a blue/red pair is mis-sized, the written PNG does not decode at the
    table's size or any cell is empty; the sha256 it prints is stable.
    ========================================================================= */
@@ -30,7 +30,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..');
-const HTML = path.join(ROOT, 'index.html');
+const CONFIG = path.join(ROOT, 'src', 'config.js');        // where the generated tables live
 const ASSET_DIR = path.join(ROOT, 'data', 'sprites');      // the asset source
 const MANIFEST = path.join(ROOT, 'data', 'sprites.json');  // the authored layout
 const BANNER = '// GENERATED FROM data/sprites.json';
@@ -55,23 +55,16 @@ if (!napi) {
   process.exit(1);
 }
 
-/* ------------------- the frame table, read from index.html ------------- */
-let tmpSeq = 0;
-function gameSurface() {
-  const html = fs.readFileSync(HTML, 'utf8');
-  const m = html.match(/<script>([\s\S]*?)<\/script>/);
-  if (!m) fail('no <script> block found in ' + HTML);
-  const tmp = path.join(__dirname, `.extracted-atlas-${process.pid}-${tmpSeq++}.js`);
-  fs.writeFileSync(tmp, m[1]);
-  try { return require(tmp); } finally { fs.unlinkSync(tmp); }
-}
+/* --------------------- the frame table, read from the game ------------- */
+const { loadGame } = require('./lib/load-game');
+const gameSurface = () => loadGame({ isolated: true });
 
 /** Replace one generated block (`// GENERATED FROM ...` + `const NAME = {...};`)
- *  with its new text; the same contract tools/check-stats.mjs uses for §1. */
+ *  with its new text; the same contract tools/check-stats.mjs uses. */
 function replaceBlock(html, name, rendered) {
   const re = new RegExp(`(^|\\n)(?:// GENERATED FROM [^\\n]*\\n)?const ${name} = \\{[\\s\\S]*?\\};`);
   const m = re.exec(html);
-  if (!m) fail(`no \`const ${name} = { ... };\` block found in index.html`);
+  if (!m) fail(`no \`const ${name} = { ... };\` block found in src/config.js`);
   // m[1] is the newline the match consumed; re-emitting it keeps the block on its own line.
   return html.slice(0, m.index) + m[1] + rendered + html.slice(m.index + m[0].length);
 }
@@ -80,7 +73,7 @@ function replaceBlock(html, name, rendered) {
 const G = gameSurface();
 if (!G || !G.KINDS || !G.BLD || !G.CFG || typeof G.spriteFor !== 'function' ||
     typeof G.bldSpriteFor !== 'function') {
-  fail('index.html does not export KINDS / BLD / CFG / spriteFor / bldSpriteFor');
+  fail('the game does not export KINDS / BLD / CFG / spriteFor / bldSpriteFor');
 }
 const M = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 
@@ -200,7 +193,7 @@ async function main() {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, png);
 
-  /* --- regenerate the §1 sprite tables from the same data --- */
+  /* --- regenerate the sprite tables in src/config.js from the same data --- */
   const cellStr = (c) => `{ sx: ${c.sx}, sy: ${c.sy}, sw: ${c.sw}, sh: ${c.sh}, `
     + `dw: ${c.dw}, dh: ${c.dh} }`;
   const renderSPRITES = () => 'const SPRITES = {\n' + Object.keys(SPRITES).map((kind) =>
@@ -215,27 +208,27 @@ async function main() {
   const renderWork = () => 'const WORK_ANIM = {\n'
     + Object.keys(WORK_ANIM).map((r) => `  ${r}: '${WORK_ANIM[r]}',`).join('\n') + '\n};';
 
-  const before = fs.readFileSync(HTML, 'utf8');
+  const before = fs.readFileSync(CONFIG, 'utf8');
   let html = before;
   for (const [name, rendered] of [['SPRITE_SHEET', renderSheet()], ['SPRITES', renderSPRITES()],
     ['WORK_ANIM', renderWork()], ['BLD_SPRITES', renderBLD()]]) {
     html = replaceBlock(html, name, `${BANNER}\n${rendered}`);
   }
-  fs.writeFileSync(HTML, html);
+  fs.writeFileSync(CONFIG, html);
 
   /* the file we just wrote must re-export exactly the tables we laid out */
   const back = gameSurface();
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   if (!same(back.SPRITE_SHEET, sheet) || !same(back.SPRITES, SPRITES) ||
       !same(back.BLD_SPRITES, BLD_SPRITES) || !same(back.WORK_ANIM, WORK_ANIM)) {
-    fail('index.html section 1 does not re-export the generated sprite tables');
+    fail('src/config.js does not re-export the generated sprite tables');
   }
 
   console.log(`atlas  ${path.relative(ROOT, OUT)}  ${decoded.width}x${decoded.height}`
     + `  sha256=${crypto.createHash('sha256').update(png).digest('hex')}`);
   console.log(lines.join('\n'));
   console.log(`ok     ${cells.length} frames composed from data/sprites.json`
-    + ' and index.html section 1 regenerated from it');
+    + ' and src/config.js regenerated from it');
 }
 
 main().catch((e) => fail(e && e.stack || String(e)));

@@ -2,14 +2,14 @@
 /* =========================================================================
    check-stats.mjs -- prove the game's stats match the vendored tables.
 
-   WHERE UNIT/BUILDING/TECH/WORLD NUMBERS LIVE, so index.html and data/ drift:
+   WHERE UNIT/BUILDING/TECH/WORLD NUMBERS LIVE, so src/config.js and data/ cannot drift:
      - data/units.json, data/buildings.json and data/techs.json are the only place
        those numbers are authored (data/README.md names the upstream sources);
-     - the `CFG`, `KINDS`, `BLD` and `TECHS` blocks in index.html section 1 are
+     - the `CFG`, `KINDS`, `BLD` and `TECHS` blocks in src/config.js are
        generated text: this tool renders them from the data and puts them
        back with --write, exactly like tools/gen-atlas.js does for the sprite
-       tables. The game never reads the JSON at runtime -- the product is
-       still one dependency-free index.html -- it carries the rendered result.
+       tables. The game never reads the JSON at runtime -- it stays a
+       dependency-free static page -- it carries the rendered result.
      - unit speeds are the table's tiles/s converted through CFG.TILE, so the
        px/s the engine moves in is derived, never typed.
 
@@ -25,7 +25,7 @@ import { createRequire } from 'node:module';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
-const HTML = path.join(ROOT, 'index.html');
+const CONFIG = path.join(ROOT, 'src', 'config.js');   // where the generated blocks live
 const DATA = path.join(ROOT, 'data');
 const WRITE = process.argv.includes('--write');
 
@@ -192,43 +192,31 @@ function renderTECHS() {
   return `${BANNER('data/techs.json')}\nconst TECHS = {\n${body}\n};`;
 }
 
-/* ------------------------- index.html: read and write -------------------- */
+/* ------------------------ src/config.js: read and write ------------------ */
 
-const scriptSource = () => {
-  const html = fs.readFileSync(HTML, 'utf8');
-  const m = html.match(/<script>([\s\S]*?)<\/script>/);
-  if (!m) fail('no <script> block found in ' + HTML);
-  return m[1];
-};
-
-/** The same trick tools/gen-atlas.js uses: load the game's script and read
- *  the exported object, so the check compares live values, not text. */
+/** Load the game the way the browser does (tools/lib/load-game.js) and read the
+ *  exported object, so the check compares live values, not text. */
 function gameSurface() {
-  const tmp = path.join(HERE, '.extracted-stats.js');
-  fs.writeFileSync(tmp, scriptSource());
-  try {
-    const required = createRequire(import.meta.url)(tmp);
-    if (!required || !required.CFG || !required.KINDS || !required.BLD || !required.TECHS) {
-      fail('index.html does not export CFG / KINDS / BLD / TECHS');
-    }
-    return required;
-  } finally {
-    fs.unlinkSync(tmp);
+  const { loadGame } = createRequire(import.meta.url)('./lib/load-game.js');
+  const game = loadGame({ isolated: true });
+  if (!game || !game.CFG || !game.KINDS || !game.BLD || !game.TECHS) {
+    fail('the game does not export CFG / KINDS / BLD / TECHS');
   }
+  return game;
 }
 
 function replaceBlock(html, name, rendered) {
   const m = new RegExp(`(^|\\n)((?:// GENERATED FROM [^\\n]*\\n)?const ${name} = \\{[\\s\\S]*?\\n\\};)`).exec(html);
-  if (!m) fail(`no \`const ${name} = { ... };\` block found in index.html`);
+  if (!m) fail(`no \`const ${name} = { ... };\` block found in src/config.js`);
   // m[1] is the newline the match consumed; re-emitting it keeps the block on its own line.
   return html.slice(0, m.index) + m[1] + rendered + html.slice(m.index + m[0].length);
 }
 
 function writeBlocks() {
-  const before = fs.readFileSync(HTML, 'utf8');
-  fs.writeFileSync(HTML, replaceBlock(replaceBlock(replaceBlock(replaceBlock(before, 'CFG', renderCFG()),
+  const before = fs.readFileSync(CONFIG, 'utf8');
+  fs.writeFileSync(CONFIG, replaceBlock(replaceBlock(replaceBlock(replaceBlock(before, 'CFG', renderCFG()),
     'KINDS', renderKINDS()), 'BLD', renderBLD()), 'TECHS', renderTECHS()));
-  console.log('write index.html section 1 regenerated from data/ (CFG, KINDS, BLD, TECHS)');
+  console.log('write src/config.js regenerated from data/ (CFG, KINDS, BLD, TECHS)');
 }
 
 /* -------------------------------- compare -------------------------------- */
@@ -241,7 +229,7 @@ function diffObject(prefix, expected, actual, out) {
     const e = expected[k];
     if (typeof e === 'object' && e !== null && !Array.isArray(e)) {
       if (typeof actual?.[k] !== 'object' || actual?.[k] === null) {
-        out.push(`${prefix}.${k} index.html:absent data:${fmt(e)}`);
+        out.push(`${prefix}.${k} game:absent data:${fmt(e)}`);
         continue;
       }
       n += diffObject(`${prefix}.${k}`, e, actual[k], out);
@@ -249,13 +237,13 @@ function diffObject(prefix, expected, actual, out) {
     }
     n++;
     const a = actual === undefined ? undefined : actual[k];
-    if (a === undefined) out.push(`${prefix}.${k} index.html:absent data:${fmt(e)}`);
+    if (a === undefined) out.push(`${prefix}.${k} game:absent data:${fmt(e)}`);
     else if (Array.isArray(e) ? JSON.stringify(a) !== JSON.stringify(e) : a !== e) {
-      out.push(`${prefix}.${k} index.html:${fmt(a)} data:${fmt(e)}`);
+      out.push(`${prefix}.${k} game:${fmt(a)} data:${fmt(e)}`);
     }
   }
   for (const k of Object.keys(actual || {})) {
-    if (!(k in expected)) out.push(`${prefix}.${k} index.html:${fmt(actual[k])} data:absent`);
+    if (!(k in expected)) out.push(`${prefix}.${k} game:${fmt(actual[k])} data:absent`);
   }
   return n;
 }
@@ -268,35 +256,35 @@ let fields = 0;
 
 fields += diffObject('CFG', unitsDoc.cfg, game.CFG, drift);
 for (const name of Object.keys(unitsDoc.units)) {
-  if (!(name in game.KINDS)) drift.push(`KINDS.${name} index.html:absent data:present`);
+  if (!(name in game.KINDS)) drift.push(`KINDS.${name} game:absent data:present`);
   else fields += diffObject(`KINDS.${name}`, kindValue(unitsDoc.units[name]), game.KINDS[name], drift);
 }
 for (const name of Object.keys(game.KINDS)) {
-  if (!(name in unitsDoc.units)) drift.push(`KINDS.${name} index.html:present data:absent`);
+  if (!(name in unitsDoc.units)) drift.push(`KINDS.${name} game:present data:absent`);
 }
 for (const name of Object.keys(bldsDoc.buildings)) {
-  if (!(name in game.BLD)) drift.push(`BLD.${name} index.html:absent data:present`);
+  if (!(name in game.BLD)) drift.push(`BLD.${name} game:absent data:present`);
   else fields += diffObject(`BLD.${name}`, bldValue(bldsDoc.buildings[name]), game.BLD[name], drift);
 }
 for (const name of Object.keys(game.BLD)) {
-  if (!(name in bldsDoc.buildings)) drift.push(`BLD.${name} index.html:present data:absent`);
+  if (!(name in bldsDoc.buildings)) drift.push(`BLD.${name} game:present data:absent`);
 }
 
 for (const name of Object.keys(techsDoc.techs)) {           // cross-file rule: the tech's building exists
   if (!(techsDoc.techs[name].building in bldsDoc.buildings)) {
     drift.push(`TECHS.${name}.building data:${techsDoc.techs[name].building} is not a building in data/buildings.json`);
   }
-  if (!(name in game.TECHS)) drift.push(`TECHS.${name} index.html:absent data:present`);
+  if (!(name in game.TECHS)) drift.push(`TECHS.${name} game:absent data:present`);
 }
 for (const name of Object.keys(game.TECHS)) {
-  if (!(name in techsDoc.techs)) drift.push(`TECHS.${name} index.html:present data:absent`);
+  if (!(name in techsDoc.techs)) drift.push(`TECHS.${name} game:present data:absent`);
 }
 fields += diffObject('TECHS', Object.fromEntries(Object.keys(techsDoc.techs)
   .map((name) => [name, techValue(techsDoc.techs[name])])), game.TECHS, drift);
 
 if (drift.length) {
   for (const line of drift) console.log('DRIFT ' + line);
-  console.error(`FAIL  ${drift.length} field(s) in index.html disagree with data/ (${fields} checked)`);
+  console.error(`FAIL  ${drift.length} field(s) in src/config.js disagree with data/ (${fields} checked)`);
   process.exit(1);
 }
-console.log(`ok    index.html matches data/ -- ${fields} fields checked (CFG, ${Object.keys(unitsDoc.units).length} kinds, ${Object.keys(bldsDoc.buildings).length} buildings, ${Object.keys(techsDoc.techs).length} techs)`);
+console.log(`ok    src/config.js matches data/ -- ${fields} fields checked (CFG, ${Object.keys(unitsDoc.units).length} kinds, ${Object.keys(bldsDoc.buildings).length} buildings, ${Object.keys(techsDoc.techs).length} techs)`);

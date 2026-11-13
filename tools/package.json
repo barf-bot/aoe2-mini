@@ -1,0 +1,13 @@
+{
+  "name": "aoe2-mini-tools",
+  "private": true,
+  "description": "Dev-only dependencies of the verification tools. The game itself has none.",
+  "scripts": {
+    "check": "node headless-check.js && node check-stats.mjs && node audit-line-refs.js",
+    "preview": "node render-preview.js",
+    "atlas": "node gen-atlas.js"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.1.0"
+  }
+}
