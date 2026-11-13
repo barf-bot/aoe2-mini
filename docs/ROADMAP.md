@@ -53,7 +53,10 @@ that before starting anything below.
    (`docs/plans/2026-11-12-market-watch-tower.md`) — the market sells and buys 100-unit
    lots of food/wood/stone at its vendored rates through `trade`, and the tower shoots
    enemy units through the `stepBuildingAttacks` path the Town Center already used.
-   Left over: trade carts and land trade and garrison mechanics. The Guard Tower and Keep
+   Left over: trade carts and land trade. Garrison mechanics — housing units in the buildings
+   whose rows carry a `garrisonCapacity` — shipped 2026-11-13 by the garrison plan
+   (`docs/plans/2026-11-13-garrison.md`: `garrisonUnits`/`leaveBuilding`, the panel's
+   `Garrisoned n/cap` line and its `Leave` buttons). The Guard Tower and Keep
    upgrade chain shipped 2026-11-13 by the tower upgrade chain plan
    (`docs/plans/2026-11-13-tower-upgrade-chain.md`): the two vendored rows joined
    `data/buildings.json` with authored `upgradesTo` links and `upgradeBuilding` turns a

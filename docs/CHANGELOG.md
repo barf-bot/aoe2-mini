@@ -51,6 +51,47 @@ commits on `main`.
   leftovers), the Stone Wall / Fortified Wall chain and gates (P1-6), ripped art for the three
   towers (P2-8) and the enemy AI building or upgrading towers — `aiStep`'s build order is unchanged.
 
+### Added — `docs/ROADMAP.md` P1-5 (garrison half): housing units in buildings
+
+- `garrisonUnits` / `leaveBuilding` (`src/commands.js:363` / `src/commands.js:397`) and the
+  right-click path that reaches them (`issueOrder`, `src/commands.js:59`): with own units
+  selected, a right-click on a finished own building whose row carries a `garrisonCapacity`
+  (Town Center 15; Barracks, Archery Range and Market 10; Watch Tower, Guard Tower and Keep 5)
+  links the units to it — `u.garrisonedIn` (`src/entities.js:66`) *is* the reserved slot, so two
+  orders in one frame cannot overbook a building — and hands each accepted one the `move` order
+  onto the building's own standing-ring tile (`order.garrison`), which `updateUnit`'s new guard
+  (`src/sim.js:195`) executes and then retires: parked, invisible, unhittable, and the arrival
+  line is the single place a garrison order ends (no second timer). `src/save.js` needed no
+  change and no `CFG.VERSION` bump — `encodeUnit` (`src/save.js:55`) copies every key, so the
+  link and the in-flight walk both ride along.
+- One targetability rule for units now exists: `targetableAsEnemy` (`src/sim.js:326`) — alive,
+  another team, not inside a building — read by `autoAcquire` (`src/sim.js:175`),
+  `orderForUnit` (`src/commands.js:12`), `issueOrder` (`src/commands.js:54`) and the AI's
+  `nearestEnemy` (`src/ai.js:38`) instead of four hand-written copies of the predicate, and
+  `pickUnit` / `unitsInBox` (`src/input.js:7`, `src/input.js:23`) refuse an inside unit too.
+  Population still counts him: `selectedUnits` (`src/economy.js:127`) drops him so he cannot be
+  ordered or recalled, while `popUsed` / `popCommitted` keep the slot he always held. A
+  `removeBuilding` (`src/entities.js:124`) — raze, cancel or demolish — evicts the garrison onto
+  the ring before the building leaves the world, so no link dangles.
+- The panel: a finished building with occupants shows `Garrisoned n/cap` in the info panel
+  (`src/hud.js:98`) and one `Leave` button per kind in the command grid plus `Leave all` when it
+  holds more than one unit (`src/hud.js:146`), whose click reaches `leaveBuilding` through the
+  delegated `data-act` ladder (`src/input.js:263`). No new CSS, no new `hudState` value, and the
+  uniform-frame checks (`tools/checks/09-hud.js` §11b) still see the same three panels.
+- No data, no `src/config.js` and no `assets/sprites.png` byte moved (`tools/check-stats.mjs`
+  still prints `373 fields checked`, `tools/gen-atlas.js` leaves the sheet byte-identical) and the
+  committed `preview.png` is unchanged, because the seeded scene garrisons nobody.
+- checks: 382 → 406 — `tools/checks/08-input.js` 40 → 50 (§10e: the two commands, every refusal
+  string, the ring placement, the per-kind and empty-building cases), `07-combat.js` 38 → 44
+  (§9h: not picked, not box-selected, not targetable, an arrow on his building missing him, the
+  walk that ends and parks him, hittable again after `Leave`), `09-hud.js` 35 → 41 (§11e: the
+  count, the buttons, both clicks and the population line) and `10-reset-save.js` 36 → 38 (§13:
+  the garrisoned pair and a pending garrison walk through save → reset → load).
+- Not in this round (and still open): garrisoned units shooting out of towers and keeps (needs
+  the per-range attack work of P1-4), enemy units taking refuge in a dying building, hp regen
+  inside, the AI garrisoning its own villagers, and P1-5's last leftover — trade carts and land
+  trade.
+
 ### Added — `docs/ROADMAP.md` P0-1: real-browser smoke test (`tools/browser-smoke.js`)
 
 - Playability used to be proven by a stub DOM (`tools/lib/harness.js`) plus a headless render

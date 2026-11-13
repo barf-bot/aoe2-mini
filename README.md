@@ -22,7 +22,7 @@ no framework, no dependencies, one PNG of unit art. Open `index.html` and play.
 - Win / lose: razing the enemy Town Center ends the game with a `Victory` overlay, losing
   your own a `Defeat` one; the simulation freezes and the overlay's `New game` restarts
 - Controls: click / drag-select, control groups (`Ctrl+1…9`, `1…9` to recall), right-click
-  move / attack / gather, hotkeys (`H` house, `F` farm, `B` barracks, `L` lumber camp,
+  move / attack / gather / garrison, hotkeys (`H` house, `F` farm, `B` barracks, `L` lumber camp,
   `G` mining camp, `M` mill, `R` archery range, `T` age, `Esc` to cancel), minimap camera drag,
   two-finger touch pan
 - An enemy village that reacts and fights back

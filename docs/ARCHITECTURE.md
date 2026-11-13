@@ -24,19 +24,19 @@ simulation.
 | `src/style.css` | — | all styles; the `max-width:720px` phone block is last so it wins the cascade |
 | `src/config.js` | no | `CFG`, `KINDS`, `SPRITE_SHEET`/`SPRITES`/`WORK_ANIM`/`spriteFor`, `BLD_SPRITES`/`bldSpriteFor`, `BLD`, `TECHS`, `AGES`, `SAVE_PATH`, `MUTE_PATH`, `LONG_PRESS_MS`/`LONG_PRESS_SLOP`, `T`, `PAL`, `TEAM`, `RES_OF_TILE`, `CARRY_COLOR`, `SFX` — every tunable number; `CFG`/`KINDS`/`BLD`/`TECHS` and the sprite tables are generated from `data/` |
 | `src/world.js` | no | seeded generation (`mulberry32`, `hash2`, `makeWorld`), site search (`findSite`), `berryCluster`, resource tiles (`tileRes`) |
-| `src/entities.js` | no | `setAtlas`, `sourceFromTile`/`sourceFromFarm`, `workSpot`, `makeUnit`, `makeBuilding`, `rebuildBlocks`, `removeBuilding`/`setResult`, `workPos`, `standingSpots` |
-| `src/sim.js` | no | `stepSim`/`updateUnit` (the order state machine — its `build` branch ends a site by calling `promoteBuilding` when the site is an upgrade in progress), combat math (`unitAttack`/`unitArmor`/`hitUnit`/`hitBuilding`/`autoAcquire`/`attackableAsEnemy`), projectiles (`spawnArrow`/`updateProjectiles`/`stepBuildingAttacks`) |
+| `src/entities.js` | no | `setAtlas`, `sourceFromTile`/`sourceFromFarm`, `workSpot`, `makeUnit` (the unit shape: `KINDS` stats, `order`, the route cache and `garrisonedIn`), `makeBuilding`, `rebuildBlocks`, `removeBuilding`/`setResult`, `workPos`, `standingSpots` |
+| `src/sim.js` | no | `stepSim`/`updateUnit` (the order state machine — its `build` branch ends a site by calling `promoteBuilding` when the site is an upgrade in progress, and its first guard parks a unit whose `garrisonedIn` is set instead of moving him), combat math (`unitAttack`/`unitArmor`/`hitUnit`/`hitBuilding`/`autoAcquire`/`attackableAsEnemy`/`targetableAsEnemy`), projectiles (`spawnArrow`/`updateProjectiles`/`stepBuildingAttacks`) |
 | `src/movement.js` | no | `tileOf`, A\* (`findPath`), `stepToward`/`moveUnit`/`standTarget`, `formationSlots`, `walkable`, `reachOf`, `separate` |
 | `src/economy.js` | no | gathering (`workersOnTile`, `findDropoff`, `deposit`, `depleteTile`, `nextSource`, `resumeGather`), `popCap`/`popUsed`, `selectedUnits`, `canAfford`/`spend`/`refund` |
-| `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`, `canPlaceAt`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, `upgradeBuilding`/`promoteBuilding`, plus `toast` |
+| `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`, `canPlaceAt`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, `upgradeBuilding`/`promoteBuilding`, `garrisonUnits`/`leaveBuilding`, plus `toast` |
 | `src/ai.js` | no | `aiStep` — the enemy village, acting through the same commands |
 | `src/save.js` | guarded | `storageGet`/`storageSet` (the one door to `localStorage`, node-safe), `encodeState`/`decodeState`, `markDirty`, `saveGame`/`loadGame`, `migrate`/`validState` |
 | `src/sound.js` | guarded | `playSfx` (WebAudio synth of the `SFX` rows), `isMuted`/`setMuted`/`applyMuteButton` |
 | `src/render.js` | yes | `beginCanvas`, world/building/unit drawing (`drawBuildings`, `unitAnim`, `drawUnits`, `drawProjectiles`), ghost, drag box, minimap, `renderFrame` |
 | `src/hud.js` | yes | the uniform HUD frame (`renderHud`/`hudState`/`hudHtml` with `infoHtml`/`commandsHtml`/`queueHtml`) and `resultHtml` |
-| `src/input.js` | yes | picking (`pickUnit`/`pickBuilding`/`unitsInBox`), the pure `pointerDown`/`pointerUp` both pointer listeners delegate to, `attachInput`'s pointer/keyboard/mute/command-bar/minimap listeners, `buttonAt`, `centerCamOnFraction`, `clamp` |
+| `src/input.js` | yes | picking (`pickUnit`/`pickBuilding`/`unitsInBox`), the pure `pointerDown`/`pointerUp` both pointer listeners delegate to, `attachInput`'s pointer/keyboard/mute/command-bar/minimap listeners, `buttonAt`, `leaveSelected`, `centerCamOnFraction`, `clamp` |
 | `src/boot.js` | yes | canvas sizing, `createState`, `resetGame`, `loadAtlas`, `boot` (mute-button sync first), the rAF loop (`startLoop`/`stepGame`) |
-| `src/main.js` | yes | the public surface — the `AoE2` object every tool reads — and the `window.Game = boot(document)` call |
+| `src/main.js` | yes | the public surface — the `AoE2` object every tool reads (the config tables, `createState`/`boot`, the command, combat, economy, save and HUD builders, the `pickUnit`/`unitsInBox` pickers and the two targetability predicates) — and the `window.Game = boot(document)` call |
 
 "Guarded" means the file reaches for a browser API only behind a `typeof` check, so it
 loads and runs in node. Adding a file: create it in `src/`, add its `<script src>` tag to
@@ -51,7 +51,7 @@ Everything mutable lives on one object, created by `createState()` and passed in
 function — no hidden globals, which is what makes the logic testable from node:
 
 ```
-Game = { world, units[], buildings[], projectiles[], blocks(Map buildingId -> tiles), sprites{atlas},
+Game = { world, units[](a unit: id, kind, team, x, y, hp/maxHp, stats from KINDS, order, slot, path/pathAt/pathFor/pathEpoch, garrisonedIn), buildings[], projectiles[], blocks(Map buildingId -> tiles), sprites{atlas},
          res[2], age[2], ageBonus[2], techs[2](per-team Sets of researched tech ids), rnd(mulberry32(CFG.SEED)), cam{x,y}, keys, mouse, drag, selection[],
          selectedBuilding, groups{}, placing, started, wave, time, frame, autosaveAt(next autosave write),
          mapEpoch(route cache epoch), pathQueries(findPath calls),
@@ -91,10 +91,14 @@ type lookup is a flat array index (`ty * world.w + tx`).
 
 `idle` → `move` → `harvest` → `go_deposit` → (re-acquire source via `nextSource`) …
 plus `build` (works on a site until `built >= 1`, and promotes it through `promoteBuilding`
-(`src/commands.js:315`) when the site is an upgrade in progress) and `attack` (chase to
+(`src/commands.js:318`) when the site is an upgrade in progress) and `attack` (chase to
 `u.r + target.r + 4`, then swing on `atkTime` cooldown). Carry capacity is
 `CFG.CARRY_MAX`; the carried resource is recorded in `u.carryRes` so `deposit()` credits
-the right stockpile — that field being unset was a real bug (deposits silently vanished).
+the right stockpile — that field being unset was a real bug (deposits silently vanished). A
+`move` order can also carry `garrison: <building id>` (`garrisonUnits`, `src/commands.js:363`):
+the garrison walk, and the only order `updateUnit` runs for a unit with `garrisonedIn` set —
+retiring it on arrival at the ring tile is the single place that order ends
+(docs/plans/2026-11-13-garrison.md).
 
 Every unit also carries its rendering state: `u.face` (`+1`/`-1`) and `u.anim`, the
 activity clock behind every animation (walk, work, swing), plus the `atSite` mark a
@@ -141,7 +145,10 @@ flat armour of that class, and `hitUnit` (`src/sim.js:81`) lands `max(1, attack 
 armour softens a hit but never absorbs it below 1. Attackers only damage the target
 they're ordered to attack — a unit (`hitUnit`) or a building (`hitBuilding`,
 `src/sim.js:156`, which razes it at 0 hp via `removeBuilding`, `src/entities.js:124` — the one
-exit that also runs `setResult` (`src/entities.js:141`), the win/lose rule). Idle fighters
+exit that also runs `setResult` (`src/entities.js:141`), the win/lose rule) — and the unit half
+of that same rule, `targetableAsEnemy` (`src/sim.js:326`: alive, another team, not inside a
+building), is what `autoAcquire`, `orderForUnit`, `issueOrder` and the AI's `nearestEnemy` read
+instead of re-typing the test (docs/plans/2026-11-13-garrison.md). Idle fighters
 acquire on their own: `autoAcquire` (`src/sim.js:169`) gives them the nearest enemy unit
 within their own `KINDS[kind].range` tiles (a melee unit falls back to `CFG.ACQUIRE`),
 else the nearest built enemy building within `CFG.BUILDING_ACQUIRE`, and a kill

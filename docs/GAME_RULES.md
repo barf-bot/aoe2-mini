@@ -77,6 +77,11 @@ a bug.
   `u.slot`, and a retiring move order releases it — so a finished formation holds no tiles
   and a slot taken by another order forces a re-ask instead of a stack. `attack` and
   `harvest` orders keep their targets: no slots for a fight.
+- A `move` order can also name the building it walks into (`order.garrison`,
+  `src/commands.js:363`): the garrison walk (docs/plans/2026-11-13-garrison.md) is the only
+  order `updateUnit` (`src/sim.js:190`) executes for a unit with `garrisonedIn` set, and the
+  arrival line retires it to `idle` — that single place is where a garrison order ends, so no
+  second timer is involved and the parked unit stops moving, animating and being drawn.
 - Units push apart to `CFG.UNIT_SEP` (11 px) every tick (`separate`, `src/movement.js:334`) —
   and because the slot pitch is that same number on the tile grid, a parked group needs
   zero pushes: the two mechanisms agree by construction.
@@ -101,7 +106,7 @@ a bug.
 - Auto-acquire (`autoAcquire`, `src/sim.js:169`): non-villager fighters spot the nearest
   enemy unit within their own reach — `range` tiles for a shooter, `CFG.ACQUIRE` (6) for a
   melee unit — else the nearest enemy building within `CFG.BUILDING_ACQUIRE` (5), at any
-  progress (`attackableAsEnemy`, `src/sim.js:314`). Snap to the next target the moment
+progress (`attackableAsEnemy`, `src/sim.js:317`). Snap to the next target the moment
   their current one dies. Villagers never start fights; they only attack when ordered.
 - Damage is computed in one place (`unitAttack`/`unitArmor`, `src/sim.js:55`/`src/sim.js:69`):
   attack = the row's `atk` × `(1 + 0.25 × ageBonus[team])` — the age multiplier of the
@@ -146,10 +151,10 @@ a bug.
   Mining Camp — are `age: 0`, the eight Feudal rows — Barracks (the table's own
   `internal_name` is `Barracks Age1`), Mill, Archery Range, Blacksmith, Market, Watch
   Tower, Guard Tower, Barricade — are `age: 1`, and the one Castle row — Keep — is `age: 2`.
-  `build` (`src/commands.js:114`) refuses a row whose
+  `build` (`src/commands.js:117`) refuses a row whose
   age the village has not reached *before* picking a builder or spending
-  (`Barracks requires Feudal Age`), `canPlaceAt` (`src/commands.js:156`) answers the same
-  gate for the placement ghost, and `commandsHtml` (`src/hud.js:106`) never offers the
+  (`Barracks requires Feudal Age`), `canPlaceAt` (`src/commands.js:159`) answers the same
+  gate for the placement ghost, and `commandsHtml` (`src/hud.js:109`) never offers the
   locked buttons — hotkeys `b`, `m`, `r`, `k`, `e`, `c`, `q`. The Blacksmith's `age: 1` was
   the first gated row (P1-4); the other thirteen rows are now gated by the same number, and
   §7e of `tools/checks/05-construction.js` proves both halves per row: the Dark Age
@@ -157,31 +162,51 @@ a bug.
   builds it for exactly its cost.
 - The tower upgrade chain (`docs/plans/2026-11-13-tower-upgrade-chain.md`): `BLD` carries an
   authored `upgradesTo` on `watch_tower` (→ `guard_tower`) and on `guard_tower` (→ `keep`),
-  and `upgradeBuilding` (`src/commands.js:278`) is the command that reads it. It reuses the
+  and `upgradeBuilding` (`src/commands.js:281`) is the command that reads it. It reuses the
   construction pipeline instead of a second timer — spend the next row's cost, write
   `b.upgrade = <next kind>`, restart `b.built` at 0 over the next row's `time`, draft the
   village's builder — so the half-upgraded tower shoots nobody (`stepBuildingAttacks`,
-  `src/sim.js:136`) and `promoteBuilding` (`src/commands.js:315`) flips `b.kind` the frame
+  `src/sim.js:136`) and `promoteBuilding` (`src/commands.js:318`) flips `b.kind` the frame
   the site finishes; hp, attack, armours, range and footprint are then the new row's and the
   `Guard Tower complete` toast names it. The refusal ladder is `build`'s, in order:
   `Not your building`, `Already under construction`, `<label> has no upgrade`,
   `<label> requires <Age>`, `Not enough <res>`, `All villagers are building` /
   `No villager available` — every one answered before anything is spent. Cancelling an
-  upgrade in progress (`cancelConstruction`, `src/commands.js:166`) refunds
+  upgrade in progress (`cancelConstruction`, `src/commands.js:169`) refunds
   `floor(CFG.CANCEL_REFUND × BLD[b.upgrade].cost)` — the tier being paid for, not the one
   standing — and leaves the old tier built (`Guard Tower upgrade cancelled`) instead of
   removing the building. Population never moves: all three tower rows carry `pop: 0`. The
   grid offers the button only when the next tier exists and the team's age allows it, and
-  `disabled` when its cost is short (`commandsHtml`, `src/hud.js:106`); §7f of
+  `disabled` when its cost is short (`commandsHtml`, `src/hud.js:109`); §7f of
   `tools/checks/05-construction.js` proves the ladder, both edges and the refund.
-- The Barricade adds no placement or combat code of its own: `build` (`src/commands.js:114`)
-  drafts its crew (`pickBuilders`, `src/commands.js:93`) through the same `canPlaceAt`
-  (`src/commands.js:156`) rule, cancelling refunds
+- Garrison (`garrisonUnits` / `leaveBuilding`, `src/commands.js:363` / `src/commands.js:397`,
+  `docs/plans/2026-11-13-garrison.md`): the seven rows carrying a `garrisonCapacity` — Town
+  Center 15, Barracks 10, Archery Range 10, Market 10, Watch Tower 5, Guard Tower 5, Keep 5 —
+  can house units; the other seven (capacity 0: House, Farm, Lumber Camp, Mining Camp, Mill,
+  Blacksmith, Barricade) never can, so a click on your House still just moves. The command
+  answers before anything changes — `Not your building`, `<label> is not built yet`, `<label>
+  has no garrison space` — then links the units that fit: `u.garrisonedIn = b.id` *is* the
+  reserved slot (two orders in one frame cannot overbook a building), the refusal toast is
+  `<label> is full` when the row ran short of room and `Already garrisoned there` when the
+  units are already housed, and every accepted unit gets the `move` order onto the building's
+  own standing-ring tile (`u.slot = null`). `leaveBuilding(Game, b, unitIds)` — default
+  everyone inside, the panel's per-kind button passes that kind's ids — sets them back down on
+  the ring and answers `<label> has nobody inside` with 0 when the building holds nobody;
+  `removeBuilding` (`src/entities.js:124`) evicts them the same way before the building
+  leaves the world. Garrisoned units do not shoot back: that needs the per-range attack work
+  (docs/ROADMAP.md P1-4), and an enemy taking refuge in a burning building, hp regen inside
+  and the AI garrisoning its own villagers are all still open. The proof is §10e of
+  `tools/checks/08-input.js`, §9h of `07-combat.js`, §11e of `09-hud.js` and the two §13
+  save cases in `10-reset-save.js`; no data, no `src/config.js` and no `assets/sprites.png`
+  byte moved for it.
+- The Barricade adds no placement or combat code of its own: `build` (`src/commands.js:117`)
+  drafts its crew (`pickBuilders`, `src/commands.js:96`) through the same `canPlaceAt`
+  (`src/commands.js:159`) rule, cancelling refunds
   `floor(3 × CFG.CANCEL_REFUND)` = **2** wood and demolishing costs nothing — and a
   built or half-built segment registers its one tile in `Game.occupied` like any other
   footprint, so routes reroute around it and a raze reopens the gap
   (`docs/plans/2026-11-12-wooden-barricade.md`).
-- Market trade (`trade`, `src/commands.js:250`): the market row is the only one carrying
+- Market trade (`trade`, `src/commands.js:253`): the market row is the only one carrying
   `trade` rates — selling 100 of food, wood or stone pays `trade.sell` **33** gold, buying
   100 back costs `trade.buy` **67** gold — and the six buttons on a finished Market move
   exactly 100 units at that rate in one click. Every refusal routes through `toast`:
@@ -198,15 +223,15 @@ a bug.
   Center (and food also to farms) when the dedicated building doesn't exist. A farm
   never receives its own harvest. Farms feed 170 food (`BLD.farm.field`) before going
   idle; the mill tracks `field` the same way.
-- One rule judges a tile — `canPlaceAt` (`src/commands.js:156`): the row's `age` gate plus a
-  free, walkable footprint (`siteFree`, `src/commands.js:200`). A click that fails it is
+- One rule judges a tile — `canPlaceAt` (`src/commands.js:159`): the row's `age` gate plus a
+  free, walkable footprint (`siteFree`, `src/commands.js:203`). A click that fails it is
   refused (`Can't build there`) with nothing spent and `Game.placing` still armed; the old
   answer was to move the site to `findSite` (`src/world.js:144`) next to the villager, and a
   tile more than 7 tiles off the builder failed too (docs/TODO.md P0-3). Distance is no
   longer part of the rule — the builder walks — so `findSite` only answers the button call
   without a tile, and `drawGhost` (`src/render.js:246`) paints with the same `canPlaceAt`.
   Placement also needs enough resources. The crew (`pickBuilders` via
-  `build`, `src/commands.js:114`) is every free villager in the current selection, else
+  `build`, `src/commands.js:117`) is every free villager in the current selection, else
   the nearest free team-0 villager: a villager on a harvest/move order, or one whose
   `build` order points at a finished or demolished building, is free (that order is
   abandoned), while one working a site with `built < 1` is never yanked off — so a
@@ -220,11 +245,12 @@ a bug.
   right-click lands on a tile his own unfinished building covers gets
   `{ kind: 'build', b: id }` instead of a plain `move` (docs/TODO.md P0-4), so a site his
   builder died or walked away from can still be finished. An enemy building is still
-  attacked and a finished own building is still just the ground a move order ends on.
-- Cancelling and demolishing (phase 2, T3/T4): `cancelConstruction` (`src/commands.js:166`)
+  attacked and a finished own building is still just the ground a move order ends on — unless
+  its row has garrison capacity, in which case the selection walks inside (Garrison, above).
+- Cancelling and demolishing (phase 2, T3/T4): `cancelConstruction` (`src/commands.js:169`)
   ends an in-progress site, refunding `floor(cost × CFG.CANCEL_REFUND)` — **80%** of the
   defined cost whatever the progress — and frees its builders; `demolish`
-  (`src/commands.js:186`) removes a finished own-team building with no refund, refuses Town
+  (`src/commands.js:189`) removes a finished own-team building with no refund, refuses Town
   Centers (`Cannot demolish a Town Center`), buildings with a training queue
   (`Still training`) and buildings with a tech in flight (`Still researching`). The
   footer offers `Cancel` for a foundation and, once the
@@ -234,8 +260,8 @@ a bug.
   must be affordable, and must have population room (`Need more houses`). Room is measured by
   one helper, `popCommitted` (`src/economy.js:118`): every living unit of the team
   (`popUsed`, `src/economy.js:108` — villagers, militia and archers alike, docs/TODO.md
-  P1-10) plus every unit still queued in its buildings. `train` (`src/commands.js:215`) and
-  the footer's disabled buttons (`commandsHtml`, `src/hud.js:106`) both read it, so the
+  P1-10) plus every unit still queued in its buildings. `train` (`src/commands.js:218`) and
+  the footer's disabled buttons (`commandsHtml`, `src/hud.js:109`) both read it, so the
   opening village reads 5/5 and a button never offers a click the command would refuse.
 
 - `built` is a **0..1 progress fraction**, not a built/not-built flag (docs/TODO.md P1-9):
@@ -245,7 +271,7 @@ a bug.
   (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:173`) all test
   `built >= 1`, as does the enemy's `aiStep` (`src/ai.js:4`). An *enemy* building follows the
   other half of the rule: attackable at any progress, a 0 % foundation included, the way
-  AoE2 does it (`attackableAsEnemy`, `src/sim.js:314`).
+  AoE2 does it (`attackableAsEnemy`, `src/sim.js:317`).
 
 ## Technologies (`TECHS`)
 
@@ -256,7 +282,7 @@ a bug.
 | Fletching | Blacksmith | 100 food + 50 gold | 30 s | +1 pierce attack |
 | Bracer | Blacksmith | 300 food + 200 gold | 40 s | +1 pierce armour |
 
-- Only a finished Blacksmith researches (`researchTech`, `src/commands.js:231`): the tech's age
+- Only a finished Blacksmith researches (`researchTech`, `src/commands.js:234`): the tech's age
   must be reached (`Forge requires Feudal Age`), one tech at a time per building
   (`Blacksmith is busy`), never a duplicate (`Forge already researched`), cost checked
   (`Not enough food`), and other buildings refuse its techs (`Barracks cannot research
@@ -269,7 +295,7 @@ a bug.
 ## Ages (`AGES`)
 
 Dark Age → Feudal Age → Castle Age (`src/config.js:286`): Castle Age is the last age, as the
-README states, and `upgradeAge` (`src/commands.js:266`) answers `Castle Age reached` there.
+README states, and `upgradeAge` (`src/commands.js:269`) answers `Castle Age reached` there.
 Cost (`src/config.js:17`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
 costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle). Hotkey `T`.
 Each upgrade sets `Game.ageBonus[0] = Game.age[0]`, which scales the player's unit damage; the
@@ -343,12 +369,12 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   (`src/boot.js:233-235`) so the saved frame is the one just run, and `stepSim` never writes —
   driving the simulation from a test touches no storage. `resetGame` sets `Game.autosaveAt =
   Game.time` (`src/boot.js:61`): a new settlement is written by the very next frame, which is
-  what makes `N` (`storageSet` + `resetGame`, `src/input.js:230`) overwrite the slot instead of waiting out the debounce.
+  what makes `N` (`storageSet` + `resetGame`, `src/input.js:241`) overwrite the slot instead of waiting out the debounce.
 - **The page surface** — the header's `Save` button (`index.html:20`) writes the slot through
   `saveGame` (`src/boot.js:185`) and toasts `Saved`; `boot` (`src/boot.js:138`) calls
   `storageGet` / `loadGame` (`src/boot.js:143-144`) right after `createState` (`src/boot.js:38`),
   so reopening the page lands on the saved game; the three new-game paths — `N`
-  (`storageSet`, `src/input.js:230`), the footer's `New map` (the `restart` action, `src/input.js:254`) and the victory overlay's
+  (`storageSet`, `src/input.js:241`), the footer's `New map` (the `restart` action, `src/input.js:267`) and the victory overlay's
   `New game` (`src/boot.js:181`) — clear the slot before `resetGame`, which schedules the rewrite.
 
 ## Sound (SFX)
@@ -365,8 +391,8 @@ the table is the contract, the audio path and the checks are its two readers, th
 |---|---|---|---|---|---|
 | `hit` | triangle | 170 → 60 | 0.14 | 0.35 | `hitUnit` (`src/sim.js:81`) |
 | `arrow` | sawtooth | 880 → 320 | 0.10 | 0.18 | `spawnArrow` (`src/sim.js:97`) |
-| `build` | square | 220 → 140 | 0.20 | 0.25 | `updateUnit`'s `b.built >= 1` branch (`src/sim.js:252`) |
-| `age` | triangle | 392 → 523 → 659 | 0.60 | 0.30 | `upgradeAge` (`src/commands.js:266`) |
+| `build` | square | 220 → 140 | 0.20 | 0.25 | `updateUnit`'s `b.built >= 1` branch (`src/sim.js:255`) |
+| `age` | triangle | 392 → 523 → 659 | 0.60 | 0.30 | `upgradeAge` (`src/commands.js:269`) |
 | `victory` | sawtooth | 523 → 659 → 784 | 0.90 | 0.30 | `setResult` (`src/entities.js:141`) |
 | `defeat` | sawtooth | 392 → 311 → 262 | 1.10 | 0.28 | `setResult` (`src/entities.js:141`) |
 
@@ -402,10 +428,15 @@ pins (`footer{flex:0 0 var(--footer-h);height:var(--footer-h)}`, 94 px, every
 panel a fixed-height `overflow:hidden` box) never changes size when the selection does —
 the info panel is a fixed title/body/bar grid, the command panel a row-based button grid.
 Choosing a placement (`Game.placing`) changes the info panel's content, never the state. A
-group collapses to a `N units` title plus one `.sum` line of per-kind counts
-(`5 Villager, 4 Militia, 3 Archer`) — at most 3 kinds named, the rest folded into
-`+K more` — instead of one line per unit, and its bar shows the squad's aggregate HP
-fraction.
+group collapses to a `N units` title plus one `.sum` line of per-kind counts, at most 3 kinds
+named, the rest folded into `+K more` — instead of one line per unit, and its bar shows the
+squad's aggregate HP fraction (`5 Villager, 4 Militia, 3 Archer` is what a
+seven-unit selection renders; the exact markup is pinned by `tools/checks/09-hud.js`). A unit
+inside a building (`garrisonedIn`, `src/entities.js:66`) is not picked by a click, not taken by
+a drag box and not recalled from a control group — `selectedUnits` (`src/economy.js:124`)
+filters him out, so the counts, the build buttons and `issueOrder` all see only the units on
+the field — while the population header keeps counting him: he still holds the slot he always
+used.
 
 Below 720 px the frame reflows instead of shrinking: one `@media (max-width:720px)` block
 (`src/style.css:67`, written last so it wins the cascade) trims the header padding to `2px 6px`
