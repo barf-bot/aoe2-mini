@@ -5,6 +5,32 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P1-11: the player's age and Blacksmith upgrades also strengthen the enemy
+
+- `Game.age`, `Game.ageBonus` and `Game.techs` were single global values that `unitAttack`
+  (`src/sim.js:55`) and `unitArmor` (`src/sim.js:69`) applied to *any* unit, so a player at
+  Castle Age with Forge raised an enemy militia's attack from the table's 4 to 7: the enemy
+  fought with upgrades it had never researched and, having no research of its own, never could.
+- All three are per team now — `age[2]`, `ageBonus[2]`, `techs[2]` indexed by team the way
+  `res[2]` already was (`src/boot.js:45`, `src/boot.js:60`). The combat helpers read the
+  attacker's or defender's own half; `upgradeAge` (`src/commands.js:266`), the header age
+  (`src/hud.js:24`) and the build / age-up buttons (`src/hud.js:145`, `src/hud.js:152`) speak for
+  team 0, while `researchTech` (`src/commands.js:231`) and `trade` (`src/commands.js:250`) use the
+  building's team and `stepSim` (`src/sim.js:26`) files a finished tech under its own building's
+  team. Team 1 keeps age 0 and an empty set until the AI can research, so an enemy unit's numbers
+  are now exactly its table row's.
+- The payload changed shape, so `CFG.VERSION` moves 1 → 2 (`data/units.json:44` →
+  `src/config.js:27`): `migrate` (`src/save.js:137`) converts a v1 save — one global age, ageBonus
+  and techs set — into the player's half with the enemy's left empty instead of refusing it, and
+  `validState` (`src/save.js:152`) now requires the per-team containers.
+- checks: 320 → 323. `tools/checks/07-combat.js` gains the reproduction itself — a player at
+  Castle Age with Forge swings 7 while the enemy militia stays at 4, and Scale Mail armour stops
+  at the player's own units; `tools/checks/10-reset-save.js` gains the v1 → v2 migration case (old
+  bytes load and re-save to exactly the v2 bytes), not just the round-trip of the new shape. The
+  checks that read the old globals (`06`, `07`, `09`, `10`, `11` and the `fundedGame` fixture in
+  `tools/lib/harness.js`) were rewritten to the per-team fields rather than dropped.
+- `preview.png` regenerates byte-identical (no render path changed).
+
 ### Fixed — `docs/TODO.md` P1-10: the population cap does not hold
 
 - `popUsed` (`src/economy.js:104`) counted villagers only — the starting militia and every

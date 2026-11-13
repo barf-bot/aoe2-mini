@@ -319,7 +319,7 @@ const withStorage = (fn) => {
 const fundedGame = () => {
   const g = AoE2.createState();
   g.res[0] = { food: 9000, wood: 9000, gold: 9000, stone: 9000 };
-  g.age = 1;
+  g.age[0] = 1;
   finishedHouse(g);
   return g;
 };

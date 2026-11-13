@@ -24,7 +24,7 @@ const CFG = {
   PROJ_SPEED: 176,                // px/s an arrow flies (8 tiles/s - the table carries no projectile speed)
   ASTAR_MAX_NODES: 4000,          // expansion cap for one A* query (the table carries no pathfinding budget)
   RES: { tree: 60, gold: 800, stone: 450, berry: 150 },
-  VERSION: 1,                     // save payload schema stamp - loadGame accepts only this version, migrate() converts older ones
+  VERSION: 2,                     // save payload schema stamp - loadGame accepts only this version, migrate() converts older ones
   AUTOSAVE_DEBOUNCE: 2,           // seconds a mutator waits before the save writes (a burst inside the window keeps ONE pending save)
   AUTOSAVE_EVERY: 30,             // seconds between autosaves of a quiet game (the table carries no save cadence)
 };

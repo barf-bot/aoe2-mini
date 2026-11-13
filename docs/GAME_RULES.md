@@ -104,11 +104,12 @@ a bug.
   progress (`attackableAsEnemy`, `src/sim.js:313`). Snap to the next target the moment
   their current one dies. Villagers never start fights; they only attack when ordered.
 - Damage is computed in one place (`unitAttack`/`unitArmor`, `src/sim.js:55`/`src/sim.js:69`):
-  attack = the row's `atk` × `(1 + 0.25 × ageBonus)` — the age multiplier, `ageBonus` is
-  the age index (1× at Dark Age) — plus every researched tech's attack for the attacker's
-  damage class; a hit then deals `max(1, attack − armour)`, armour being the defender row's
-  `melee`/`pierce` value plus the techs' flat armour of that class (blacksmith techs apply
-  to units only, never to built buildings' attacks).
+  attack = the row's `atk` × `(1 + 0.25 × ageBonus[team])` — the age multiplier of the
+  attacker's own team (`ageBonus[team]` is that team's age index, 1× at Dark Age) — plus
+  the techs the same team researched, for the attacker's damage class; a hit then deals
+  `max(1, attack − armour)`, armour being the defender row's `melee`/`pierce` value plus
+  its own team's techs' flat armour of that class (blacksmith techs apply to units only,
+  never to built buildings' attacks).
 - Population used counts **villagers only**, per AoE2 convention.
 - Art: all three kinds render from the unit atlas (`SPRITE_SHEET` 1522×684 at
   `src/config.js:73`), the frames ripped from the AoE2 art and recoloured per team.
@@ -212,7 +213,7 @@ a bug.
   a building counts for its population cap, receives a carried load and can be worked only
   once it is complete — `popCap` (`src/economy.js:98`), `findDropoff` (`src/economy.js:31`),
   `resumeGather` (`src/economy.js:84`), the farm case of `orderForUnit`
-  (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:163`) all test
+  (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:173`) all test
   `built >= 1`, as does the enemy's `aiStep` (`src/ai.js:4`). An *enemy* building follows the
   other half of the rule: attackable at any progress, a 0 % foundation included, the way
   AoE2 does it (`attackableAsEnemy`, `src/sim.js:313`).
@@ -231,8 +232,9 @@ a bug.
   (`Blacksmith is busy`), never a duplicate (`Forge already researched`), cost checked
   (`Not enough food`), and other buildings refuse its techs (`Barracks cannot research
   Forge`). The queue panel and the on-map bar track the in-flight tech next to training.
-- Finishing adds the id to `Game.techs` (toast `Forge researched`); the effects apply
-  through `unitAttack`/`unitArmor` to unit damage only, and the +1 range on
+- Finishing adds the id to `Game.techs[b.team]` — the researching team's own set (toast `Forge
+  researched`); the effects apply through `unitAttack`/`unitArmor` to that team's unit damage
+  only (docs/TODO.md P1-11: the player's Forge never arms an enemy), and the +1 range on
   Fletching/Bracer is not modelled.
 
 ## Ages (`AGES`)
@@ -240,7 +242,8 @@ a bug.
 Dark Age → Feudal Age → Castle Age → Imperial Age.
 Cost (`src/config.js:17`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
 costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle, Castle → Imperial). Hotkey `T`.
-Each upgrade sets `Game.ageBonus = Game.age`, which scales unit damage.
+Each upgrade sets `Game.ageBonus[0] = Game.age[0]`, which scales the player's unit damage; the
+enemy's half stays 0 and its tech set empty until the AI can research (docs/TODO.md P1-11).
 
 ## Enemy AI (Red)
 
@@ -273,32 +276,35 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
 
 - **Envelope** — `saveGame(path, Game, at = now())` (`src/save.js:123`) writes
   `{ version, seed, writtenAt, state }`: `version` is `CFG.VERSION` (`src/config.js:27`),
-  `1`; `seed` is `Game.world.seed` falling back to `CFG.SEED`, the only way the excluded `rnd`
+  `2`; `seed` is `Game.world.seed` falling back to `CFG.SEED`, the only way the excluded `rnd`
   closure is rebuilt; `writtenAt` is the `at` argument, pinned so the same `Game` saved twice
   gives the same bytes; `state` is `encodeState(Game)` (`src/save.js:77`), the schema the
   harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:22`).
-- **Version rule** — `migrate(payload)` (`src/save.js:137`) accepts a payload only when its
-  `version` equals `CFG.VERSION`; when the schema moves to 2 the conversion lives there instead
-  of the save being thrown away. `validState(payload)` (`src/save.js:145`) then checks the shape
-  before a single field is assigned — the world's `w`/`h`/`seed` against `CFG.MAP_W`/`MAP_H` and
-  the envelope, the array and object containers, `time` and `nextId` as numbers. Every refusal
+- **Version rule** — `migrate(payload)` (`src/save.js:137`) takes `CFG.VERSION` (2) as written and
+  converts a `version: 1` payload — one global `age`, `ageBonus` and `techs` set — into the
+  per-team shape (the player's half filled, the enemy's empty) instead of throwing such a save
+  away; any other version is refused. `validState(payload)` (`src/save.js:152`) then checks the
+  shape before a single field is assigned — the world's `w`/`h`/`seed` against `CFG.MAP_W`/`MAP_H`,
+  the array and object containers (the per-team `age` / `ageBonus` / `techs` pair among them),
+  `time` and `nextId` as numbers. Every refusal
   (missing slot, empty slot, unparseable text, an unreadable version, an unwalkable shape) ends
-  the same way: `loadGame(path, Game, raw = storageGet(path))` (`src/save.js:242`) calls
+  the same way: `loadGame(path, Game, raw = storageGet(path))` (`src/save.js:252`) calls
   `resetGame` and answers `false` — it never throws.
-- **In and out of `state`** — `Game.techs` (a `Set`) leaves as an array and comes back a `Set`;
-  `Game.blocks` (a `Map` of building id → tiles) leaves as an object and comes back a `Map` keyed
+- **In and out of `state`** — `Game.techs` (one Set per team, `[player, enemy]`) leaves as the
+  pair of id arrays and comes back two Sets; `Game.blocks` (a `Map` of building id → tiles)
+  leaves as an object and comes back a `Map` keyed
   by `Number(k)`, then `rebuildBlocks` (`src/entities.js:102`) recomputes it and `decodeState`
-  (`src/save.js:193`) bumps `mapEpoch` instead of restoring it, so every cached route rebuilds on
+  (`src/save.js:203`) bumps `mapEpoch` instead of restoring it, so every cached route rebuilds on
   its first step. Excluded as per-runtime caches: `dom`, `view`, `mm`, `mmBase`, `toastMsg`,
   `toastAt`, `pingAt`, `frame`, `pathQueries`, `sprites`, `rnd`, `mapEpoch`, `autosaveAt`, `sound`.
 - **References become ids** — `Game.selectedBuilding` is stored as an id and relinked on load
-  (`decodeState`, `src/save.js:193`); a projectile's target becomes `tk` (`'unit' | 'building'`)
-  plus `tid` (`encodeProjectile`, `src/save.js:71`, and `decodeProjectile`, `src/save.js:180`
+  (`decodeState`, `src/save.js:203`); a projectile's target becomes `tk` (`'unit' | 'building'`)
+  plus `tid` (`encodeProjectile`, `src/save.js:71`, and `decodeProjectile`, `src/save.js:190`
   relinks it and drops an arrow whose mark is gone); a `harvest` / `go_deposit` order's `src` is
   stored as the tile or farm it names (`encodeSource`, `src/save.js:38`) and rebuilt through
   `sourceFromTile` (`src/entities.js:16`) / `sourceFromFarm` (`src/entities.js:29`) — a parsed `src`
   would be a dead number where the live one is a getter onto `world.amount` / `b.field`, and a
-  source that no longer exists retires the order to `idle` (`decodeOrder`, `src/save.js:163`).
+  source that no longer exists retires the order to `idle` (`decodeOrder`, `src/save.js:173`).
 - **Autosave** — `CFG.AUTOSAVE_DEBOUNCE: 2` and `CFG.AUTOSAVE_EVERY: 30` (`src/config.js:28-29`)
   set the rhythm through `Game.autosaveAt`: `markDirty(Game)` (`src/save.js:113`), called by
   every command mutator and by `stepSim`'s three completion events (a unit trains, a tech finishes, a

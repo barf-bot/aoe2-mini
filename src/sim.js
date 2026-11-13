@@ -23,7 +23,7 @@ function stepSim(Game, dt) {
     b.research.t -= dt;
     if (b.research.t <= 0) {
       const done = b.research.id;
-      Game.techs.add(done);
+      Game.techs[b.team].add(done);
       markDirty(Game);                     // a finished tech is a change the sim made
       toast(Game, TECHS[done].label + ' researched');
       b.research = null;
@@ -46,32 +46,32 @@ function stepSim(Game, dt) {
 
 /* ---- combat math ---- */
 
-/** The attack an attacker deals: the row's number scaled by the age bonus,
- * plus every researched tech's attack for the damage class the attacker uses.
- * A unit uses KINDS (and gets techs); a built building uses BLD.attack and
- * never gets a unit tech. Damage class: atkType 'ranged' units and built
- * buildings' arrows are pierce, everything else is melee. The single place
- * attack math happens - spawnArrow and the melee swing both call this. */
+/** The attack an attacker deals: the row's number scaled by its own team's age
+ * bonus, plus that team's researched techs' attack for the damage class it uses —
+ * per-team age / ageBonus / techs (docs/TODO.md P1-11) so the player's age-ups and
+ * Forge never arm an enemy. A unit uses KINDS and gets techs; a built building uses
+ * BLD.attack and never gets a unit tech. Class: 'ranged' units and building arrows
+ * are pierce, else melee — the one place attack math lives (swing and arrow). */
 function unitAttack(Game, u) {
   const isUnit = u.atk !== undefined;                     // units carry atk, buildings don't
   const table = isUnit ? u.atk : BLD[u.kind].attack;
   const cls = !isUnit || u.atkType === 'ranged' ? 'pierce' : 'melee';
-  const atk = table * (1 + 0.25 * Game.ageBonus);         // the shipped age scaling
+  const atk = table * (1 + 0.25 * Game.ageBonus[u.team]); // the attacker's own age scaling
   if (!isUnit) return atk;
   let total = atk;
-  for (const id of Game.techs) total += TECHS[id].atk[cls];
+  for (const id of Game.techs[u.team]) total += TECHS[id].atk[cls];
   return total;
 }
 
-/** Armour a defender has against 'melee' or 'pierce' damage: the table row's
- * own armour, plus every researched tech's armour of that type for unit
- * defenders (building rows have armour, unit techs never apply to them). */
+/** Armour a defender has against 'melee' or 'pierce' damage: the table row's own
+ * armour, plus the armour of the techs its OWN team researched, for unit defenders
+ * (building rows have armour, unit techs never apply to them, nor to another team). */
 function unitArmor(Game, u, type = 'melee') {
   const isUnit = u.atk !== undefined;
   const row = isUnit ? KINDS[u.kind] : BLD[u.kind];
   let armor = type === 'pierce' ? row.pierceArmor : row.meleeArmor;
   if (!isUnit) return armor;
-  for (const id of Game.techs) armor += TECHS[id].armor[type];
+  for (const id of Game.techs[u.team]) armor += TECHS[id].armor[type];
   return armor;
 }
 

@@ -33,7 +33,7 @@ const saveCheck = (name, fn) => {
   check(out[0], name, out[1]);
 };
 
-saveCheck('save: saveGame returns the v1 envelope', () => {
+saveCheck('save: saveGame returns the v2 envelope', () => {
   const g = AoE2.createState();
   const [raw, env] = saveOf(g, 1000);
   return [AoE2.CFG.VERSION === dataUnits.cfg.VERSION && env.version === AoE2.CFG.VERSION &&
@@ -45,12 +45,12 @@ saveCheck('save: saveGame returns the v1 envelope', () => {
 
 saveCheck('save: Game.techs and Game.blocks encode as array and object', () => {
   const g = AoE2.createState();
-  g.age = 1;
-  g.techs.add('forge');
+  g.age[0] = 1;
+  g.techs[0].add('forge');
   const site = AoE2.findSite(g.world, 40, 40, 2);
   const b = AoE2.makeBuilding(g, 'barracks', 0, site.tx, site.ty);
   const st = stateOf(g, 1000);
-  return [JSON.stringify(st.techs) === '["forge"]' &&
+  return [JSON.stringify(st.techs) === '[["forge"],[]]' &&
     JSON.stringify(st.blocks[String(b.id)]) === JSON.stringify(g.blocks.get(b.id)) &&
     st.occupied.length === g.occupied.size,
     'techs=' + JSON.stringify(st.techs) + ' blocks[' + b.id + ']=' +
@@ -158,8 +158,9 @@ const playFixture = () => {
   const site = AoE2.findSite(g.world, 40, 40, 2);
   const bar = AoE2.makeBuilding(g, 'barracks', 0, site.tx, site.ty);
   bar.built = 1;
-  g.age = 1;
-  g.techs.add('forge');
+  g.age[0] = 1;
+  g.ageBonus[0] = 1;                               // the pair upgradeAge writes together
+  g.techs[0].add('forge');
   const v = g.units.find((u) => u.team === 0 && u.kind === 'villager' &&
     u.order.src && u.order.src.kind === 'tile');
   AoE2.hitUnit(g, v, 5);                                   // one unit wounded
@@ -196,8 +197,10 @@ const unitTuples = (g) => g.units.map((u) => [u.id, u.x, u.y, u.hp, u.order.kind
 const bldTuples = (g) => g.buildings.map((b) => [b.id, b.kind, b.team, b.tx, b.ty, b.hp, b.built].join(':')).join('|');
 const standardSettlement = (g) => {
   const std = AoE2.createState();
-  return g.units.length === std.units.length && g.time === std.time && g.age === std.age &&
-    g.ageBonus === std.ageBonus && g.nextId === std.nextId && g.wave === std.wave &&
+  return g.units.length === std.units.length && g.time === std.time &&
+    JSON.stringify(g.age) === JSON.stringify(std.age) &&
+    JSON.stringify(g.ageBonus) === JSON.stringify(std.ageBonus) &&
+    g.nextId === std.nextId && g.wave === std.wave &&
     g.result === std.result && JSON.stringify(g.res) === JSON.stringify(std.res) &&
     JSON.stringify(g.buildings.map((b) => b.id)) === JSON.stringify(std.buildings.map((b) => b.id));
 };
@@ -217,11 +220,13 @@ loadCheck('load: every observable field equals its pre-save value', () => {
   const g2 = AoE2.createState();
   const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
   return [okLoad === true && unitTuples(g2) === unitTuples(g) && bldTuples(g2) === bldTuples(g) &&
-    JSON.stringify(g2.res) === JSON.stringify(g.res) && g2.age === g.age &&
-    g2.ageBonus === g.ageBonus && g2.result === g.result && JSON.stringify(g2.cam) === JSON.stringify(g.cam) &&
+    JSON.stringify(g2.res) === JSON.stringify(g.res) &&
+    JSON.stringify(g2.age) === JSON.stringify(g.age) &&
+    JSON.stringify(g2.ageBonus) === JSON.stringify(g.ageBonus) && g2.result === g.result &&
+    JSON.stringify(g2.cam) === JSON.stringify(g.cam) &&
     g2.nextId === g.nextId && g2.time === g.time,
     'units=' + (unitTuples(g2) === unitTuples(g)) + ' buildings=' + (bldTuples(g2) === bldTuples(g)) +
-    ' res=' + (JSON.stringify(g2.res) === JSON.stringify(g.res)) + ' age=' + g2.age + '/' + g.age +
+    ' res=' + (JSON.stringify(g2.res) === JSON.stringify(g.res)) + ' age=' + JSON.stringify(g2.age) + '/' + JSON.stringify(g.age) +
     ' time=' + g2.time + '/' + g.time + ' nextId=' + g2.nextId + '/' + g.nextId];
 });
 
@@ -260,6 +265,28 @@ loadCheck('load: a wrong version resets the game instead of throwing', () => {
     'loaded=' + okLoad + ' backToStandard=' + standardSettlement(g)];
 });
 
+loadCheck('load: a v1 save migrates to the per-team shape instead of being refused', () => {
+  /* VERSION 1 (docs/TODO.md P1-11) stored one global age / ageBonus / techs set for
+     the whole game; version 2 keeps them per team. The old bytes must still load: the
+     player's half filled, the enemy's empty, and the re-save byte-identical to what a
+     v2 game writes for the same fixture. */
+  const g = playFixture();
+  const v2 = AoE2.saveGame(AoE2.SAVE_PATH, g, LOAD_AT);
+  const st = JSON.parse(v2).state;
+  const v1 = JSON.stringify({ version: 1, seed: g.world.seed, writtenAt: LOAD_AT,
+    state: Object.assign({}, st, { age: st.age[0], ageBonus: st.ageBonus[0], techs: st.techs[0] }) });
+  const g2 = AoE2.createState();
+  const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, v1);
+  return [okLoad === true && JSON.stringify(g2.age) === '[1,0]' &&
+      JSON.stringify(g2.ageBonus) === '[1,0]' && [...g2.techs[0]].join(',') === 'forge' &&
+      g2.techs[1] instanceof Set && g2.techs[1].size === 0 &&
+      AoE2.saveGame(AoE2.SAVE_PATH + ':v1', g2, LOAD_AT) === v2,
+    'loaded=' + okLoad + ' age=' + JSON.stringify(g2.age) + ' ageBonus=' +
+    JSON.stringify(g2.ageBonus) + ' techs0=[' + [...g2.techs[0]].join(',') + '] techs1=' +
+    (g2.techs[1] instanceof Set ? '[' + [...g2.techs[1]].join(',') + ']' : String(g2.techs[1])) +
+    ' resaveMatchesV2=' + (g2 && AoE2.saveGame(AoE2.SAVE_PATH + ':v1', g2, LOAD_AT) === v2)];
+});
+
 loadCheck('load: a missing slot resets instead of throwing', () => {
   const g = playFixture();
   const okLoad = AoE2.loadGame('aoe2mini:no-such-slot', g);
@@ -289,14 +316,16 @@ loadCheck('load: a state of the wrong shape is refused', () => {
   return [r1 === false && r2 === false, 'units:"many"=' + r1 + ' missingBuildings=' + r2];
 });
 
-loadCheck('load: techs and blocks come back as Set and Map', () => {
+loadCheck('load: techs and blocks come back as per-team Sets and a Map', () => {
   const { raw } = fixtureSave();
   const state = JSON.parse(raw).state;
   const g2 = AoE2.createState();
   const okLoad = AoE2.loadGame(AoE2.SAVE_PATH, g2, raw);
-  return [okLoad === true && g2.techs instanceof Set && [...g2.techs].join(',') === state.techs.join(',') &&
+  return [okLoad === true && Array.isArray(g2.techs) && g2.techs.every((t) => t instanceof Set) &&
+    JSON.stringify(g2.techs.map((t) => Array.from(t))) === JSON.stringify(state.techs) &&
     g2.blocks instanceof Map && JSON.stringify(Object.fromEntries(g2.blocks)) === JSON.stringify(state.blocks),
-    'techs=' + Object.prototype.toString.call(g2.techs) + '[' + [...g2.techs].join(',') + ']' +
+    'techs=' + Object.prototype.toString.call(g2.techs) + '[' +
+    g2.techs.map((t) => Array.from(t).join(',')).join('|') + ']' +
     ' blocks=' + Object.prototype.toString.call(g2.blocks) + ' keys=' + [...g2.blocks.keys()].join(',')];
 });
 
@@ -522,7 +551,7 @@ autoCheck('autosave: a training that completes marks the game again', () => {
 const savedFixture = (at = 1000) => {
   const g = AoE2.createState();
   g.started = true;                                     // a save always comes from a booted game
-  g.age = 1;
+  g.age[0] = 1;
   g.res[0] = { food: 100, wood: 100, gold: 999, stone: 50 };
   const p = AoE2.workPos(g, g.buildings.find((b) => b.team === 0 && b.kind === 'town_center'), null);
   AoE2.makeUnit(g, 'archer', 0, p.x, p.y);
@@ -548,10 +577,10 @@ uiCheck('ui: the header Save button writes the slot and toasts', () => {
 uiCheck('ui: N starts a new game, clears the slot and writes the new game back', () => {
   const [src, raw] = savedFixture();
   return bootFixture(raw, (doc, Game) => {
-    const loaded = Game.units.length === src.units.length && Game.age === 1 && Game.res[0].gold === 999;
+    const loaded = Game.units.length === src.units.length && Game.age[0] === 1 && Game.res[0].gold === 999;
     doc.fire('keydown', { key: 'n' });
     const cleared = AoE2.storageGet(AoE2.SAVE_PATH) === null;
-    const after = [Game.units.length, Game.time, Game.age].join('/');
+    const after = [Game.units.length, Game.time, Game.age[0]].join('/');
     AoE2.stepGame(Game, DT);
     const slot = AoE2.storageGet(AoE2.SAVE_PATH);
     const env = slot === null ? {} : JSON.parse(slot);
@@ -567,9 +596,9 @@ uiCheck('ui: the footer’s New map button clears the slot too', () => {
     const btn = stubEl('button', 'btnRestart', 80, 24);
     btn.setAttribute('data-act', 'restart');
     Game.dom.commands.listeners.click.forEach((fn) => fn({ target: btn }));
-    return [Game.units.length === 10 && Game.age === 0 && Game.res[0].gold === AoE2.CFG.START.gold &&
+    return [Game.units.length === 10 && Game.age[0] === 0 && Game.res[0].gold === AoE2.CFG.START.gold &&
       AoE2.storageGet(AoE2.SAVE_PATH) === null,
-      'was=' + src.units.length + ' units, now=' + Game.units.length + ' age=' + Game.age +
+      'was=' + src.units.length + ' units, now=' + Game.units.length + ' age=' + Game.age[0] +
       ' gold=' + Game.res[0].gold + ' slot=' + (AoE2.storageGet(AoE2.SAVE_PATH) === null ? 'cleared' : 'filled')];
   });
 });
@@ -592,9 +621,9 @@ uiCheck('boot: opening the page with a slot restores that game', () => {
   const [src, raw] = savedFixture();
   return bootFixture(raw, (doc, Game) => [
     AoE2.saveGame(AoE2.SAVE_PATH, Game, 1000) === raw &&
-    Game.units.length === src.units.length && Game.age === 1 && Game.res[0].gold === 999 &&
+    Game.units.length === src.units.length && Game.age[0] === 1 && Game.res[0].gold === 999 &&
     Game.units.some((u) => u.kind === 'archer' && u.team === 0),
-    'units=' + Game.units.length + '/' + src.units.length + ' age=' + Game.age +
+    'units=' + Game.units.length + '/' + src.units.length + ' age=' + Game.age[0] +
     ' gold=' + Game.res[0].gold +
     ' resavedIdentical=' + (AoE2.saveGame(AoE2.SAVE_PATH, Game, 1000) === raw),
   ]);
@@ -603,9 +632,10 @@ uiCheck('boot: opening the page with a slot restores that game', () => {
 uiCheck('boot: opening the page with an empty slot gives the standard settlement', () => {
   const std = AoE2.createState();
   return bootFixture(null, (doc, Game) => [
-    Game.units.length === std.units.length && Game.units.length === 10 && Game.age === std.age &&
+    Game.units.length === std.units.length && Game.units.length === 10 &&
+    JSON.stringify(Game.age) === JSON.stringify(std.age) &&
     Game.time === std.time && JSON.stringify(Game.res[0]) === JSON.stringify(AoE2.CFG.START),
-    'units=' + Game.units.length + '/' + std.units.length + ' age=' + Game.age +
+    'units=' + Game.units.length + '/' + std.units.length + ' age=' + Game.age[0] +
     ' res0=' + JSON.stringify(Game.res[0]),
   ]);
 });

@@ -117,7 +117,7 @@ function build(Game, kind, atX, atY) {
   const clicked = atX !== undefined && atY !== undefined
     ? { tx: Math.floor(atX / CFG.TILE), ty: Math.floor(atY / CFG.TILE) }
     : null;
-  if ((def.age ?? 0) > Game.age) return toast(Game, def.label + ' requires ' + AGES[def.age]);
+  if ((def.age ?? 0) > Game.age[0]) return toast(Game, def.label + ' requires ' + AGES[def.age]);
   const crew = pickBuilders(Game, clicked);
   if (!crew.length) return toast(Game, Game.units.some(u => u.team === 0 && u.kind === 'villager')
     ? 'All villagers are building' : 'No villager available');
@@ -155,7 +155,7 @@ function build(Game, kind, atX, atY) {
  *  walks to whatever tile was clicked. */
 function canPlaceAt(Game, kind, tx, ty) {
   const def = BLD[kind];
-  if (!def || (def.age ?? 0) > Game.age) return false;
+  if (!def || (def.age ?? 0) > Game.age[0]) return false;
   return siteFree(Game, tx, ty, def.w, def.h);
 }
 
@@ -233,8 +233,8 @@ function researchTech(Game, b, id) {
   if (!tech) return toast(Game, 'Unknown tech ' + id);
   if (tech.building !== b.kind) return toast(Game, BLD[b.kind].label + ' cannot research ' + tech.label);
   if (b.built < 1) return toast(Game, 'Still building');
-  if (Game.age < tech.age) return toast(Game, tech.label + ' requires ' + AGES[tech.age]);
-  if (Game.techs.has(id)) return toast(Game, tech.label + ' already researched');
+  if (Game.age[b.team] < tech.age) return toast(Game, tech.label + ' requires ' + AGES[tech.age]);
+  if (Game.techs[b.team].has(id)) return toast(Game, tech.label + ' already researched');
   if (b.research) return toast(Game, BLD[b.kind].label + ' is busy');
   if (!canAfford(Game, b.team, tech.cost)) return toast(Game, 'Not enough ' + missing(Game, b.team, tech.cost));
   spend(Game, b.team, tech.cost);
@@ -251,7 +251,7 @@ function trade(Game, b, res, direction) {
   const def = b && BLD[b.kind];
   if (!def || !def.trade) return toast(Game, (def ? def.label : String(b && b.kind)) + ' cannot trade');
   if (b.built < 1) return toast(Game, 'Still building');
-  if ((def.age ?? 0) > Game.age) return toast(Game, def.label + ' requires ' + AGES[def.age]);
+  if ((def.age ?? 0) > Game.age[b.team]) return toast(Game, def.label + ' requires ' + AGES[def.age]);
   if (direction !== 'sell' && direction !== 'buy') return toast(Game, 'Unknown trade direction ' + direction);
   if (['food', 'wood', 'stone'].indexOf(res) < 0) return toast(Game, 'Cannot trade ' + res);
   const lot = direction === 'sell' ? { [res]: 100 } : { gold: def.trade.buy };
@@ -264,15 +264,15 @@ function trade(Game, b, res, direction) {
 }
 
 function upgradeAge(Game) {
-  if (Game.age >= AGES.length - 1) return toast(Game, 'Imperial Age reached');
-  const cost = { food: Game.age === 0 ? CFG.AGE_FOOD : CFG.AGE_FOOD * 2 };
+  if (Game.age[0] >= AGES.length - 1) return toast(Game, 'Imperial Age reached');
+  const cost = { food: Game.age[0] === 0 ? CFG.AGE_FOOD : CFG.AGE_FOOD * 2 };
   if (!canAfford(Game, 0, cost)) return toast(Game, 'Need ' + cost.food + ' food');
   spend(Game, 0, cost);
-  Game.age++;
-  Game.ageBonus = Game.age;
+  Game.age[0]++;                             // the player's own age (docs/TODO.md P1-11)
+  Game.ageBonus[0] = Game.age[0];            // and only the player's attack/armour scaling
   playSfx(Game, 'age');
   markDirty(Game);                         // the age up is a change
-  toast(Game, AGES[Game.age] + ' reached');
+  toast(Game, AGES[Game.age[0]] + ' reached');
 }
 
 /* ------------------------------- toast --------------------------------- */

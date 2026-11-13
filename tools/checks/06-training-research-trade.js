@@ -108,8 +108,8 @@ check(!!arUnit && arUnit.hp === 30 && arUnit.maxHp === 30 && arUnit.atk === 4 &&
 
 /* ---- 8b. research (2026-11-12 blacksmith tech tree, T4) -------------- */
 /* The blacksmith's one-slot research on its own fresh state: the Dark Age
- * refusal, a Feudal Forge that spends exactly its cost, lands in Game.techs
- * and raises the militia, the duplicate and busy-slot refusals through to a
+ * refusal, a Feudal Forge that spends exactly its cost, lands in team 0's tech
+ * set and raises the militia, the duplicate and busy-slot refusals through to a
  * finished Fletching cycle on the archer line, and the wrong building. */
 const rbSt = AoE2.createState();
 rbSt.res[0] = { food: 500, wood: 400, gold: 200, stone: 50 }; // START holds 118 food; Forge costs 150
@@ -127,7 +127,7 @@ check(!rbAge.err && rbAge.after === rbAge.before && rbAge.msg === 'Forge require
   'research: research before the tech\'s age is refused',
   rbAge.err ? 'researchTech threw ' + rbAge.err
     : rbAge.msg + ' / res ' + (rbAge.after === rbAge.before ? 'untouched' : 'touched'));
-rbSt.age = 1; // the tech's age; ageBonus stays 0 so unitAttack reads table + tech exactly
+rbSt.age[0] = 1; // the tech's age; ageBonus[0] stays 0 so unitAttack reads table + tech exactly
 const rbGo = rbTry(rbB, 'forge');
 const rbGoExp = JSON.stringify(Object.assign(JSON.parse(rbGo.before),
   { food: JSON.parse(rbGo.before).food - AoE2.TECHS.forge.cost.food }));
@@ -137,10 +137,10 @@ check(!rbGo.err && rbGo.after === rbGoExp && !!rbB && !!rbB.research &&
   rbGo.err ? 'researchTech threw ' + rbGo.err
     : 'res ' + rbGo.after + ' want ' + rbGoExp + ', slot ' + JSON.stringify(rbB && rbB.research));
 for (let i = 0; i < Math.ceil(AoE2.TECHS.forge.time / DT) + 2; i++) AoE2.stepSim(rbSt, DT);
-check(rbSt.techs.has('forge') && rbB.research === null && rbSt.toastMsg === 'Forge researched' &&
+check(rbSt.techs[0].has('forge') && rbB.research === null && rbSt.toastMsg === 'Forge researched' &&
   AoE2.unitAttack(rbSt, rbMil) === AoE2.KINDS.militia.atk + AoE2.TECHS.forge.atk.melee,
   'research: finishing Forge lands it in Game.techs and clears the slot',
-  'techs [' + [...rbSt.techs].join(',') + '] slot ' + JSON.stringify(rbB.research) +
+  'techs [' + [...rbSt.techs[0]].join(',') + '] slot ' + JSON.stringify(rbB.research) +
   ' toast ' + rbSt.toastMsg);
 const rbDup = rbTry(rbB, 'forge');
 check(!rbDup.err && rbDup.msg === 'Forge already researched' && rbDup.after === rbDup.before,
@@ -156,7 +156,7 @@ const rbBusy = rbTry(rbB, 'bracer');
 for (let i = 0; i < Math.ceil(AoE2.TECHS.fletching.time / DT) + 2; i++) AoE2.stepSim(rbSt, DT);
 check(!rbFly.err && rbFly.after === rbFlyExp && rbFlySlot === 'fletching' &&
   !rbBusy.err && rbBusy.msg === 'Blacksmith is busy' && rbBusy.after === rbBusy.before &&
-  rbSt.techs.has('fletching') && rbB.research === null &&
+  rbSt.techs[0].has('fletching') && rbB.research === null &&
   AoE2.unitAttack(rbSt, rbArc) === AoE2.KINDS.archer.atk + AoE2.TECHS.fletching.atk.pierce,
   'research: one research at a time',
   'fletching slot ' + rbFlySlot + ', busy: ' + rbBusy.msg + ' -> landed, archer atk '
@@ -177,7 +177,7 @@ check(!rbWrong.err && rbWrong.msg === 'Barracks cannot research Forge' && rbWron
    slip through, and the command itself is asserted to return the building. */
 const marketAt = (age, built) => {
   const st = AoE2.createState();
-  st.age = age;
+  st.age[0] = age;
   st.res[0] = { food: 300, wood: 300, gold: 100, stone: 300 };
   const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
   const s = v && freeSpotAround(st.world, st, tOf(v.x), tOf(v.y),

@@ -41,7 +41,7 @@
     "PROJ_SPEED": 176,
     "ASTAR_MAX_NODES": 4000,
     "RES": { "tree": 60, "gold": 800, "stone": 450, "berry": 150 },
-    "VERSION": 1,
+    "VERSION": 2,
     "AUTOSAVE_DEBOUNCE": 2, "AUTOSAVE_EVERY": 30
   },
   "cfgNotes": {

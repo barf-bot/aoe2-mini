@@ -304,12 +304,12 @@ soundCheck("sound: reaching the next age plays the age row's note, a refusal doe
     AoE2.upgradeAge(g);
     const paid = voicesOf(Ctor);
     const stuck = AoE2.createState();
-    stuck.age = AoE2.AGES.length - 1;                // Imperial: nothing to research or pay
+    stuck.age[0] = AoE2.AGES.length - 1;           // Imperial: nothing to research or pay
     stuck.frame = 1;
     AoE2.upgradeAge(stuck);
     const refused = voicesOf(Ctor);
     return [paid.length === 1 && JSON.stringify(paid[0]) === JSON.stringify(want) &&
-      stuck.age === AoE2.AGES.length - 1 && stuck.toastMsg === 'Imperial Age reached' &&
+      stuck.age[0] === AoE2.AGES.length - 1 && stuck.toastMsg === 'Imperial Age reached' &&
       refused.length === 1,
       'upgrade=' + JSON.stringify(paid) + ' refusal toast=' + JSON.stringify(stuck.toastMsg) +
       ' voicesAfterRefusal=' + refused.length];

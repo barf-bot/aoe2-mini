@@ -186,12 +186,18 @@ check(!!tp && tp.t === foe7 && tp.team === 0 &&
 const mCall = (fn, ...args) => { try { return { v: fn(...args) }; } catch (e) { return { err: String((e && e.message) || e) }; } };
 const mkMath = (ageBonus, techs) => {
   const st = AoE2.createState();
-  st.ageBonus = ageBonus;
   let err = '';
-  try { for (const id of techs) st.techs.add(id); } catch (e) { err = String((e && e.message) || e); }
+  /* age / ageBonus / techs are per team (docs/TODO.md P1-11): the arrays are
+     [player, enemy], so these writes arm team 0 only. A state still carrying the
+     old global scalars throws here instead of passing, and `foe` — a red militia
+     next to the red villagers — is what proves the player's bonuses stop there. */
+  try { st.age[0] = st.ageBonus[0] = ageBonus; for (const id of techs) st.techs[0].add(id); }
+  catch (e) { err = String((e && e.message) || e); }
   const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  const f = st.units.find((u) => u.team === 1 && u.kind === 'villager');
   return { err, st, mil: AoE2.makeUnit(st, 'militia', 0, v.x + 2, v.y),
-    arc: AoE2.makeUnit(st, 'archer', 0, v.x + 4, v.y) };
+    arc: AoE2.makeUnit(st, 'archer', 0, v.x + 4, v.y),
+    foe: f && AoE2.makeUnit(st, 'militia', 1, f.x + 2, f.y) };
 };
 const mxD = mkMath(0, []);
 const dAtk = mxD.err ? { err: mxD.err } : mCall(AoE2.unitAttack, mxD.st, mxD.mil);
@@ -203,6 +209,13 @@ const sAtk = s2.err ? { err: s2.err } : mCall(AoE2.unitAttack, s2.st, s2.mil);
 check(!sAtk.err && sAtk.v === 4 * 1.5 + 1,
   'math: the age multiplier and a Forge bonus stack in one number',
   sAtk.err ? 'unitAttack threw ' + sAtk.err : sAtk.v + ' want 4 * 1.5 + 1');
+/* The P1-11 reproduction: a player at Castle Age with Forge (ageBonus 2, forge in
+   team 0's set) used to raise the enemy's militia from 4 to 7 as well. */
+const sFoe = s2.err ? { err: s2.err } : mCall(AoE2.unitAttack, s2.st, s2.foe);
+check(!sFoe.err && sFoe.v === AoE2.KINDS.militia.atk,
+  'math: the player\'s age and Forge do not arm an enemy militia',
+  sFoe.err ? 'unitAttack threw ' + sFoe.err
+    : 'enemy militia ' + sFoe.v + ' want ' + AoE2.KINDS.militia.atk + ' (player ' + sAtk.v + ')');
 const mxG = mkMath(0, ['forge']);
 const gMil = mxG.err ? { err: mxG.err } : mCall(AoE2.unitAttack, mxG.st, mxG.mil);
 const gArc = mxG.err ? { err: mxG.err } : mCall(AoE2.unitAttack, mxG.st, mxG.arc);
@@ -231,6 +244,12 @@ check(!smMil.err && !brArc.err &&
   'math: Scale Mail raises the melee line\'s armour and Bracer the archer line\'s',
   smMil.err ? 'unitArmor threw ' + smMil.err
     : 'militia melee ' + smMil.v + ', archer pierce ' + smArc.v + '/' + brArc.v);
+const smFoe = sm0.err ? { err: sm0.err } : mCall(AoE2.unitArmor, sm0.st, sm0.foe, 'melee');
+check(!smFoe.err && smFoe.v === AoE2.KINDS.militia.meleeArmor,
+  'math: the player\'s Scale Mail does not armour an enemy militia',
+  smFoe.err ? 'unitArmor threw ' + smFoe.err
+    : 'enemy militia ' + smFoe.v + ' want ' + AoE2.KINDS.militia.meleeArmor +
+      ' (own militia ' + smMil.v + ')');
 const hR = (() => {
   const f = mkMath(0, []);
   if (f.err) return { err: f.err };
@@ -301,7 +320,7 @@ const twFoe = twNear &&
 if (twNear) AoE2.stepSim(twNear.st, DT);
 const twArrow = twNear && twNear.st.projectiles[0];
 check(!!twArrow && twNear.st.projectiles.length === 1 && twArrow.team === 0 && twArrow.t === twFoe &&
-      twArrow.dmg === AoE2.BLD.watch_tower.attack * (1 + 0.25 * twNear.st.ageBonus) &&
+      twArrow.dmg === AoE2.BLD.watch_tower.attack * (1 + 0.25 * twNear.st.ageBonus[0]) &&
       twArrow.accuracy === AoE2.BLD.watch_tower.accuracy &&
       twNear.tw.cd === AoE2.BLD.watch_tower.reload,
   'tower: a built Watch Tower shoots the nearest enemy inside its line of sight',

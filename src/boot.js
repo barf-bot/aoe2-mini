@@ -42,7 +42,7 @@ function createState() {
     res: [{ food: 0, wood: 0, gold: 0, stone: 0 }, { food: 0, wood: 0, gold: 0, stone: 0 }],
     selection: [], selectedBuilding: null, groups: {}, keys: {},
     cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, placing: null,
-    time: 0, wave: 0, age: 0, ageBonus: 0, techs: new Set(), nextId: 1, started: false, result: null, rnd: mulberry32(CFG.SEED),
+    time: 0, wave: 0, age: [0, 0], ageBonus: [0, 0], techs: [new Set(), new Set()], nextId: 1, started: false, result: null, rnd: mulberry32(CFG.SEED),
     mapEpoch: 0, pathQueries: 0, // walkable-set epoch + findPath budget, both section-4 path state
     dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0, autosaveAt: 0, sound: null,
   };
@@ -57,7 +57,7 @@ function resetGame(Game) {
   Game.projectiles = [];
   Game.buildings = [];
   Game.nextId = 1;
-  Game.time = 0; Game.wave = 0; Game.age = 0; Game.ageBonus = 0; Game.techs = new Set(); Game.rnd = mulberry32(CFG.SEED);
+  Game.time = 0; Game.wave = 0; Game.age = [0, 0]; Game.ageBonus = [0, 0]; Game.techs = [new Set(), new Set()]; Game.rnd = mulberry32(CFG.SEED);
   Game.autosaveAt = Game.time;             // due now: the next frame writes this settlement
   Game.mapEpoch = 0; Game.pathQueries = 0; // section-4 path state: fresh map, no cached routes
   Game.selection = []; Game.selectedBuilding = null; Game.placing = null; Game.result = null;

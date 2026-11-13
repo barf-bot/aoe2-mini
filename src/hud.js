@@ -21,7 +21,7 @@ function renderHud(Game) {
   setText(d.set_gold, String(Math.floor(Game.res[0].gold)));
   setText(d.set_stone, String(Math.floor(Game.res[0].stone)));
   setText(d.set_pop, popUsed(Game, 0) + '/' + popCap(Game, 0));
-  setText(d.set_age, AGES[Game.age]);
+  setText(d.set_age, AGES[Game.age[0]]);
   if (d.hud) {                                            /* one write for the whole frame */
     if (d.hud.setAttribute) d.hud.setAttribute('data-state', hudState(Game));
     setHTML('hudLast', d.hud, hudHtml(Game));
@@ -93,7 +93,7 @@ function infoHtml(Game) {
   }
   const b = Game.selectedBuilding;
   if (b) {
-    const ups = Object.keys(TECHS).filter(id => TECHS[id].building === b.kind && Game.techs.has(id))
+    const ups = Object.keys(TECHS).filter(id => TECHS[id].building === b.kind && Game.techs[b.team].has(id))
       .map(id => TECHS[id].label);
     return shell(BLD[b.kind].label, 'HP ' + Math.ceil(b.hp) + '/' + b.maxHp +
       (b.field ? '<br>Field: ' + Math.ceil(b.field) : '') +
@@ -115,7 +115,7 @@ function commandsHtml(Game) {
     }
     for (const id in TECHS) {                        // research buttons for this building
       const t = TECHS[id];
-      if (t.building !== b.kind || Game.techs.has(id)) continue;
+      if (t.building !== b.kind || Game.techs[b.team].has(id)) continue;
       out.push('<button data-act="research" data-arg="' + id + '"' +
         (!canAfford(Game, b.team, t.cost) || b.research ? ' disabled' : '') + '>' +
         t.label + '<span class="c">' + fmtCost(t.cost) + '</span></button>');
@@ -142,17 +142,17 @@ function commandsHtml(Game) {
     for (const k in BLD) {
       if (k === 'town_center') continue;
       const def = BLD[k];
-      if ((def.age ?? 0) > Game.age) continue;   // age-locked kinds are not offered at all
+      if ((def.age ?? 0) > Game.age[0]) continue;   // age-locked kinds are not offered at all
       out.push('<button data-act="build" data-arg="' + k + '"' +
         (Game.placing === k ? ' class="armed"' : '') +
         (canAfford(Game, 0, def.cost) ? '' : ' disabled') + '>' +
         def.label + '<span class="c">' + fmtCost(def.cost) + '</span></button>');
     }
   }
-  if (!sel.length && !b && Game.age < AGES.length - 1) {
-    const cost = Game.age === 0 ? CFG.AGE_FOOD : CFG.AGE_FOOD * 2;
+  if (!sel.length && !b && Game.age[0] < AGES.length - 1) {
+    const cost = Game.age[0] === 0 ? CFG.AGE_FOOD : CFG.AGE_FOOD * 2;
     out.push('<button data-act="age"' + (canAfford(Game, 0, { food: cost }) ? '' : ' disabled') + '>' +
-      AGES[Game.age + 1] + '<span class="c">' + cost + ' food</span></button>');
+      AGES[Game.age[0] + 1] + '<span class="c">' + cost + ' food</span></button>');
     out.push('<button data-act="restart">New map</button>');
   }
   return out.join('') || '<div class="hint">No commands</div>';

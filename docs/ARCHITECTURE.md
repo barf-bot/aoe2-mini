@@ -52,7 +52,7 @@ function — no hidden globals, which is what makes the logic testable from node
 
 ```
 Game = { world, units[], buildings[], projectiles[], blocks(Map buildingId -> tiles), sprites{atlas},
-         res[2], age, ageBonus, techs(Set of researched tech ids), rnd(mulberry32(CFG.SEED)), cam{x,y}, keys, mouse, drag, selection[],
+         res[2], age[2], ageBonus[2], techs[2](per-team Sets of researched tech ids), rnd(mulberry32(CFG.SEED)), cam{x,y}, keys, mouse, drag, selection[],
          selectedBuilding, groups{}, placing, started, wave, time, frame, autosaveAt(next autosave write),
          mapEpoch(route cache epoch), pathQueries(findPath calls),
          result('victory' | 'defeat' | null), dom{...}, view, minimapCache, sound }
@@ -129,12 +129,14 @@ the ranks that replaced the golden-angle `spread`.
 
 Damage math lives in one place — the `combat math` sub-block (`unitAttack`,
 `src/sim.js:55`; `unitArmor`, `src/sim.js:69`): a unit's attack is the row's
-`KINDS[kind].atk` times the age multiplier `1 + 0.25 * ageBonus` (`ageBonus` is the age
-index, set on upgrade — 1× at Dark Age, so 7 militia swings (7×4) fell a 25 hp villager)
-plus every researched tech's attack for the damage class (melee for a swing, pierce for
-an arrow or a ranged unit); a built shooter uses `BLD[kind].attack` and gets no unit
-tech. The defender's armour is the row's `meleeArmor`/`pierceArmor` plus the techs' flat
-armour of that class, and `hitUnit` (`src/sim.js:81`) lands `max(1, attack − armour)` —
+`KINDS[kind].atk` times the age multiplier `1 + 0.25 * ageBonus[team]` — the age and its
+bonus belong to the attacker's own team (docs/TODO.md P1-11: team 1's half is 0 until the
+AI can research, so the player's Castle Age and Forge never arm the units shooting at
+them) — 1× at Dark Age, so 7 militia swings (7×4) fell a 25 hp villager, plus that
+team's researched techs' attack for the damage class (melee for a swing, pierce for an
+arrow or a ranged unit); a built shooter uses `BLD[kind].attack` and gets no unit tech.
+The defender's armour is the row's `meleeArmor`/`pierceArmor` plus its own team's techs'
+flat armour of that class, and `hitUnit` (`src/sim.js:81`) lands `max(1, attack − armour)` —
 armour softens a hit but never absorbs it below 1. Attackers only damage the target
 they're ordered to attack — a unit (`hitUnit`) or a building (`hitBuilding`,
 `src/sim.js:156`, which razes it at 0 hp via `removeBuilding`, `src/entities.js:124` — the one
@@ -156,16 +158,17 @@ the same way from `stepBuildingAttacks` (`src/sim.js:136`).
 schema — the field list the harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:22`) —
 `saveGame(path, Game, at = now())` (`src/save.js:123`) serialises `{ version, seed, writtenAt,
 state }` and hands the string to `storageSet` (`src/save.js:18`), and
-`loadGame(path, Game, raw = storageGet(path))` (`src/save.js:242`) reads the slot back. The
+`loadGame(path, Game, raw = storageGet(path))` (`src/save.js:252`) reads the slot back. The
 shipped signature is that three-argument one rather than the design's `loadGame(path, raw)`: the
 target `Game` sits in the middle so a test — or `boot` (`src/boot.js:138`) opening the page — can
-load a slot into a game that already exists. `migrate` (`src/save.js:137`) and `validState`
-(`src/save.js:145`) gate the payload (the version, then the shape) and every refusal ends in
-`resetGame(Game); return false`; `decodeState` (`src/save.js:193`) then restores in dependency
+load a slot into a game that already exists. `migrate` (`src/save.js:137`) — it takes v2 and
+converts a v1 payload's global `age` / `ageBonus` / `techs` into the per-team pair — and
+`validState` (`src/save.js:152`) gate the payload (the version, then the shape); every refusal
+ends in `resetGame(Game); return false`; `decodeState` (`src/save.js:203`) then restores in dependency
 order — world → buildings → `blocks` + `rebuildBlocks` (`src/entities.js:102`) → `mapEpoch++` → units
 (with `order.src` rebuilt through `sourceFromTile` (`src/entities.js:16`) / `sourceFromFarm`,
-`src/entities.js:29`) → projectiles (`t` relinked by `decodeProjectile`, `src/save.js:180`) → the
-id-only fields → `techs` (a `Set`) and `rnd` (rebuilt from the envelope's seed). The schedule is
+`src/entities.js:29`) → projectiles (`t` relinked by `decodeProjectile`, `src/save.js:190`) → the
+id-only fields → `techs` (the per-team pair of Sets) and `rnd` (rebuilt from the envelope's seed). The schedule is
 `markDirty(Game)` (`src/save.js:113`) — pull `Game.autosaveAt` earlier, never later — and
 `stepGame` after `stepSim` (`src/boot.js:233-235`) is the only writer, so the write carries the
 frame it just ran and `stepSim` itself never touches storage. The ruleset is in

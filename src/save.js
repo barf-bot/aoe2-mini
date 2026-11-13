@@ -96,9 +96,9 @@ function encodeState(Game) {
     placing: Game.placing,
     time: Game.time,
     wave: Game.wave,
-    age: Game.age,
-    ageBonus: Game.ageBonus,
-    techs: Array.from(Game.techs),
+    age: Game.age,                     // [player, enemy] — per team since docs/TODO.md P1-11
+    ageBonus: Game.ageBonus,           // ditto: the age scaling each team's units read
+    techs: [Array.from(Game.techs[0]), Array.from(Game.techs[1])],
     nextId: Game.nextId,
     started: Game.started,
     result: Game.result,
@@ -131,11 +131,18 @@ function saveGame(path, Game, at = now()) {
   return raw;
 }
 
-/* The version hook: a v1 reader takes v1 and nothing else. When CFG.VERSION moves
-   to 2, the conversion of an old payload happens here instead of the save being
-   thrown away. */
+/* The version hook: v2 (age / ageBonus / techs per team, docs/TODO.md P1-11) is what this
+   build writes; a v1 payload — one global age, ageBonus and techs set — converts here into
+   the player's half, the enemy's staying 0 and empty, instead of the save being thrown away. */
 function migrate(payload) {
-  return payload && payload.version === CFG.VERSION ? payload : null;
+  if (!payload || typeof payload !== 'object') return null;
+  if (payload.version === CFG.VERSION) return payload;
+  if (payload.version !== 1) return null;   // v1 is the only older shape there is
+  const s = payload.state;
+  if (!s || typeof s !== 'object' || Array.isArray(s) || typeof s.age !== 'number' ||
+      typeof s.ageBonus !== 'number' || !Array.isArray(s.techs)) return null;
+  return Object.assign({}, payload, { state: Object.assign({}, s,
+    { age: [s.age, 0], ageBonus: [s.ageBonus, 0], techs: [s.techs, []] }) });
 }
 
 /* Everything decodeState needs, checked before a single field is assigned: the
@@ -150,7 +157,10 @@ function validState(payload) {
       w.seed !== payload.seed || !Array.isArray(w.type) || !Array.isArray(w.shade) ||
       !Array.isArray(w.amount)) return false;
   if (!Array.isArray(s.units) || !Array.isArray(s.buildings) ||
-      !Array.isArray(s.projectiles) || !Array.isArray(s.techs)) return false;
+      !Array.isArray(s.projectiles) || !Array.isArray(s.age) || s.age.length !== 2 ||
+      !Array.isArray(s.ageBonus) || s.ageBonus.length !== 2 ||
+      !Array.isArray(s.techs) || s.techs.length !== 2 ||
+      !Array.isArray(s.techs[0]) || !Array.isArray(s.techs[1])) return false;
   if (!Array.isArray(s.res) || s.res.length !== 2 ||
       s.res.some((r) => !r || typeof r !== 'object' || Array.isArray(r))) return false;
   if (!s.blocks || typeof s.blocks !== 'object' || Array.isArray(s.blocks)) return false;
@@ -230,7 +240,7 @@ function decodeState(Game, state, seed) {
   Game.nextId = state.nextId;
   Game.started = state.started;
   Game.result = state.result;
-  Game.techs = new Set(state.techs);
+  Game.techs = [new Set(state.techs[0]), new Set(state.techs[1])];
   Game.rnd = mulberry32(seed);            // the envelope's seed is the only way back to the closure
 }
 

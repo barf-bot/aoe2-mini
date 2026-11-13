@@ -90,8 +90,8 @@ check(popAtCap && !popRoom && !popOne && popMax,
 
 Game.res[0].food = 900;
 AoE2.upgradeAge(Game);
-check(Game.age === 1 && Game.res[0].food === 400, 'age: Feudal Age costs 500 food', 'age=' + Game.age + ' food=' + Game.res[0].food);
-check(AoE2.AGES[Game.age] === 'Feudal Age', 'age: label follows the age', AoE2.AGES[Game.age]);
+check(Game.age[0] === 1 && Game.res[0].food === 400, 'age: Feudal Age costs 500 food', 'age=' + Game.age[0] + ' food=' + Game.res[0].food);
+check(AoE2.AGES[Game.age[0]] === 'Feudal Age', 'age: label follows the age', AoE2.AGES[Game.age[0]]);
 check(AoE2.upgradeAge(Game) === undefined && Game.res[0].food === 400 || true, 'age: Castle Age needs 1000 food',
   JSON.stringify(Game.toastMsg));
 // T1: the gate in the command bar -- paired states like the half/done checks
@@ -119,9 +119,9 @@ Game.selectedBuilding = { kind: 'blacksmith', team: 0, built: 1, hp: 1800, maxHp
 const bsB = Game.selectedBuilding;
 const bsCmd = (() => {
   const plain = AoE2.commandsHtml(Game);
-  Game.techs.add('forge');
+  Game.techs[0].add('forge');
   const withForge = AoE2.commandsHtml(Game);
-  Game.techs.delete('forge');
+  Game.techs[0].delete('forge');
   return { plain, withForge };
 })();
 check(bsCmd.plain.includes('data-act="research" data-arg="forge"') &&

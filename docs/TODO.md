@@ -25,18 +25,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P1 — wrong behaviour you notice within a minute
 
-### 11. The player's age and Blacksmith upgrades also strengthen the enemy
-
-**Verified.** An enemy militia's attack goes from 4 to 7 when the *player* reaches Castle
-Age and researches Forge.
-
-- **Cause:** `Game.age`, `Game.ageBonus` and `Game.techs` are global; `unitAttack` and
-  `unitArmor` in `src/sim.js` apply them to any unit.
-- **Fix:** make them per team (`Game.age[team]`, `Game.techs[team]`) or apply them only
-  when `u.team === 0` until the AI can research. This changes the save payload: bump
-  `VERSION` in `data/units.json` and handle the old shape in `migrate` (`src/save.js`).
-- **Done when:** the reproduction above leaves the enemy's attack at 4.
-
 ---
 
 ## P2 — smaller defects
