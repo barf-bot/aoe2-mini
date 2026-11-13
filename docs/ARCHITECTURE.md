@@ -145,7 +145,7 @@ the same way from `stepBuildingAttacks` (`src/sim.js:136`).
 ### Save / load (`saveGame`, `src/save.js:123`)
 
 `src/save.js` owns the whole contract. `encodeState` (`src/save.js:77`) is the single owner of the
-schema — the field list the harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:19`) —
+schema — the field list the harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:22`) —
 `saveGame(path, Game, at = now())` (`src/save.js:123`) serialises `{ version, seed, writtenAt,
 state }` and hands the string to `storageSet` (`src/save.js:18`), and
 `loadGame(path, Game, raw = storageGet(path))` (`src/save.js:242`) reads the slot back. The
@@ -223,14 +223,17 @@ executes exactly what the browser does, in the same order, and stack traces poin
 `loadGame({ isolated: true })` runs them in a fresh empty context, which is how the two
 generators read the tables without a DOM.
 
-- `tools/headless-check.js` — the runner for `tools/checks/`. The check files are fragments
-  of **one sequential script**: they run in name order, compiled as one function, and share
-  one booted `Game`, so a later file sees the consts and the mutated state of the earlier
-  ones (they are split by topic, not isolated — do not reorder them). `00-harness.js`
-  installs a stub `document`/`window` (elements with `textContent`/`innerHTML` accessors,
-  cached per id, `fire()` to dispatch events, a Proxy 2D context that swallows every draw
-  call), boots the game, and the eleven files after it assert 278 invariants. It never
-  opens a browser. Node has no `Image`, so the harness defines one (§2b) whose `src` setter
+- `tools/headless-check.js` — the runner for `tools/checks/`: it starts every check file
+  in its own node process, in parallel, and adds up the results (a file that crashes
+  before reporting counts as a failure, never as zero checks). Each check file requires
+  `tools/lib/harness.js`, which installs a stub `document`/`window` (elements with
+  `textContent`/`innerHTML` accessors, cached per id, `fire()` to dispatch events, a Proxy
+  2D context that swallows every draw call), boots the game and exports the booted `Game`,
+  the `AoE2` surface, `check`/`report` and the fixtures more than one file needs. So every
+  file gets a fresh game, the files are **independent** — order does not matter and
+  `node tools/checks/07-combat.js` runs one alone — and together they assert 282
+  invariants. It never opens a browser. Node has no `Image`, so the harness defines one
+  (§2b) whose `src` setter
   decodes the real sheet — caveat measured on `@napi-rs/canvas` 1.1.0: an `Image` built
   that way reports the right size but paints nothing, so this stub proves the loading
   *wiring* while `render-preview.js` renders from a properly decoded image.

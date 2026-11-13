@@ -122,10 +122,9 @@ frames, the archer line, ranged combat, win/lose, docs). Left over on purpose:
 
 ## Process items (not features)
 
-- **Make the checks independent.** They are split by topic (`tools/checks/`) but still one
-  sequential script sharing a booted `Game`; giving each file its own fresh state would let
-  one area run alone and stop an early failure from cascading.
-- **Automate verification on push**: a Pages deploy action that runs
-  `node tools/headless-check.js` before publishing, so a red suite can't ship.
+- **Gate the deploy on CI**: `.github/workflows/check.yml` runs the suite on every push, but
+  Pages still publishes `main` from the branch, so a red run does not stop a deploy. Either
+  protect `main` with the `check` status or switch Pages to deploy from an Actions workflow
+  that needs it.
 - **Decide the repo's home**: currently `barf-bot/aoe2-mini`. Transfer to Barf's own account
   and set up a username Pages site (`dogx.dev`) if this stops being a throwaway.

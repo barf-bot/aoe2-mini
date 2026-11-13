@@ -1,15 +1,21 @@
 'use strict';
-/* checks/00-harness.js -- the harness: result bookkeeping, the stub DOM / storage / Image / AudioContext, then load + boot.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+/* harness.js -- what every file in tools/checks/ starts from.
+
+   Requiring this module installs a stub DOM (document / window / localStorage /
+   Image) on `global`, loads the game through load-game.js -- which boots it
+   against those stubs -- and exports the booted `Game`, the `AoE2` surface, the
+   check bookkeeping (check / ok / bad / report) and the fixtures more than one
+   check file needs. Each check file runs in its own process, so each one gets
+   its own freshly booted Game: nothing a file does can leak into another. */
 
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const gameLoader = require(path.join(TOOLS_DIR, 'lib', 'load-game.js'));
+const gameLoader = require('./load-game.js');
 
-const HTML = process.argv[2] || path.join(TOOLS_DIR, '..', 'index.html');
+const TOOLS_DIR = path.join(__dirname, '..');
+
+const HTML = path.join(TOOLS_DIR, '..', 'index.html');
 const html = fs.readFileSync(HTML, 'utf8');   // the markup
 const SCRIPT_FILES = gameLoader.scriptFiles(HTML);   // the <script src> list, in load order
 const scriptSrc = gameLoader.scriptSource(HTML);     // every game script, concatenated
@@ -33,12 +39,6 @@ function report() {
   process.exit(fails.length ? 1 : 0);
 }
 function pad(s, n) { return s.length >= n ? s : s + ' '.repeat(n - s.length); }
-
-/* ---- 1. syntax ------------------------------------------------------- */
-const syntax = cp.spawnSync(process.execPath, SCRIPT_FILES.reduce((a, f) => a.concat('--check', f), []), { encoding: 'utf8' });
-check(syntax.status === 0, 'syntax: node --check on every game script',
-  syntax.status === 0 ? SCRIPT_FILES.length + ' files clean' : (syntax.stderr || '').trim().split('\n').slice(0, 5).join(' | '));
-if (syntax.status !== 0) report();
 
 /* ---- 2. stub DOM ------------------------------------------------------ */
 function stubCtx(canvas) {
@@ -213,13 +213,114 @@ const voicesOf = (Ctor) => Ctor.instances.reduce((all, c) => all.concat(stubVoic
 
 /* ---- 3. load + boot -------------------------------------------------- */
 const AoE2 = gameLoader.loadGame({ html: HTML });
-check(!!AoE2 && !!AoE2.CFG, 'module: exports the game surface', Object.keys(AoE2 || {}).length + ' exports');
-if (!AoE2 || !AoE2.CFG) report();
-check(!!global.window.Game, 'boot: window.Game built from the stub DOM', global.window.Game ? 'booted' : 'no Game');
-const Game = global.window.Game;
-if (!Game || !Game.world) report();
+const Game = global.window.Game;          // undefined when the boot failed: 00-boot.js reports that
 
-check(Game.view && Game.view.ok, 'render: canvas context acquired', Game.view && Game.view.ok ? 'ok' : 'failed');
-check(Game.dom.set_food !== undefined, 'hud: <b> nodes wired so labels survive a render', 'set_food present');
-check(rafQueue.length === 1, 'loop: exactly one requestAnimationFrame queued', String(rafQueue.length));
-check(Game.frame === 0, 'loop: boot rendered without recursing into the frame loop', 'frame=' + Game.frame);
+/* ---- 4. fixtures shared by more than one check file ------------------- */
+const DT = 1 / 30;
+const tc = Game && Game.buildings.find(b => b.team === 0 && b.kind === 'town_center');
+const blueVill = () => Game.units.filter(u => u.team === 0 && u.kind === 'villager');
+const stepRender = (n) => {
+  for (let i = 0; i < n; i++) { AoE2.stepGame(Game, DT); if (i % 15 === 0) AoE2.renderFrame(Game); }
+};
+const DIRS8H = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+/* A fresh state with every tile turned to plain grass and every unit idle: the
+   only resource tiles in the world are the ones a check places. The Town
+   Centers, the occupancy set and the 4 villagers keep their seeded positions,
+   which keeps the fixtures honest about movement while removing every other
+   source a retarget could secretly fall back to. */
+const tIdx = (st, x, y) => y * st.world.w + x;
+const setTile = (st, x, y, type, amount) => { st.world.type[tIdx(st, x, y)] = type; st.world.amount[tIdx(st, x, y)] = amount; };
+const tileCentre = (st, x, y) => ({ x: x * AoE2.CFG.TILE + AoE2.CFG.TILE / 2, y: y * AoE2.CFG.TILE + AoE2.CFG.TILE / 2 });
+function flatState() {
+  const st = AoE2.createState();
+  for (let i = 0; i < st.world.type.length; i++) { st.world.type[i] = AoE2.T.GRASS; st.world.amount[i] = 0; }
+  for (const u of st.units) u.order = { kind: 'idle' };
+  return st;
+}
+
+// The solidity rule, written here independently of the game so the harness cannot
+// agree with a wrong implementation: a tile blocks movement when it is water, a
+// resource tile with stock (amount > 0), or a tile any building covers (an
+// unbuilt foundation counts, exactly like the Game.occupied set the game keeps).
+const tOf = (v) => Math.floor(v / AoE2.CFG.TILE);
+const solidTile = (g, tx, ty) => {
+  if (tx < 0 || ty < 0 || tx >= g.world.w || ty >= g.world.h) return 'off-map';
+  const i = ty * g.world.w + tx;
+  if (g.world.type[i] === AoE2.T.WATER) return 'water';
+  if (AoE2.RES_OF_TILE[g.world.type[i]] && g.world.amount[i] > 0) return 'resource';
+  if (g.occupied.has(i)) return 'building';
+  return null;
+};
+
+function freeSpotAround(world, Game, tx, ty, w, h, maxR) {
+  for (let r = 1; r <= maxR; r++) {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      if (AoE2.siteFree(Game, tx + dx, ty + dy, w, h)) return { tx: tx + dx, ty: ty + dy };
+    }
+  }
+  return null;
+}
+
+/** A finished player house dropped beside the Town Center of `g` -- for the checks that
+ *  need one standing (population cap, demolish) without replaying its construction. */
+function finishedHouse(g) {
+  const home = g.buildings.find(b => b.team === 0 && b.kind === 'town_center');
+  const spot = freeSpotAround(g.world, g, home.tx, home.ty, 2, 2, 8);
+  const b = AoE2.makeBuilding(g, 'house', 0, spot.tx, spot.ty);
+  b.built = 1; b.hp = b.maxHp;
+  return b;
+}
+
+/** Run fn against a throwaway localStorage, restoring the real stub after. */
+const withStorage = (fn) => {
+  const keep = global.localStorage;
+  const s = fakeStorage();
+  global.localStorage = s;
+  try { return fn(s); } finally { global.localStorage = keep; }
+};
+/* A settlement with every cost payable and Feudal unlocked, so each command
+   actually commits instead of refusing (a refusal never marks). */
+const fundedGame = () => {
+  const g = AoE2.createState();
+  g.res[0] = { food: 9000, wood: 9000, gold: 9000, stone: 9000 };
+  g.age = 1;
+  return g;
+};
+const builtAt = (g, kind, ty) => {
+  const s = AoE2.findSite(g.world, 40, ty, AoE2.BLD[kind].w) || { tx: 40, ty };
+  const b = AoE2.makeBuilding(g, kind, 0, s.tx, s.ty);
+  b.built = 1; b.hp = b.maxHp;
+  return b;
+};
+const siteAt = (g, kind, ty) => {
+  const s = AoE2.findSite(g.world, 40, ty, AoE2.BLD[kind].w) || { tx: 40, ty };
+  return AoE2.makeBuilding(g, kind, 0, s.tx, s.ty);
+};
+/** A check whose body returns [passed, detail]; a throw is a failure, not a crash. */
+const uiCheck = (name, fn) => {
+  let out;
+  try { out = fn(); } catch (e) { bad(name, 'threw ' + e.message); return; }
+  check(out[0], name, out[1]);
+};
+/** Boot a second, private page: its own doc, its own storage (optionally pre-filled). */
+const bootFixture = (raw, fn, extra) => {
+  const keep = global.localStorage;
+  global.localStorage = fakeStorage();
+  if (raw !== undefined) AoE2.storageSet(AoE2.SAVE_PATH, raw);
+  for (const k of Object.keys(extra || {})) AoE2.storageSet(k, extra[k]);   // e.g. MUTE_PATH
+  const doc = makeDoc();
+  const Game = AoE2.boot(doc);
+  try { return fn(doc, Game); } finally { global.localStorage = keep; }
+};
+
+module.exports = {
+  AoE2, DIMS, DIRS8H, DT, Game, HTML, HTML_DIR, SCRIPT_FILES,
+  TOOLS_DIR, bad, blueVill, bootFixture, builtAt, check, cp, dataBuildings,
+  dataUnits, doc, fakeStorage, finishedHouse, flatState, freeSpotAround, fs, fundedGame, gameLoader,
+  html, makeAudioStub, makeDoc, napiImage, ok, pad, path, rafQueue,
+  report, results, scriptSrc, setTile, siteAt, solidTile, stepRender, stubCtx,
+  stubEl, stubVoices, styleCss, tIdx, tOf, tc, tileCentre, uiCheck,
+  voicesOf, withAudio, withStorage,
+};

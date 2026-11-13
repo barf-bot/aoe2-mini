@@ -1,8 +1,11 @@
 'use strict';
 /* checks/04-pathfinding.js -- A* pathfinding and barricade routing.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/04-pathfinding.js`) against a freshly booted game. */
+
+const {
+  AoE2, DIRS8H, DT, check, flatState, pad, path, setTile, solidTile, tIdx, tOf, tc, tileCentre,
+  report,
+} = require('../lib/harness');
 
 /* ---- 6c. pathfinding (T1: findPath, the A* core) -------------------- */
 // Written before findPath existed, and still graded the §6a way: the harness
@@ -144,7 +147,6 @@ check(!!foundRoute && foundRoute[0].tx === 0 && foundRoute[0].ty === 0 &&
 // and walkOrder(), which steps the sim while the order lives and reports every
 // position he occupied plus how many findPath calls it cost (Game.pathQueries —
 // the plan pins the "re-paths every frame" bug class with a number).
-const DIRS8H = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 /** flatState plus a villager ordered `dist` tiles in `dir` (default: the first
  *  direction with `dist` free tiles in a row). `at` is the ordered point, always
  *  a tile centre, so arriving exactly and arriving on the tile are the same act. */
@@ -623,3 +625,5 @@ check(!!barPocket && barPocket.r1 === null && barPocket.v.order.kind === 'idle' 
     : `ringed: route ${String(barPocket.r1)}, order ${barPocket.v.order.kind} after ${barPocket.w1.n} steps; ` +
       `popped ${barPocket.Vp.x + barPocket.d[0]},${barPocket.Vp.y + barPocket.d[1]}: ` +
       `route ${String(barPocket.r2 && barPocket.r2.length)}, refSteps ${String(barPocket.ref)} + 1`);
+
+report();

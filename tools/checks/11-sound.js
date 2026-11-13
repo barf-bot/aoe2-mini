@@ -1,8 +1,11 @@
 'use strict';
 /* checks/11-sound.js -- the SFX table, the synth path, the mute toggle.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/11-sound.js`) against a freshly booted game. */
+
+const {
+  AoE2, DT, Game, bad, bootFixture, builtAt, check, doc, fundedGame, html, ok, scriptSrc, siteAt,
+  stubVoices, styleCss, tc, uiCheck, voicesOf, withAudio, withStorage, report,
+} = require('../lib/harness');
 
 /* ---- 14. sound (this plan, T1) ------------------------------- */
 /* `SFX` is the sound contract: one row per sound, five fields per row, `fire`
@@ -338,3 +341,5 @@ soundCheck('sound: the result plays its own chord once', () => {
       ' allVoices=' + all.length];
   });
 });
+
+report();

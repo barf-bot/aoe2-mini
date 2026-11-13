@@ -230,7 +230,7 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   `1`; `seed` is `Game.world.seed` falling back to `CFG.SEED`, the only way the excluded `rnd`
   closure is rebuilt; `writtenAt` is the `at` argument, pinned so the same `Game` saved twice
   gives the same bytes; `state` is `encodeState(Game)` (`src/save.js:77`), the schema the
-  harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:19`).
+  harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:22`).
 - **Version rule** — `migrate(payload)` (`src/save.js:137`) accepts a payload only when its
   `version` equals `CFG.VERSION`; when the schema moves to 2 the conversion lives there instead
   of the save being thrown away. `validState(payload)` (`src/save.js:145`) then checks the shape

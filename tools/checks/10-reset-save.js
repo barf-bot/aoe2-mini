@@ -1,8 +1,11 @@
 'use strict';
 /* checks/10-reset-save.js -- new game, save / load.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/10-reset-save.js`) against a freshly booted game. */
+
+const {
+  AoE2, DIRS8H, DT, Game, bad, bootFixture, builtAt, check, dataUnits, doc, fundedGame, ok,
+  siteAt, stepRender, stubEl, tc, uiCheck, withStorage, report,
+} = require('../lib/harness');
 
 /* ---- 12. reset ------------------------------------------------------ */
 const unitsBeforeReset = Game.units.length;
@@ -401,31 +404,6 @@ const autoCheck = (name, fn) => {
   try { out = fn(); } catch (e) { bad(name, 'threw ' + e.message); return; }
   check(out[0], name, out[1]);
 };
-const withStorage = (fn) => {
-  const keep = global.localStorage;
-  const s = fakeStorage();
-  global.localStorage = s;
-  try { return fn(s); } finally { global.localStorage = keep; }
-};
-/* A settlement with every cost payable and Feudal unlocked, so each command
-   below actually commits instead of refusing (a refusal never marks). */
-const fundedGame = () => {
-  const g = AoE2.createState();
-  g.res[0] = { food: 9000, wood: 9000, gold: 9000, stone: 9000 };
-  g.age = 1;
-  return g;
-};
-const builtAt = (g, kind, ty) => {
-  const s = AoE2.findSite(g.world, 40, ty, AoE2.BLD[kind].w) || { tx: 40, ty };
-  const b = AoE2.makeBuilding(g, kind, 0, s.tx, s.ty);
-  b.built = 1; b.hp = b.maxHp;
-  return b;
-};
-const siteAt = (g, kind, ty) => {
-  const s = AoE2.findSite(g.world, 40, ty, AoE2.BLD[kind].w) || { tx: 40, ty };
-  return AoE2.makeBuilding(g, kind, 0, s.tx, s.ty);
-};
-
 autoCheck('autosave: a fresh settlement is saved by the first frame', () => {
   const g = AoE2.createState();
   const startAt = g.autosaveAt;
@@ -541,20 +519,6 @@ autoCheck('autosave: a training that completes marks the game again', () => {
 
 /* The page surface: every check boots its own doc with the slot set up first, so
    the boot path and the button paths are proven on the real markup. */
-const uiCheck = (name, fn) => {
-  let out;
-  try { out = fn(); } catch (e) { bad(name, 'threw ' + e.message); return; }
-  check(out[0], name, out[1]);
-};
-const bootFixture = (raw, fn, extra) => {
-  const keep = global.localStorage;
-  global.localStorage = fakeStorage();
-  if (raw !== undefined) AoE2.storageSet(AoE2.SAVE_PATH, raw);
-  for (const k of Object.keys(extra || {})) AoE2.storageSet(k, extra[k]);   // e.g. MUTE_PATH
-  const doc = makeDoc();
-  const Game = AoE2.boot(doc);
-  try { return fn(doc, Game); } finally { global.localStorage = keep; }
-};
 const savedFixture = (at = 1000) => {
   const g = AoE2.createState();
   g.started = true;                                     // a save always comes from a booted game
@@ -645,3 +609,5 @@ uiCheck('boot: opening the page with an empty slot gives the standard settlement
     ' res0=' + JSON.stringify(Game.res[0]),
   ]);
 });
+
+report();

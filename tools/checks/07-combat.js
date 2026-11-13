@@ -1,8 +1,10 @@
 'use strict';
 /* checks/07-combat.js -- melee, auto-acquire, ranged combat, attack/armour math, game over, towers.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/07-combat.js`) against a freshly booted game. */
+
+const {
+  AoE2, DT, Game, check, freeSpotAround, makeDoc, path, stubEl, tOf, tc, report,
+} = require('../lib/harness');
 
 /* ---- 9. combat ------------------------------------------------------ */
 const foe = Game.units.find(u => u.team === 1 && u.kind === 'villager');
@@ -367,3 +369,5 @@ check(!!rbRaze && !rbRaze.err && rbRaze.v === true && !rb.st.buildings.includes(
       : `removed=${String(rbRaze.v)} selection=${String(rb.st.selectedBuilding)} ` +
         `toast=${rb.st.toastMsg} walkable=${String(AoE2.walkable(rb.st, rb.b.x, rb.b.y))} ` +
         `result=${String(rb.st.result)}`);
+
+report();

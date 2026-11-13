@@ -1,8 +1,10 @@
 'use strict';
 /* checks/08-input.js -- mouse, keyboard, edge-scroll and touch input.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/08-input.js`) against a freshly booted game. */
+
+const {
+  AoE2, DT, Game, blueVill, check, doc, flatState, html, pad, path, tOf, tileCentre, report,
+} = require('../lib/harness');
 
 /* ---- 10. input ------------------------------------------------------ */
 const view = doc.getElementById('view');
@@ -271,3 +273,5 @@ check(slopEdge.afterHold !== slopEdge.before &&        // only the hold branch c
       slopEdge.sel.indexOf(hv.id) >= 0 && slopEdge.drag === null,
   'input: 7 px of drift still commands and 8 px already selects (LONG_PRESS_SLOP)',
   JSON.stringify(slopEdge));
+
+report();

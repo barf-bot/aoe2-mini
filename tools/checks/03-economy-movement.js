@@ -1,29 +1,14 @@
 'use strict';
 /* checks/03-economy-movement.js -- 30 s of simulated play: economy + movement invariants, walkability, facing.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/03-economy-movement.js`) against a freshly booted game. */
+
+const {
+  AoE2, DT, Game, check, pad, solidTile, tOf, tc, report,
+} = require('../lib/harness');
 
 /* ---- 6. simulate 30s: economy + movement invariants ----------------- */
-const DT = 1 / 30;
 const step = (n) => { for (let i = 0; i < n; i++) AoE2.stepGame(Game, DT); };
-const stepRender = (n) => {
-  for (let i = 0; i < n; i++) { AoE2.stepGame(Game, DT); if (i % 15 === 0) AoE2.renderFrame(Game); }
-};
 const food0 = Game.res[0].food;
-// T2 solidity rule, written here independently of the game so the harness cannot
-// agree with a wrong implementation: a tile blocks movement when it is water, a
-// resource tile with stock (amount > 0), or a tile any building covers (an
-// unbuilt foundation counts, exactly like the Game.occupied set the game keeps).
-const tOf = (v) => Math.floor(v / AoE2.CFG.TILE);
-const solidTile = (g, tx, ty) => {
-  if (tx < 0 || ty < 0 || tx >= g.world.w || ty >= g.world.h) return 'off-map';
-  const i = ty * g.world.w + tx;
-  if (g.world.type[i] === AoE2.T.WATER) return 'water';
-  if (AoE2.RES_OF_TILE[g.world.type[i]] && g.world.amount[i] > 0) return 'resource';
-  if (g.occupied.has(i)) return 'building';
-  return null;
-};
 let err = null, solidErr = null, moved = 0;
 const before = Game.units.map(u => ({ id: u.id, x: u.x, y: u.y }));
 try {
@@ -144,3 +129,5 @@ faceStep(30);
 check(typeof restedAt === 'number' && marcher.anim === restedAt,
   'units: walk phase frozen while idle',
   secs(restedAt) + ' -> ' + secs(marcher.anim) + ' over 1s of standing');
+
+report();

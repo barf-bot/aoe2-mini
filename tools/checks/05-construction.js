@@ -1,22 +1,16 @@
 'use strict';
 /* checks/05-construction.js -- construction, camps + drop-offs, cancel / demolish, the barricade.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/05-construction.js`) against a freshly booted game. */
+
+const {
+  AoE2, DT, Game, blueVill, check, dataBuildings, freeSpotAround, pad, stepRender, tOf, tc,
+  report,
+} = require('../lib/harness');
 
 /* ---- 7. construction ------------------------------------------------ */
-function freeSpotAround(world, Game, tx, ty, w, h, maxR) {
-  for (let r = 1; r <= maxR; r++) {
-    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
-      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-      if (AoE2.siteFree(Game, tx + dx, ty + dy, w, h)) return { tx: tx + dx, ty: ty + dy };
-    }
-  }
-  return null;
-}
 const v0 = blueVill()[0];
 const wood0 = Game.res[0].wood;
-const spot = freeSpotAround(w0, Game, Math.floor(v0.x / AoE2.CFG.TILE), Math.floor(v0.y / AoE2.CFG.TILE), 2, 2, 8);
+const spot = freeSpotAround(Game.world, Game, Math.floor(v0.x / AoE2.CFG.TILE), Math.floor(v0.y / AoE2.CFG.TILE), 2, 2, 8);
 check(!!spot, 'site: a legal 2x2 house pad exists near the villager',
   spot ? 'tile ' + spot.tx + ',' + spot.ty : 'none found');
 Game.selection = [v0.id];
@@ -361,3 +355,5 @@ check(bdDemo === true && !bd.buildings.includes(bdB) &&
       JSON.stringify(bd.res[0]) === resBd0 && bd.blocks.get(bdB.id) === undefined,
   'demolish: a finished barricade is removed with zero change to the stockpile',
   bdB ? JSON.stringify(bd.res[0]) + ' (was ' + resBd0 + ')' : 'rebuild failed');
+
+report();

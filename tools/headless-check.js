@@ -2,52 +2,49 @@
 /* =========================================================================
    headless-check.js -- verify the game without a browser.
 
-   Runs every file in tools/checks/ in name order as ONE sequential script:
-   00-harness.js stubs the DOM and boots the game through tools/lib/load-game.js,
-   the files after it drive the simulation and assert real behaviour -- seeded
+   Runs every file in tools/checks/, each in its own node process, and adds up
+   their results. A check file requires tools/lib/harness.js, which stubs the
+   DOM and boots the game, then asserts real behaviour for its topic -- seeded
    world generation, the economy, pathfinding, construction, training, combat,
-   input, the HUD, save/load and sound. The checks are sequential on purpose:
-   they share one booted Game, so they are split by topic, not isolated.
+   input, the HUD, save/load, sound. Every file gets a freshly booted Game, so
+   the files are independent: order does not matter and one can run alone.
 
-   The fragments are joined and compiled as one function, which keeps the
-   harness's names out of the global scope the game's scripts live in (a check
-   helper can never silently replace a game function). Stack traces are mapped
-   back to tools/checks/NN-topic.js:line before they are printed.
-
-   usage: node tools/headless-check.js [path/to/index.html]
+   usage: node tools/headless-check.js [filter] [-q]
+     node tools/headless-check.js             every file
+     node tools/headless-check.js combat      only files whose name contains "combat"
+     node tools/headless-check.js -q          failures and totals only
+     node tools/checks/07-combat.js           one file directly, full stack traces
    ========================================================================= */
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
+const cp = require('child_process');
 
 const CHECKS = path.join(__dirname, 'checks');
-const BUNDLE = path.join(CHECKS, '(all checks)');
+const args = process.argv.slice(2);
+const quiet = args.includes('-q');
+const filter = args.find((a) => !a.startsWith('-')) || '';
+const files = fs.readdirSync(CHECKS).filter((f) => f.endsWith('.js') && f.includes(filter)).sort();
+if (!files.length) { console.error('FAIL  no check file matches "' + filter + '"'); process.exit(1); }
 
-const starts = [];           // [first bundle line, file] per fragment
-let body = '', line = 1;
-for (const name of fs.readdirSync(CHECKS).filter((f) => f.endsWith('.js')).sort()) {
-  const src = fs.readFileSync(path.join(CHECKS, name), 'utf8').replace(/\n*$/, '\n');
-  starts.push([line, path.join(CHECKS, name)]);
-  body += src;
-  line += src.split('\n').length - 1;
-}
-body += 'report();\n';       // prints every result and exits 0 / 1
+const run = (name) => new Promise((resolve) => {
+  cp.execFile(process.execPath, [path.join(CHECKS, name)], { maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
+    const m = /(\d+)\/(\d+) checks passed\s*$/.exec(stdout);
+    // no totals line means the file crashed before report(): that is one failure, never a silent zero
+    resolve({ name, stdout, stderr, passed: m ? +m[1] : 0, total: m ? +m[2] : 1, crashed: !m });
+  });
+});
 
-/** `(all checks):1234:5` -> `04-pathfinding.js:321:5` */
-function remap(stack) {
-  return String(stack).split(BUNDLE + ':').map((chunk, i) => {
-    if (!i) return chunk;
-    const n = parseInt(chunk, 10);
-    const at = starts.filter((s) => s[0] <= n).pop();
-    return at ? at[1] + ':' + (n - at[0] + 1) + chunk.slice(String(n).length) : BUNDLE + ':' + chunk;
-  }).join('');
-}
-
-try {
-  vm.compileFunction(body, ['require', 'TOOLS_DIR'], { filename: BUNDLE })(require, __dirname);
-} catch (e) {
-  console.error('FAIL  the check script threw:\n' + remap(e && e.stack || e));
-  process.exit(1);
-}
+Promise.all(files.map(run)).then((results) => {
+  let passed = 0, total = 0;
+  for (const r of results) {
+    passed += r.passed; total += r.total;
+    const lines = r.stdout.split('\n').filter((l) => /^(PASS|FAIL)  /.test(l));
+    for (const l of lines) if (!quiet || l.startsWith('FAIL')) console.log(l);
+    if (r.crashed) console.log('FAIL  ' + r.name + ' crashed before reporting:\n' + (r.stderr || r.stdout).trim());
+    console.log((r.passed === r.total ? 'ok    ' : 'FAIL  ') + r.name + '  ' + r.passed + '/' + r.total + (quiet ? '' : '\n'));
+  }
+  console.log('\n' + passed + '/' + total + ' checks passed');
+  process.exit(passed === total ? 0 : 1);
+});

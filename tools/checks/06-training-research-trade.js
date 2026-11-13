@@ -1,12 +1,17 @@
 'use strict';
 /* checks/06-training-research-trade.js -- training queues, research, market trade.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/06-training-research-trade.js`) against a freshly booted game. */
+
+const {
+  finishedHouse,
+  AoE2, DT, Game, blueVill, check, dataBuildings, freeSpotAround, stepRender, tOf, tc, report,
+} = require('../lib/harness');
 
 /* ---- 8. training ---------------------------------------------------- */
+const house = finishedHouse(Game);        // the cap of 10 the population checks below count on
 const foodBt = Game.res[0].food;
-const unitsBt = Game.units.length;
+const ownUnits = () => Game.units.filter(u => u.team === 0).length;   // the enemy AI trains on its own clock
+const unitsBt = ownUnits();
 const trained = AoE2.train(Game, tc, 'villager');
 check(!!trained && tc.queue.length === 1, 'train: villager queued at the Town Center', 'queue=' + tc.queue.length);
 check(Math.floor(Game.res[0].food) === Math.floor(foodBt - 50), 'train: exactly 50 food spent',
@@ -14,8 +19,8 @@ check(Math.floor(Game.res[0].food) === Math.floor(foodBt - 50), 'train: exactly 
 check(AoE2.train(Game, tc, 'militia') === undefined && Game.toastMsg === 'Militia needs a Town Center',
   'train: militia rejected from a Town Center', JSON.stringify(Game.toastMsg));
 stepRender(Math.ceil(AoE2.KINDS.villager.time / DT) + 2);     // the table's train time, not 7s
-check(Game.units.length === unitsBt + 2, 'train: unit spawns when the timer expires',
-  unitsBt + ' -> ' + Game.units.length);
+check(ownUnits() === unitsBt + 1, 'train: unit spawns when the timer expires',
+  unitsBt + ' -> ' + ownUnits());
 check(blueVill().length === 5, 'train: the new unit is a villager', String(blueVill().length));
 check(AoE2.popUsed(Game, 0) === 5 && AoE2.popCap(Game, 0) === 10, 'pop: 5/10 after training',
   AoE2.popUsed(Game, 0) + '/' + AoE2.popCap(Game, 0));
@@ -190,3 +195,5 @@ const trBar = (() => {
 })();
 refusal('trade: a barracks cannot trade',
   trBar && tradeTry(trF.st, trBar, 'food', 'sell'), 'Barracks cannot trade');
+
+report();

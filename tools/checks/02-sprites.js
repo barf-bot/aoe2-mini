@@ -1,8 +1,10 @@
 'use strict';
 /* checks/02-sprites.js -- sprite frame tables, animation selection, building sprites, atlas wiring.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/02-sprites.js`) against a freshly booted game. */
+
+const {
+  AoE2, Game, bad, check, napiImage, ok, report,
+} = require('../lib/harness');
 
 /* ---- 5b. sprite frame table ----------------------------------------- */
 // The atlas layout is data, not code: one sheet, one cell per registered
@@ -160,3 +162,5 @@ check(!!bootedAtlas === !!napiImage && (!bootedAtlas ||
     ? 'loaded ' + bootedAtlas.src + ' ' + bootedAtlas.width + 'x' + bootedAtlas.height +
       ', matches SPRITE_SHEET'
     : (napiImage ? 'nothing loaded' : 'no canvas backend in this sandbox'));
+
+report();

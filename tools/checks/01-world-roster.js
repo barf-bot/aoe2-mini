@@ -1,8 +1,10 @@
 'use strict';
 /* checks/01-world-roster.js -- world generation, the starting roster, starter spread, depletion.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/01-world-roster.js`) against a freshly booted game. */
+
+const {
+  AoE2, Game, blueVill, check, dataUnits, flatState, ok, setTile, tIdx, tc, tileCentre, report,
+} = require('../lib/harness');
 
 /* ---- 4. world generation -------------------------------------------- */
 const hashOf = (w) => {
@@ -20,7 +22,6 @@ const nameOf = (n) => Object.keys(AoE2.T).find(k => AoE2.T[k] === n);
 check(Object.keys(counts).length >= 4, 'world: terrain mix generated',
   Object.entries(counts).map(([t, n]) => nameOf(+t) + '=' + n).join(' '));
 
-const tc = Game.buildings.find(b => b.team === 0 && b.kind === 'town_center');
 check(!!tc, 'roster: player Town Center exists', tc ? 'tile ' + tc.tx + ',' + tc.ty : 'missing');
 let nearGold = 0;
 for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
@@ -64,7 +65,6 @@ check(berryTiles.length > 0 && berryTiles.every((t) => t.amount === 150),
   Array.from(new Set(berryTiles.map((t) => t.amount))).join(','));
 
 /* ---- 5. starting roster --------------------------------------------- */
-const blueVill = () => Game.units.filter(u => u.team === 0 && u.kind === 'villager');
 check(Game.buildings.filter(b => b.team === 1 && b.built).length === 1, 'roster: enemy Town Center exists', 'ok');
 check(blueVill().length === 4, 'roster: 4 player villagers', String(blueVill().length));
 check(Game.units.filter(u => u.team === 0 && u.kind === 'militia').length === 1,
@@ -121,20 +121,6 @@ check(Object.keys(villTiles).length >= 2 &&
 check(blueVill().every(v => v.order.src.res === 'food'),
   'gather: food-first assignment — all 4 starters take berries (AoE2 opens on food)',
   blueVill().map(v => v.order.src.res).join(','));
-/* Fixtures for the T4 checks: a fresh seeded state flattened to grass, so the
-   only resource tiles in the world are the ones a check places. The Town
-   Centers, the occupancy set and the 4 villagers keep their seeded positions,
-   which keeps the fixtures honest about movement while removing every other
-   source a retarget could secretly fall back to. */
-const tIdx = (st, x, y) => y * st.world.w + x;
-const setTile = (st, x, y, type, amount) => { st.world.type[tIdx(st, x, y)] = type; st.world.amount[tIdx(st, x, y)] = amount; };
-const tileCentre = (st, x, y) => ({ x: x * AoE2.CFG.TILE + AoE2.CFG.TILE / 2, y: y * AoE2.CFG.TILE + AoE2.CFG.TILE / 2 });
-function flatState() {
-  const st = AoE2.createState();
-  for (let i = 0; i < st.world.type.length; i++) { st.world.type[i] = AoE2.T.GRASS; st.world.amount[i] = 0; }
-  for (const u of st.units) u.order = { kind: 'idle' };
-  return st;
-}
 /** Two berry tiles on a line through the villager's own tile: one `deadDist`
  *  tiles one way, one `liveDist` tiles the other, both on free ground. */
 function berryPair(st, v, deadDist, liveDist) {
@@ -216,3 +202,5 @@ check(bDrain && bv.order.kind === 'idle',
   'depletion: with the nearest other tile 6 tiles away the empty villager goes idle',
   !bDrain ? 'the tile never emptied in 6000 steps'
     : 'empty at step ' + bDrain.steps + ', order ' + bv.order.kind);
+
+report();

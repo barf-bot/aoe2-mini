@@ -50,21 +50,25 @@ frames in `data/sprites/`.
 ## How to verify a change (never report "done" without this)
 
 ```bash
-node tools/headless-check.js     # must end with "NN/NN checks passed", exit 0
+node tools/headless-check.js -q  # must end with "NN/NN checks passed", exit 0
 node tools/check-stats.mjs       # verifies src/config.js against data/ (exit 1 prints every drifted field)
 node tools/audit-line-refs.js    # doc line refs, the file map, the DOM-free rule, the tool inventory
 node tools/render-preview.js     # rewrites preview.png from the real renderer
 node tools/gen-atlas.js          # composes assets/sprites.png from data/sprites/ and regenerates the tables
 ```
 
-The first three are `npm run check --prefix tools`. The last two need
+The first three are `npm run check --prefix tools`, and `.github/workflows/check.yml` runs
+all five on every push and pull request. The last two need
 `npm install --prefix tools` once (`tools/node_modules` is gitignored); both are
 deterministic, so on an unchanged tree they leave `git status` clean.
 
-`tools/headless-check.js` runs the files in `tools/checks/` in name order as one sequential
-script: `00-harness.js` stubs the DOM and boots the game, the rest assert
-economy/pathfinding/construction/training/combat/input/UI/save/sound invariants against
-that one booted `Game`. All tools load the game through `tools/lib/load-game.js`, which
+`tools/headless-check.js` runs every file in `tools/checks/`, each in its own process.
+A check file starts by requiring `tools/lib/harness.js`, which stubs the DOM and boots the
+game, and then asserts its topic's invariants
+(economy/pathfinding/construction/training/combat/input/UI/save/sound/AI) against that
+freshly booted `Game` — so the files are independent, and one runs alone with
+`node tools/checks/07-combat.js` or `node tools/headless-check.js combat`. `-q` prints
+failures and totals only. All tools load the game through `tools/lib/load-game.js`, which
 reads the `<script src>` list from `index.html` and runs the same files in the same order
 the browser does.
 
@@ -87,7 +91,7 @@ The game exposes its internals for exactly this reason — the `AoE2` object in
 If you add a new mechanic, add the check that proves it (in the matching
 `tools/checks/NN-topic.js`). Fix the test *and* the code with equal suspicion: two past
 "failures" were the harness asserting on the wrong object, and a stubbed `Image` that
-reports the right dimensions can still paint nothing (see `tools/checks/00-harness.js` §2b).
+reports the right dimensions can still paint nothing (see `tools/lib/harness.js` §2b).
 
 ## Editing rules
 
@@ -104,9 +108,9 @@ reports the right dimensions can still paint nothing (see `tools/checks/00-harne
 - Outside `src/config.js` and `src/main.js`, a source file contains only function
   declarations — no top-level statements — so load order never matters between them.
 - Single state object (`Game`) passed explicitly — no module-level mutable state outside it.
-- The check files share one scope and one `Game`: add checks at the end of the matching
-  file, do not reorder files, and build a throwaway `AoE2.createState()` when a check needs
-  a clean world.
+- A check file must pass when run alone: it may only rely on `tools/lib/harness.js` and on
+  what it set up itself. Fixtures needed by more than one file go in the harness; build a
+  throwaway `AoE2.createState()` when a check needs a clean world.
 - Commit style: imperative, one logical change per commit (`Add README with live-site link
   and tool docs`, `Fix villager carry bookkeeping so deposits land in the stockpile`).
 
@@ -124,7 +128,7 @@ reports the right dimensions can still paint nothing (see `tools/checks/00-harne
 | `docs/ROADMAP.md` | prioritized open work |
 | `docs/CHANGELOG.md` | dated entries of what shipped |
 | `docs/plans/` | historical design plans; they predate the `src/` split and cite the old single-file line numbers |
-| `tools/` | `headless-check.js` (runner for `tools/checks/`), `check-stats.mjs`, `render-preview.js`, `gen-atlas.js`, `audit-line-refs.js`, and the shared loader in `tools/lib/` |
+| `tools/` | `headless-check.js` (runner for `tools/checks/`), `check-stats.mjs`, `render-preview.js`, `gen-atlas.js`, `audit-line-refs.js`, and `tools/lib/` (`load-game.js`, the loader every tool uses, and `harness.js`, the stub DOM + fixtures the checks start from) |
 
 The docs are not trusted by eye: `tools/audit-line-refs.js` is what proves the line
 references above and in `docs/` still match the code, and AGENTS/README must list every

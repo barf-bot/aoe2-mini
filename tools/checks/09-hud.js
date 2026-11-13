@@ -1,8 +1,11 @@
 'use strict';
 /* checks/09-hud.js -- command bar, the uniform HUD frame, the responsive layout.
-   One fragment of a single sequential script: tools/headless-check.js runs every file in
-   tools/checks/ in name order in one shared scope, so later files see the consts (and the
-   mutated Game) of earlier ones. */
+   Runs on its own (`node tools/checks/09-hud.js`) against a freshly booted game. */
+
+const {
+  finishedHouse,
+  AoE2, Game, blueVill, check, html, stubEl, styleCss, tileCentre, report,
+} = require('../lib/harness');
 
 /* ---- 11. command bar buttons ---------------------------------------- */
 Game.selection = [];
@@ -25,8 +28,8 @@ check(cmdRng.includes('data-act="build" data-arg="archery_range"') &&
   'ui: clicking the Archery Range button arms placement',
   'offered=' + cmdRng.includes('data-arg="archery_range"') + ' placing=' + Game.placing);
 // and the Demolish button (phase-2 T5): dispatched through the same delegated
-// listener, it demolishes the selected finished house from §7 for no refund.
-const uiHouse = Game.buildings.find(x => x.team === 0 && x.kind === 'house' && x.built >= 1);
+// listener, it demolishes the selected finished house for no refund.
+const uiHouse = finishedHouse(Game);
 const uiWood0 = Game.res[0].wood;
 Game.selectedBuilding = uiHouse;
 const dBtn = stubEl('button', 'btn2', 60, 24);
@@ -276,3 +279,5 @@ check(propOf(mHeader, 'padding') === '2px 6px' && propOf(bHeader, 'padding') ===
       propOf(mHeader, 'gap') === '6px' && propOf(bHeader, 'gap') === '14px',
   'ui: the responsive block trims the header padding the desktop rule declares',
   'media header{' + String(mHeader) + '} vs base header{' + String(bHeader) + '}');
+
+report();
