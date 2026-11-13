@@ -1,6 +1,6 @@
 # Tower upgrade chain (Watch Tower → Guard Tower → Keep)
 
-Status: in progress
+Status: done
 
 ## Design
 
