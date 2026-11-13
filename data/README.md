@@ -1,7 +1,7 @@
 # data/ — the vendored AoE2 content
 
-The numbers and the art the game is built from. `index.html` never reads these files at
-runtime (the product is still one dependency-free file); it carries what the tools in
+The numbers and the art the game is built from. The game never reads these files at
+runtime (the product is still a dependency-free static page); it carries what the tools in
 `tools/` render *from* them, and the tools are what prove the game and the data agree.
 
 | File | Contains | Consumed by |
@@ -28,7 +28,7 @@ Rules written into the files themselves:
   fixed instead of the table's (`CARRY_MAX` 10, `villager.atkTime` 0.64, `militia.atkTime` 0.5).
 - **Speeds are converted, not typed.** `KINDS.<kind>.speed` px/s = `round(CFG.TILE × speedTps)`;
   the table speaks tiles/s, the engine moves in px.
-- **Adding a unit means adding the row first.** `check-stats.mjs` fails when `index.html`
+- **Adding a unit means adding the row first.** `check-stats.mjs` fails when `src/config.js`
   declares a kind the data does not have, so content arrives as data, then as art, then as code.
 
 ## Refreshing from upstream
@@ -38,7 +38,7 @@ Fetch the current upstream JSON, copy the shipped rows back in (keeping the `sou
 
 ```bash
 node tools/check-stats.mjs          # prints every field that now disagrees
-node tools/check-stats.mjs --write  # puts the new numbers into index.html section 1
+node tools/check-stats.mjs --write  # puts the new numbers into src/config.js
 node tools/headless-check.js        # the sim has to still pass on the new numbers
 ```
 

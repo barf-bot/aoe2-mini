@@ -15,7 +15,7 @@ prototypes stall.
    (uniform cost, 8-connected, no diagonal cut between two solid tiles), the route is
    cached per order and re-pathed when the world changes, `standTarget` resolves a solid
    target into a tile to stand on and `formationSlots` gives every unit in a group its own
-   tile. The exit condition is proven by the §6c harness checks, which grade every route
+   tile. The exit condition is proven by the pathfinding checks (`tools/checks/04-pathfinding.js`), which grade every route
    against the harness's own Dijkstra (within ~15% of optimal).
 3. **Ranged combat + a second unit line (archer).** Shipped 2026-11-11 by the
    OG-content port (`docs/plans/2026-11-11-og-content-port.md`, T4 + T5): `KINDS.archer`
@@ -68,18 +68,18 @@ prototypes stall.
    reopens on the saved game), and the debounced autosave writes without a `Save` press.
    Left over: multiple save slots, cloud sync and share codes — folded into P2 item 12.
 10. **Sound.** Shipped 2026-11-12 by the sound plan (`docs/plans/2026-11-12-sound.md`):
-    `SFX` (`index.html:433-440`) authors six rows — hit, arrow, build, age, victory, defeat —
-    and `playSfx(Game, name)` (`index.html:2122`) renders each one as an oscillator plus gain
+    `SFX` (`src/config.js:310-317`) authors six rows — hit, arrow, build, age, victory, defeat —
+    and `playSfx(Game, name)` (`src/sound.js:33`) renders each one as an oscillator plus gain
     envelope through the Web Audio API, so no audio file enters the repo; the header
     `Sound on/off` button mutes it and the preference survives a reload through
     `aoe2mini:muted`. Nothing cut — the plan's six rows are the shipped set.
 11. **Touch controls** for phones (tap-select, long-press command), plus a responsive
     layout. Shipped 2026-11-12 by the touch-controls plan
     (`docs/plans/2026-11-12-touch-controls-layout.md`): `pointerDown`/`pointerUp`
-    (`index.html:2671`, `index.html:2682`) answer mouse and touch from one path —
+    (`src/input.js:30`, `src/input.js:41`) answer mouse and touch from one path —
     `touch-action:none` on the canvas, one pointer per drag, and a 600 ms press-and-hold
     that issues the order a right-click would — while a `@media (max-width:720px)` block
-    (`index.html:73`) stacks the footer panels and trims the header on narrow widths. Cut
+    (`src/style.css:66`) stacks the footer panels and trims the header on narrow widths. Cut
     from this round: pinch-zoom, two-finger pan, virtual joystick, on-screen keyboard,
     gamepad, tablet split-view and minimap drag on touch.
 12. **Replay / seeded challenge** — the `mulberry32` seed is already a shareable handle on a
@@ -103,7 +103,7 @@ Split out of the board-rules request because one plan caps at 8 tasks; phase 1
 ## Deferred from the 2026-11-11 OG-content port plan
 
 `docs/plans/2026-11-11-og-content-port.md` ships the part that fits in 8 tasks (vendored
-stat tables + `tools/check-stats.mjs`, the §1 generation, the atlas built from ripped
+stat tables + `tools/check-stats.mjs`, the config generation, the atlas built from ripped
 frames, the archer line, ranged combat, win/lose, docs). Left over on purpose:
 
 - **Asset-source swap workflow.** `data/sprites/` + `data/sprites.json` are the single
@@ -122,10 +122,9 @@ frames, the archer line, ranged combat, win/lose, docs). Left over on purpose:
 
 ## Process items (not features)
 
-- **Split the harness checks by domain.** Today it's 137 checks in one file; group them into
-  `economy / build / combat / input / ui` sections so a failure names its area instantly.
-- **Pin the toolchain**: a `package.json` with `devDependencies` (`@napi-rs/canvas`) and an
-  `npm test` script would make CI possible without touching the game's dependency-free rule.
+- **Make the checks independent.** They are split by topic (`tools/checks/`) but still one
+  sequential script sharing a booted `Game`; giving each file its own fresh state would let
+  one area run alone and stop an early failure from cascading.
 - **Automate verification on push**: a Pages deploy action that runs
   `node tools/headless-check.js` before publishing, so a red suite can't ship.
 - **Decide the repo's home**: currently `barf-bot/aoe2-mini`. Transfer to Barf's own account

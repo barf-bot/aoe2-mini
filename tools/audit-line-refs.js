@@ -1,16 +1,14 @@
 #!/usr/bin/env node
-/* audit-line-refs.js -- verify the docs' line references against index.html.
+/* audit-line-refs.js -- keep the docs honest about the code.
 
-   1. every `index.html:NNN` / `index.html:NNN-NNN` in the docs must be in range, and the
-      cited span must contain a symbol from the citing sentence (the citation may wrap, so
-      the line above is searched too): "setAtlas (index.html:343)" fails the moment
-      setAtlas moves away from that line;
-   2. the file-map ranges in docs/ARCHITECTURE.md, the named sub-blocks of section 4, and
-      the config range in docs/GAME_RULES.md must equal the real spans measured from the
-      banners in index.html;
-   3. everything in tools/ must be documented in AGENTS.md and README.md;
-   4. the `index.html is N lines` claim AGENTS.md quotes for the patch-not-rewrite rule must
-      equal the real file length.
+   1. every `path:NNN` / `path:NNN-NNN` reference in the docs (to index.html, src/* or
+      tools/*) must be in range, and the cited span must contain a symbol from the citing
+      sentence (the citation may wrap, so the line above is searched too):
+      "setAtlas (src/entities.js:8)" fails once setAtlas moves more than a few lines away;
+   2. the file map in docs/ARCHITECTURE.md must list exactly the scripts and stylesheets
+      index.html loads -- a new src/ file without a row fails, so does a row without a file;
+   3. the logic files (DOM column `no` in that map) must not name a browser global;
+   4. everything in tools/ must be documented in AGENTS.md and README.md.
 
    usage: node tools/audit-line-refs.js
  */
@@ -19,61 +17,42 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const lines = src.replace(/\s+$/, '').split('\n'); // == `wc -l index.html`, no phantom last line
-const LAST_JS_LINE = lines.reduce((acc, l, i) => (/^\s*<\/?(script|body|html)>\s*$/.test(l) ? acc : i + 1), 0);
+const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 const DOCS = ['README.md', 'AGENTS.md', 'docs/ARCHITECTURE.md', 'docs/GAME_RULES.md',
-  'docs/CHANGELOG.md', 'docs/ROADMAP.md', 'docs/CONVENTIONS.md'];
-const STOP = new Set(['index', 'html', 'the', 'and', 'from', 'with', 'lines', 'see', 'has',
-  'section', 'this', 'that', 'file', 'files', 'code', 'docs', 'when', 'into', 'uses', 'used',
-  'only', 'image', 'images', 'game', 'games', 'may', 'keep', 'true', 'false', 'null', 'one',
-  'same', 'also', 'than', 'but', 'not', 'for', 'its', 'his', 'her', 'their', 'which', 'while',
-  'where', 'what', 'size', 'sizes', 'node', 'browser', 'browsers', 'cost', 'dark', 'feudal',
-  'food', 'every', 'later', 'age', 'ages', 'banner', 'banners', 'truthful', 'functions',
-  'move', 'moved', 'filled', 'fills', 'inject', 'injects', 'injected', 'harnesses', 'harness',
-  'place', 'unit', 'units', 'terrain', 'drawn', 'procedurally', 'contains', 'contained',
-  'content', 'contents', 'table', 'rows', 'row', 'doc', 'says', 'say', 'cited', 'cite',
-  'verifies', 'verify', 'tooling', 'tools', 'tool', 'live', 'site', 'readme']);
-const wordSet = (t) => (t.replace(/index\.html:\d+(?:-\d+)?/g, ' ')
-  .match(/[A-Za-z_][A-Za-z0-9_]{2,}/g) || []).map((w) => w.toLowerCase());
+  'docs/ROADMAP.md', 'docs/CONVENTIONS.md', 'data/README.md'];
+const REF = /((?:index\.html|(?:src|tools)\/[\w./-]+\.(?:js|mjs|css))):(\d+)(?:-(\d+))?/g;
+// English glue that would match almost any span; everything else in the citing sentence counts.
+const STOP = new Set(['the', 'and', 'from', 'with', 'see', 'has', 'this', 'that', 'when', 'into',
+  'only', 'may', 'one', 'same', 'also', 'than', 'but', 'not', 'for', 'its', 'which', 'while',
+  'where', 'what', 'every', 'then', 'are', 'was', 'they', 'them', 'each', 'both', 'does', 'instead',
+  'index', 'html', 'src', 'tools', 'checks', 'css', 'mjs', 'game', 'true', 'false', 'null', 'const',
+  'function', 'return', 'line', 'lines', 'file', 'files', 'code', 'docs']);
+const CONTEXT = 3;   // a citation may point inside a function: its name can sit a few lines up
+const wordSet = (t) => (t.replace(REF, ' ')
+  .match(/[A-Za-z_][A-Za-z0-9_]{2,}/g) || []).map((w) => w.toLowerCase()).filter((w) => !STOP.has(w));
 
-let fail = 0;
+let fail = 0, passed = 0;
 const bad = (f, m) => { console.log('FAIL ' + f + ': ' + m); fail++; };
-const ok = (f, m) => console.log('ok   ' + f + ': ' + m);
+const ok = (f, m) => { passed++; if (process.argv.includes('-v')) console.log('ok   ' + f + ': ' + m); };
 
-/* ---- index.html structure: numbered sections + named sub-blocks ---- */
-// banner shapes in index.html: numbered sections ('4. simulation') and named sub-blocks
-// ('economy helpers', plus the trailing 'public surface' banner).
-const numbered = [];
-const unnumbered = [];
-lines.forEach((l, i) => {
-  let m = l.match(/^\/\*\s-{4,}\s*(\d+)\.\s+(.+?)\s-{4,}\s\*\/$/);
-  if (m) { numbered.push({ num: +m[1], name: m[2].trim(), from: i + 1 }); return; }
-  m = l.match(/^\/\*\s-{4,}\s*([A-Za-z][A-Za-z /]*?)\s-{4,}\s\*\/$/);
-  if (m) unnumbered.push({ name: m[1].trim(), from: i + 1 });
-});
-numbered.forEach((s, i) => {
-  if (i + 1 < numbered.length) s.to = numbered[i + 1].from - 1;
-  else {
-    const tail = unnumbered.find((b) => b.from > s.from);
-    s.to = tail ? tail.from - 1 : LAST_JS_LINE;
+/* ---- 1. line refs in every doc ---- */
+const cache = {};
+const linesOf = (rel) => {
+  if (!(rel in cache)) {
+    cache[rel] = fs.existsSync(path.join(ROOT, rel)) ? read(rel).replace(/\s+$/, '').split('\n') : null;
   }
-});
-unnumbered.forEach((b, i) => {
-  const next = unnumbered[i + 1];
-  b.to = next ? next.from - 1 : LAST_JS_LINE;
-});
-const section = (n) => numbered.find((s) => s.num === n);
-
-/* ---- 1. content refs in every doc ---- */
+  return cache[rel];
+};
 for (const rel of DOCS) {
-  const doc = fs.readFileSync(path.join(ROOT, rel), 'utf8').split('\n');
+  const doc = read(rel).split('\n');
   doc.forEach((line, i) => {
-    for (const m of line.matchAll(/index\.html:(\d+)(?:-(\d+))?/g)) {
-      const from = +m[1];
-      const to = Math.max(from, +(m[2] || m[1]));
-      if (to > lines.length) { bad(rel, `${m[0]} is past the end of index.html (${lines.length} lines)`); continue; }
-      const span = lines.slice(from - 1, to).join('\n').toLowerCase();
+    for (const m of line.matchAll(REF)) {
+      const lines = linesOf(m[1]);
+      if (!lines) { bad(rel, `${m[0]} cites a file that does not exist`); continue; }
+      const from = +m[2];
+      const to = Math.max(from, +(m[3] || m[2]));
+      if (to > lines.length) { bad(rel, `${m[0]} is past the end of ${m[1]} (${lines.length} lines)`); continue; }
+      const span = lines.slice(Math.max(0, from - 1 - CONTEXT), to + CONTEXT).join('\n').toLowerCase();
       const ids = [...wordSet(line), ...(i ? wordSet(doc[i - 1]) : [])];
       const hit = ids.find((id) => span.includes(id));
       if (!hit) bad(rel, m[0] + ' cites "' + (ids.slice(0, 3).join(',') || 'nothing') + '" but line ' + from + ' reads: "' + lines[from - 1].trim().slice(0, 56) + '"');
@@ -82,69 +61,41 @@ for (const rel of DOCS) {
   });
 }
 
-/* ---- 2. ARCHITECTURE file map + GAME_RULES config range ---- */
-const arch = fs.readFileSync(path.join(ROOT, 'docs/ARCHITECTURE.md'), 'utf8');
-const rows = [...arch.matchAll(/^\|\s*(\d|—)\s*\|\s*([^|]+?)\s*\|\s*(\d+)-(\d+)\s*\|\s*([^|]*)\|/gm)];
+/* ---- 2. ARCHITECTURE file map vs what index.html loads ---- */
+const html = read('index.html');
+const loaded = [...html.matchAll(/<script\s+src="([^"]+)"/g), ...html.matchAll(/<link\s+rel="stylesheet"\s+href="([^"]+)"/g)].map((m) => m[1]);
+const onDisk = fs.readdirSync(path.join(ROOT, 'src')).map((f) => 'src/' + f);
+const rows = [...read('docs/ARCHITECTURE.md').matchAll(/^\|\s*`(src\/[^`]+)`\s*\|\s*([^|]*?)\s*\|/gm)].map((m) => ({ file: m[1], dom: m[2] }));
 if (!rows.length) bad('docs/ARCHITECTURE.md', 'file map: no rows parsed');
-for (const [, num, name, from, to] of rows) {
-  const label = name.trim();
-  const claimed = from + '-' + to;
-  if (num === '—') {
-    const last = numbered[numbered.length - 1];
-    const truth = unnumbered.find((b) => b.from > last.from);
-    if (!truth) { bad('docs/ARCHITECTURE.md', 'no export banner found after the last section'); continue; }
-    if (claimed !== truth.from + '-' + truth.to) bad('docs/ARCHITECTURE.md', `public surface says ${claimed}, index.html says ${truth.from}-${truth.to}`);
-    else ok('docs/ARCHITECTURE.md', `public surface ${claimed} ("${truth.name}")`);
-    continue;
-  }
-  const s = section(+num);
-  if (!s) { bad('docs/ARCHITECTURE.md', `row ${num} "${label}" has no banner in index.html`); continue; }
-  if (s.name !== label) { bad('docs/ARCHITECTURE.md', `row ${num} "${label}" != banner "${s.name}"`); continue; }
-  if (claimed !== s.from + '-' + s.to) bad('docs/ARCHITECTURE.md', `section ${num} ${label}: doc says ${claimed}, index.html says ${s.from}-${s.to}`);
-  else ok('docs/ARCHITECTURE.md', `section ${num} ${label} ${s.from}-${s.to}`);
+for (const f of onDisk) {
+  if (!loaded.includes(f)) bad('index.html', `${f} exists but index.html does not load it`);
+  else if (!rows.some((r) => r.file === f)) bad('docs/ARCHITECTURE.md', `file map has no row for ${f}`);
+  else ok('docs/ARCHITECTURE.md', `file map lists ${f}`);
+}
+for (const f of loaded) if (!onDisk.includes(f)) bad('index.html', `loads ${f}, which does not exist`);
+for (const r of rows) if (!onDisk.includes(r.file)) bad('docs/ARCHITECTURE.md', `file map row ${r.file} has no file`);
+const order = (list) => list.filter((f) => f.endsWith('.js')).join(' ');
+if (order(rows.map((r) => r.file)) !== order(loaded)) bad('docs/ARCHITECTURE.md', 'file map order differs from the load order in index.html');
+
+/* ---- 3. the logic files stay DOM-free ---- */
+const BROWSER = /\b(?:document|window|navigator|localStorage)\s*[.[]|typeof\s+(?:document|window)\b|\bnew\s+Image\b|\bAudioContext\b|\brequestAnimationFrame\b/;
+for (const r of rows.filter((x) => x.dom === 'no')) {
+  if (!onDisk.includes(r.file)) continue;
+  const hits = read(r.file).split('\n').map((l, i) => [i + 1, l]).filter(([, l]) => BROWSER.test(l.replace(/\/\/.*$/, '')));
+  if (hits.length) bad(r.file, `marked DOM-free but line ${hits[0][0]} reads: "${hits[0][1].trim().slice(0, 60)}"`);
+  else ok(r.file, 'names no browser global');
 }
 
-/* named sub-blocks quoted inside a section's Contents cell must match real banners */
-for (const row of rows) {
-  if (row[1] === '—') continue;
-  const s = section(+row[1]);
-  if (!s) continue;
-  const quoted = [...new Set([...(row[5] || '').matchAll(/`([A-Za-z][A-Za-z \/]*)`\s*\((\d+)\)/g)])];
-  for (const [, name, n] of quoted) {
-    const b = unnumbered.find((x) => x.name === name.trim());
-    if (!b) bad('docs/ARCHITECTURE.md', `section ${row[1]} cites block \`${name}\` (${n}) — no such banner`);
-    else if (b.from !== +n) bad('docs/ARCHITECTURE.md', `block \`${name}\` cited as ${n}, banner is at ${b.from}`);
-    else if (b.from < s.from || b.from > s.to) bad('docs/ARCHITECTURE.md', `block \`${name}\` (${n}) is not inside section ${row[1]} (${s.from}-${s.to})`);
-    else ok('docs/ARCHITECTURE.md', `section ${row[1]} block \`${name}\` at ${n}`);
-  }
-  const real = unnumbered.filter((b) => b.from > s.from && b.from <= s.to);
-  if (real.length !== quoted.length && real.length) {
-    bad('docs/ARCHITECTURE.md', `section ${row[1]} has ${real.length} named block(s) [${real.map((b) => b.name).join(', ')}], doc cites ${quoted.length}`);
-  }
-}
-
-const rules = fs.readFileSync(path.join(ROOT, 'docs/GAME_RULES.md'), 'utf8');
-for (const m of rules.matchAll(/§1 config \(lines (\d+)-(\d+)\)/g)) {
-  const s = section(1);
-  if (!s || s.from + '-' + s.to !== m[1] + '-' + m[2]) bad('docs/GAME_RULES.md', `config range ${m[1]}-${m[2]} != ${s ? s.from + '-' + s.to : 'missing'}`);
-  else ok('docs/GAME_RULES.md', `config range ${s.from}-${s.to}`);
-}
-
-/* ---- 3. tools/ inventory vs the docs that describe it ---- */
-const present = fs.readdirSync(path.join(ROOT, 'tools')).filter((f) => !f.startsWith('.') && f !== 'node_modules').sort();
+/* ---- 4. tools/ inventory vs the docs that describe it ---- */
+const present = fs.readdirSync(path.join(ROOT, 'tools'), { withFileTypes: true })
+  .filter((e) => !e.name.startsWith('.') && e.name !== 'node_modules' && !/^package(-lock)?\.json$/.test(e.name))
+  .map((e) => (e.isDirectory() ? 'tools/' + e.name + '/' : e.name)).sort();
 for (const rel of ['AGENTS.md', 'README.md']) {
-  const doc = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+  const doc = read(rel);
   const missing = present.filter((f) => !doc.includes(f));
   if (missing.length) bad(rel, `tools not documented: ${missing.join(', ')}`);
   else ok(rel, `all ${present.length} tool(s) documented: ${present.join(', ')}`);
 }
 
-/* ---- 4. the file length AGENTS.md quotes ---- */
-const agentsDoc = fs.readFileSync(path.join(ROOT, 'AGENTS.md'), 'utf8');
-for (const m of agentsDoc.matchAll(/`index\.html` is (\d+) lines/g)) {
-  if (+m[1] !== lines.length) bad('AGENTS.md', `says index.html is ${m[1]} lines, the file has ${lines.length}`);
-  else ok('AGENTS.md', `index.html length ${lines.length}`);
-}
-
-console.log('\n' + (fail ? fail + ' ref problem(s)' : 'all doc line refs agree with index.html'));
+console.log(fail ? fail + ' problem(s), ' + passed + ' ok' : passed + ' doc checks ok: line refs, file map, DOM-free rule and tool inventory agree with the code');
 process.exit(fail ? 1 : 0);
