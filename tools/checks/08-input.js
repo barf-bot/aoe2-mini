@@ -3,7 +3,7 @@
    Runs on its own (`node tools/checks/08-input.js`) against a freshly booted game. */
 
 const {
-  AoE2, DT, Game, blueVill, check, doc, flatState, html, pad, path, tOf, tileCentre, report,
+  AoE2, DT, Game, blueVill, check, doc, flatState, freeSpotAround, html, pad, path, tOf, tileCentre, report,
 } = require('../lib/harness');
 
 /* ---- 10. input ------------------------------------------------------ */
@@ -72,6 +72,35 @@ check(!!refusalF && !refusalF.threw && refusalF.now.join(' ') === refusalF.had.j
   !refusalF ? 'no two villagers with a free tile two steps away'
     : refusalF.threw ? `issueOrder off the map threw ${refusalF.threw.message}`
       : `${refusalF.now.join(' ')} (was ${refusalF.had.join(' ')}), pingAt ${refusalF.nowPing} (was ${refusalF.ping})`);
+/* docs/TODO.md P0-4: the same click on your OWN foundation is a work order, not a
+   walk — a villager who is sent there builds, so a site nobody is building (its
+   builder died or was pulled off it) can still be finished. issueOrder is exactly
+   what the contextmenu handler above calls, and it runs on a throwaway state so the
+   shared Game the checks below are mid-flight on stays untouched. */
+const siteWork = (() => {
+  const st = flatState();
+  const vs = st.units.filter((u) => u.team === 0 && u.kind === 'villager');
+  const spot = vs.length > 1 && freeSpotAround(st.world, st, tOf(vs[1].x), tOf(vs[1].y), 2, 2, 8);
+  if (!spot) return null;
+  const b = AoE2.makeBuilding(st, 'house', 0, spot.tx, spot.ty);   // a site, nobody on it
+  b.built = 0.3;
+  st.selection = [vs[1].id];
+  const at = tileCentre(st, spot.tx, spot.ty);
+  let threw = null;
+  try { AoE2.issueOrder(st, at.x, at.y); } catch (e) { threw = e; }
+  const order = JSON.stringify(vs[1].order);
+  let steps = 0;
+  const cap = Math.ceil((AoE2.BLD.house.time + 8) / DT);            // the rest of the site + a walk
+  while (!threw && b.built < 1 && steps < cap) { AoE2.stepGame(st, DT); steps++; }
+  return { threw, order, want: JSON.stringify({ kind: 'build', b: b.id }), built: b.built,
+           seconds: +(steps * DT).toFixed(2) };
+})();
+check(!!siteWork && !siteWork.threw && siteWork.order === siteWork.want && siteWork.built >= 1,
+  'command: right-click on your own foundation makes the villager build it',
+  !siteWork ? 'no free 2x2 house pad near a second villager'
+    : siteWork.threw ? 'issueOrder threw: ' + siteWork.threw.message
+      : 'order=' + siteWork.order + ' (want ' + siteWork.want + '), built ' +
+        Math.round(siteWork.built * 100) + '% after ' + siteWork.seconds + 's');
 doc.fire('keydown', { key: 'h', target: view });
 check(Game.placing === 'house', 'command: hotkey h arms house placement', String(Game.placing));
 doc.fire('keydown', { key: 'Escape', target: view });

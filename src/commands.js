@@ -2,7 +2,8 @@
 /* commands -- everything a player (or the AI) can order: move/attack/gather, build,
    train, research, trade, age up. Pure functions taking (Game, ...). No DOM. */
 
-/** Right-click resolution for one unit: enemy > enemy building > farm > resource > move. */
+/** Right-click resolution for one unit: enemy > enemy building > own site (a
+ *  villager works it, docs/TODO.md P0-4) > own farm > resource > move. */
 function orderForUnit(Game, u, wx, wy) {
   const world = Game.world;
   if (wx < 0 || wy < 0 || wx >= world.w * CFG.TILE || wy >= world.h * CFG.TILE) return null;
@@ -16,6 +17,14 @@ function orderForUnit(Game, u, wx, wy) {
   if (eB) return { kind: 'attack', b: eB.id };
 
   if (u.kind === 'villager') {
+    /* An own foundation is work, not a walking destination (docs/TODO.md P0-4):
+       the old answer was a plain `move` and a site whose builder was pulled away
+       or killed could never be finished. Asked before the farm and the resource
+       cases, so a half-built farm — `built` 0.3 with its field already full — is
+       repaired instead of worked. */
+    const site = Game.buildings.find(b => b.team === u.team && b.built < 1 &&
+      tx >= b.tx && tx < b.tx + b.w && ty >= b.ty && ty < b.ty + b.h);
+    if (site) return { kind: 'build', b: site.id };
     const farm = Game.buildings.find(b => b.team === u.team && b.built && b.kind === 'farm' &&
       b.field > 0 && tx >= b.tx && tx < b.tx + b.w && ty >= b.ty && ty < b.ty + b.h);
     if (farm) return { kind: 'harvest', src: sourceFromFarm(farm) };
@@ -25,7 +34,7 @@ function orderForUnit(Game, u, wx, wy) {
     }
   }
   /* A route can only end on a walkable tile, so a plain right-click on a solid one
-     (water, a resource the villager could not work, one of your own buildings)
+     (water, a resource the villager could not work, one of your own finished buildings)
      becomes the standing spot the order can actually reach — the same answer every
      other order kind gets from standTarget — instead of a destination the unit
      presses the shore at forever. */
@@ -70,30 +79,35 @@ function issueOrder(Game, wx, wy) {
   if (n) { Game.pingAt = Game.time; markDirty(Game); }
 }
 
-/** Builder for a new site (T5, the multi-build bug): the old code took
- *  sel.find(villager) — the same first villager on every placement — which
- *  yanked him off his first site and left it stalled at partial forever. Now:
- *  the nearest idle villager in the selection, falling back to the nearest
- *  idle team-0 villager. "Idle" = not assigned to an unfinished building; a
- *  harvest/go_deposit/move order is simply abandoned (as it always was), and a
- *  villager whose order is build on a building with built < 1 is never taken. */
-function pickBuilder(Game, site) {
+/** The villagers a placement drafts (T5 + docs/TODO.md P0-4): every free
+ *  villager in the current selection, or — the selection holding none, the way
+ *  the button call always worked — the nearest free villager of the player's
+ *  own team. "Free" = not assigned to an unfinished building; a harvest or a
+ *  go_deposit or move order is simply abandoned (as it always was), and a
+ *  villager whose order is build on a building with built < 1 is never taken.
+ *  The picker used to answer the single nearest of them, which yanked him off
+ *  his first site on every new placement while the rest of a four-villager
+ *  crew stood around watching one man build; the whole free crew is handed the
+ *  order now — updateUnit stacks their work, so the site goes up faster and a
+ *  half-built house never depends on one villager surviving. */
+function pickBuilders(Game, site) {
   const free = (u) => {
     if (u.kind !== 'villager' || u.dead) return false;
     if (u.order.kind !== 'build') return true;
     const b = Game.buildings.find((z) => z.id === u.order.b);
     return !b || b.built >= 1;
   };
-  let pool = selectedUnits(Game).filter(free);
-  if (!pool.length) pool = Game.units.filter((u) => u.team === 0 && free(u));
-  if (!pool.length) return null;
-  if (!site) return pool[0];
+  const sel = selectedUnits(Game).filter(free);
+  if (sel.length) return sel;
+  const pool = Game.units.filter((u) => u.team === 0 && free(u));
+  if (!pool.length) return [];
+  if (!site) return [pool[0]];
   let best = pool[0], bd = Infinity;
   for (const u of pool) {
     const d = Math.hypot(Math.floor(u.x / CFG.TILE) - site.tx, Math.floor(u.y / CFG.TILE) - site.ty);
     if (d < bd) { bd = d; best = u; }
   }
-  return best;
+  return [best];
 }
 
 /** Build button / click-to-place. */
@@ -104,8 +118,8 @@ function build(Game, kind, atX, atY) {
     ? { tx: Math.floor(atX / CFG.TILE), ty: Math.floor(atY / CFG.TILE) }
     : null;
   if ((def.age ?? 0) > Game.age) return toast(Game, def.label + ' requires ' + AGES[def.age]);
-  const v = pickBuilder(Game, clicked);
-  if (!v) return toast(Game, Game.units.some(u => u.team === 0 && u.kind === 'villager')
+  const crew = pickBuilders(Game, clicked);
+  if (!crew.length) return toast(Game, Game.units.some(u => u.team === 0 && u.kind === 'villager')
     ? 'All villagers are building' : 'No villager available');
   if (!canAfford(Game, 0, def.cost)) return toast(Game, 'Not enough ' + missing(Game, 0, def.cost));
   /* A click is the site or nothing (docs/TODO.md P0-3): the old answer for a
@@ -117,11 +131,16 @@ function build(Game, kind, atX, atY) {
      has no tile to honour and has always meant "put it up near a villager". */
   const site = clicked
     ? (canPlaceAt(Game, kind, clicked.tx, clicked.ty) ? clicked : null)
-    : findSite(Game.world, Math.floor(v.x / CFG.TILE), Math.floor(v.y / CFG.TILE), def.w);
+    : findSite(Game.world, Math.floor(crew[0].x / CFG.TILE), Math.floor(crew[0].y / CFG.TILE), def.w);
   if (!site) return toast(Game, "Can't build there");
   spend(Game, 0, def.cost);
   const b = makeBuilding(Game, kind, 0, site.tx, site.ty);
-  v.order = { kind: 'build', b: b.id };
+  /* every free villager in the crew takes the order (docs/TODO.md P0-4), and none
+     of them keeps a formation tile: a site owns no tile, as issueOrder rules. */
+  for (const u of crew) {
+    u.order = { kind: 'build', b: b.id };
+    u.slot = null;
+  }
   Game.placing = null;
   markDirty(Game);                         // the spend and the new site are a change
   toast(Game, def.label + ' started');

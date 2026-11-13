@@ -5,6 +5,29 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P0-4: villagers cannot be sent to a construction site
+
+- `orderForUnit` in `src/commands.js` had no case for an own building with `built < 1`, so
+  right-clicking a foundation handed the villager a plain `move` and the site stayed at
+  0 % the moment its builder was pulled away or killed (verified: 60 s of simulation on a
+  foundation, no progress). A villager whose click lands on his own unfinished building now
+  gets `{ kind: 'build', b: id }`; a finished one is still just the ground a move ends on,
+  and an enemy building is still an attack target.
+- `build` drafted `pickBuilder`'s single villager — with four villagers selected and one
+  house going up, three of them stood around it. `pickBuilders`
+  (`src/commands.js:93`) hands the order to every free villager in the selection (the
+  selection holding none still falls back to the nearest free villager of the player's
+  team, as the button call always did); their work stacks in `updateUnit`, so the same
+  house rises in 360 simulated steps with the crew against 751 with one builder, and no
+  site depends on a single villager surviving. A builder leaving a site for a new one also
+  releases the formation tile he held (`issueOrder`'s rule for non-move orders).
+- `tools/checks/05-construction.js` pinned the old rule (two placements from a
+  4-villager selection take two distinct builders, one each); that assertion is replaced
+  by three pinning the new one — the whole crew lands on one site, the crew's house beats
+  the single-builder house on time, and the crew a finished site releases raises the next
+  one (43 → 45 checks). `tools/checks/08-input.js` gains the
+  right-click-on-your-own-foundation case (29 → 30 checks; 294 → 297 in the suite).
+
 ### Fixed — `docs/TODO.md` P0-3: a building placed on an invalid spot appeared elsewhere
 
 - `build` in `src/commands.js` answered a click it could not build on — an occupied or
@@ -14,7 +37,7 @@ commits on `main`.
   site or a refusal: `Can't build there`, nothing spent, no building, and `Game.placing`
   stays armed. The 7-tile limit is gone — the builder walks — so a click 20 tiles away
   builds exactly on that tile, and `findSite` only answers the button call that carries no
-  tile. That rule is now one exported function, `canPlaceAt` (`src/commands.js:137`), which
+  tile. That rule is now one exported function, `canPlaceAt` (`src/commands.js:156`), which
   `drawGhost` (`src/render.js:240`) uses too: the ghost used to judge the tile with
   `siteFree` alone, so an age-gated kind hovered green where the click would only answer
   `requires Feudal Age`. `near` (`src/commands.js`) is gone with the range limit.

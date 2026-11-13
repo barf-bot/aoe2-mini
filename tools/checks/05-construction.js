@@ -31,32 +31,70 @@ check(house.hp === house.maxHp, 'build: hp scales with progress to full', house.
 check(AoE2.popCap(Game, 0) === 10, 'pop: house raises the cap to 10', String(AoE2.popCap(Game, 0)));
 check(AoE2.siteFree(Game, house.tx, house.ty, 2, 2) === false, 'site: occupied land rejected after building', 'rejected');
 
-// T5 multi-build: build() used to hand every new site to sel.find(villager) —
-// the same first villager — so the second placement yanked him off his first
-// site and left it stalled at partial forever. Two placements from one
-// 4-villager selection must recruit two different idle builders, and the sim
-// must then finish both buildings. The farm pad goes next to the SECOND
-// villager's tile (straight-line walking cannot always reach a pad across a
-// live resource tile — roadmap P0.2 keeps that out of this check).
-const mb = AoE2.createState();
-const mv = mb.units.filter((u) => u.team === 0 && u.kind === 'villager');
-mb.selection = mv.map((u) => u.id);
-const mbHouseSpot = freeSpotAround(mb.world, mb, tOf(mv[0].x), tOf(mv[0].y), 2, 2, 8);
-const mbHouse = mbHouseSpot && AoE2.build(mb, 'house', mbHouseSpot.tx * AoE2.CFG.TILE + 4, mbHouseSpot.ty * AoE2.CFG.TILE + 4);
-const mbFarmSpot = mbHouse && freeSpotAround(mb.world, mb, tOf(mv[1].x), tOf(mv[1].y), 2, 2, 8);
-const mbFarm = mbFarmSpot && AoE2.build(mb, 'farm', mbFarmSpot.tx * AoE2.CFG.TILE + 4, mbFarmSpot.ty * AoE2.CFG.TILE + 4);
-const buildersOn = (bid) => mb.units.filter((u) => u.order.kind === 'build' && u.order.b === bid).map((u) => u.id);
-const mbBuilders = mbHouse && mbFarm ? [buildersOn(mbHouse.id), buildersOn(mbFarm.id)] : null;
-// the slower of the two parallel sites (the house) decides the window, from BLD
-for (let i = 0; i < Math.ceil(AoE2.BLD.house.time / DT) + 2; i++) AoE2.stepGame(mb, DT);
-check(!!mbHouse && !!mbFarm && !!mbBuilders &&
-      mbBuilders[0].length === 1 && mbBuilders[1].length === 1 &&
-      mbBuilders[0][0] !== mbBuilders[1][0] && mbHouse.built >= 1 && mbFarm.built >= 1,
-  'build: two placements from a 4-villager selection get two distinct builders and both complete',
-  !mbHouse || !mbFarm
-    ? 'placement failed: ' + [!mbHouse && 'house', !mbFarm && 'farm'].filter(Boolean).join(' ')
-    : 'house builder [' + mbBuilders[0].join(',') + '] farm builder [' + mbBuilders[1].join(',') + ']' +
-      ' built ' + Math.round(mbHouse.built * 100) + '%/' + Math.round(mbFarm.built * 100) + '%');
+// T5 multi-build (docs/CHANGELOG.md: pickBuilder assigns the nearest idle
+// villager so a second placement never yanks a builder off his first site) plus
+// docs/TODO.md P0-4: a placement now drafts EVERY free villager in the selection
+// — one already working a site with built < 1 is not free — and their work
+// stacks in updateUnit's build branch. So the old fixture ("two sites up at
+// once, one builder each") becomes "one house with the whole crew, then the
+// farm the same crew releases", measured against the same house on the same
+// seeded world raised by a single builder.
+const villagersIn = (st) => st.units.filter((u) => u.team === 0 && u.kind === 'villager');
+const crewOn = (st, bid) => st.units
+  .filter((u) => u.order.kind === 'build' && u.order.b === bid).map((u) => u.id);
+const stepsToBuilt = (st, b) => {                    // frames until the site is finished
+  const cap = Math.ceil((AoE2.BLD[b.kind].time + 8) / DT);          // + the walk to the pad
+  let steps = 0;
+  while (b.built < 1 && steps < cap) { AoE2.stepGame(st, DT); steps++; }
+  return steps;
+};
+const placeAt = (st, kind, spot) =>
+  AoE2.build(st, kind, spot.tx * AoE2.CFG.TILE + 4, spot.ty * AoE2.CFG.TILE + 4);
+const soloHouse = (() => {                           // the same house, one builder selected
+  const st = AoE2.createState();
+  const v = villagersIn(st)[0];
+  if (!v) return null;
+  const spot = freeSpotAround(st.world, st, tOf(v.x), tOf(v.y), 2, 2, 8);
+  st.selection = [v.id];                              // pin the builder, as §7 does
+  const b = spot && placeAt(st, 'house', spot);
+  if (!b) return null;
+  const crew = crewOn(st, b.id);
+  const steps = stepsToBuilt(st, b);
+  return { crew: crew.length, built: b.built, steps };
+})();
+const mb = (() => {                                  // ... and with the whole village selected
+  const st = AoE2.createState();
+  const mv = villagersIn(st);
+  if (!mv.length) return null;
+  const spot = freeSpotAround(st.world, st, tOf(mv[0].x), tOf(mv[0].y), 2, 2, 8);
+  st.selection = mv.map((u) => u.id);                 // every villager in the village
+  const house = spot && placeAt(st, 'house', spot);
+  if (!house) return null;
+  const crew = crewOn(st, house.id);
+  const steps = stepsToBuilt(st, house);
+  const farmSpot = mv.length > 1 && freeSpotAround(st.world, st, tOf(mv[1].x), tOf(mv[1].y), 2, 2, 8);
+  const farm = farmSpot && placeAt(st, 'farm', farmSpot);
+  return { n: mv.length, house, crew, steps, farm, toast: st.toastMsg,
+           farmCrew: farm ? crewOn(st, farm.id) : [], farmSteps: farm ? stepsToBuilt(st, farm) : 0 };
+})();
+check(!!mb && mb.crew.length === mb.n && mb.house.built >= 1,
+  'build: a placement drafts every free villager in the selection',
+  !mb ? 'the house could not be placed'
+    : 'crew ' + mb.crew.length + '/' + mb.n + ' builders, built ' +
+      Math.round(mb.house.built * 100) + '%');
+check(!!mb && !!soloHouse && soloHouse.crew === 1 && mb.house.built >= 1 &&
+      soloHouse.built >= 1 && mb.steps < soloHouse.steps,
+  'build: the whole crew finishes a house faster than one villager does',
+  !mb || !soloHouse ? 'placement failed: ' + (!mb ? 'crew site' : 'single-builder site')
+    : mb.crew.length + ' builders took ' + mb.steps + ' steps, ' + soloHouse.crew +
+      ' builder took ' + soloHouse.steps);
+check(!!mb && !!mb.farm && mb.farm.built >= 1 &&
+      JSON.stringify(mb.farmCrew.slice().sort()) === JSON.stringify(mb.crew.slice().sort()),
+  'build: the crew the finished site releases raises the next one',
+  !mb ? 'the house could not be placed'
+    : !mb.farm ? 'no second site (toast ' + JSON.stringify(mb.toast) + ')'
+      : 'farm crew ' + mb.farmCrew.length + '/' + mb.crew.length + ', built ' +
+        Math.round(mb.farm.built * 100) + '% in ' + mb.farmSteps + ' steps');
 
 // T1 blacksmith: the BLAC row joins BLD behind an authored `age` gate -- a
 // Dark Age village is refused with a toast before any villager is drafted

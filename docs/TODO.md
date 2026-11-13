@@ -21,21 +21,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P0 — the game cannot be played with the mouse
 
-### 4. Villagers cannot be sent to a construction site
-
-**Verified.** Right-clicking an own foundation gives the villager a plain `move` order;
-after 60 s the site is still at 0 %. With four villagers selected, placing a building
-assigns exactly one builder. A site whose builder was pulled away or killed can never be
-finished.
-
-- **Cause:** `orderForUnit` in `src/commands.js` has no case for an own building with
-  `built < 1`; `build` assigns only `pickBuilder`'s single villager.
-- **Fix:** in `orderForUnit`, a villager clicking an own unfinished building gets
-  `{ kind: 'build', b: id }`. In `build`, give that order to every selected villager that
-  is free. `updateUnit`'s build branch already lets several builders add progress.
-- **Done when:** (a) right-click on a foundation finishes it; (b) four selected villagers
-  all get `build` orders and finish a house faster than one does.
-
 ---
 
 ## P1 — wrong behaviour you notice within a minute
