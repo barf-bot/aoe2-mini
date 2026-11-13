@@ -4,7 +4,7 @@
 function pickUnit(Game, x, y) {
   let best = null, bd = Infinity;
   for (const u of Game.units) {
-    if (u.dead || u.team !== 0) continue;
+    if (u.dead || u.team !== 0 || u.garrisonedIn) continue;
     const d = (u.x - x) ** 2 + (u.y - y) ** 2;
     if (d < 64 && d < bd) { bd = d; best = u; }
   }
@@ -20,7 +20,7 @@ function pickBuilding(Game, x, y) {
 }
 
 function unitsInBox(Game, ax, ay, bx, by) {
-  return Game.units.filter(u => !u.dead && u.team === 0 && u.x >= ax && u.x <= bx && u.y >= ay && u.y <= by);
+  return Game.units.filter(u => !u.dead && u.team === 0 && !u.garrisonedIn && u.x >= ax && u.x <= bx && u.y >= ay && u.y <= by);
 }
 /** Where a pointer went down, in every frame the command needs: the canvas point
  *  (drag box), the world point (order / build target) and the press identity

@@ -9,7 +9,7 @@ function orderForUnit(Game, u, wx, wy) {
   if (wx < 0 || wy < 0 || wx >= world.w * CFG.TILE || wy >= world.h * CFG.TILE) return null;
   const tx = Math.floor(wx / CFG.TILE), ty = Math.floor(wy / CFG.TILE);
 
-  const enemy = Game.units.find(v => v.team !== u.team && !v.dead &&
+  const enemy = Game.units.find(v => targetableAsEnemy(v, u.team) &&
     Math.hypot(v.x - wx, v.y - wy) < CFG.TILE * 0.8);
   if (enemy) return { kind: 'attack', target: enemy.id };
   const eB = Game.buildings.find(b => attackableAsEnemy(b, u.team) &&
@@ -51,7 +51,7 @@ function orderForUnit(Game, u, wx, wy) {
 function issueOrder(Game, wx, wy) {
   const sel = selectedUnits(Game);
   if (!sel.length) return;
-  const enemy = Game.units.find(v => v.team !== sel[0].team && !v.dead &&
+  const enemy = Game.units.find(v => targetableAsEnemy(v, sel[0].team) &&
     Math.hypot(v.x - wx, v.y - wy) < CFG.TILE * 0.8);
   const tTx = Math.floor(wx / CFG.TILE), tTy = Math.floor(wy / CFG.TILE);
   const eB = Game.buildings.find(b => attackableAsEnemy(b, sel[0].team) &&

@@ -35,7 +35,7 @@ function aiStep(Game, dt) {
 function nearestEnemy(Game, team) {
   let best = null, bd = Infinity;
   for (const u of Game.units) {
-    if (u.team === team || u.dead) continue;
+    if (!targetableAsEnemy(u, team)) continue;
     const home = Game.buildings.find(b => b.team === team && b.built >= 1);
     if (!home) return u;
     const d = (u.x - home.x) ** 2 + (u.y - home.y) ** 2;

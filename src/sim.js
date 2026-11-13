@@ -172,7 +172,7 @@ function autoAcquire(Game, u) {
                                              : CFG.ACQUIRE * CFG.TILE;          /* melee: the authored radius */
   let bestUnit = null, du = Infinity;
   for (const v of Game.units) {
-    if (v.team === u.team || v.dead) continue;
+    if (!targetableAsEnemy(v, u.team)) continue;
     const d = Math.hypot(v.x - u.x, v.y - u.y);
     if (d <= RU && d < du) { du = d; bestUnit = v; }
   }
@@ -190,6 +190,9 @@ function autoAcquire(Game, u) {
 function updateUnit(Game, u, dt) {
   if (u.dead) return;
   const o = u.order;
+  /* A linked unit executes nothing but the garrison walk his order names: one rule for
+   *  the parked state and the arrival, so moveUnit (the writer of u.face/u.anim) is skipped. */
+  if (u.garrisonedIn && !(o.kind === 'move' && o.garrison === u.garrisonedIn)) return;
 
   if (o.kind === 'idle') {
     const spot = autoAcquire(Game, u);          // standing still: take the nearest fight
@@ -313,4 +316,13 @@ function updateUnit(Game, u, dt) {
  *  to a sword again. */
 function attackableAsEnemy(b, team) {
   return !!b && b.team !== team;
+}
+
+/** The rule for pointing a weapon at an enemy unit, written once (the unit sibling of
+ *  attackableAsEnemy above, docs/plans/2026-11-13-garrison.md T2): a dead unit and a unit
+ *  of the shooter's own team are never targets, and neither is a unit inside a building —
+ *  garrisoned, he cannot be picked, ordered or hit. autoAcquire, orderForUnit, issueOrder
+ *  and ai's nearestEnemy read this one instead of re-typing the predicate. */
+function targetableAsEnemy(u, team) {
+  return !!u && !u.dead && u.team !== team && !u.garrisonedIn;
 }

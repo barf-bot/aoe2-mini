@@ -1,9 +1,9 @@
 'use strict';
-/* checks/07-combat.js -- melee, auto-acquire, ranged combat, attack/armour math, game over, towers.
+/* checks/07-combat.js -- melee, auto-acquire, ranged combat, attack/armour math, game over, towers, garrison.
    Runs on its own (`node tools/checks/07-combat.js`) against a freshly booted game. */
 
 const {
-  AoE2, DT, Game, check, freeSpotAround, makeDoc, path, stubEl, tOf, tc, report,
+  AoE2, DT, Game, builtAt, check, flatState, freeSpotAround, makeDoc, path, stubEl, tOf, tc, report,
 } = require('../lib/harness');
 
 /* ---- 9. combat ------------------------------------------------------ */
@@ -417,5 +417,102 @@ check(!!rbRaze && !rbRaze.err && rbRaze.v === true && !rb.st.buildings.includes(
       : `removed=${String(rbRaze.v)} selection=${String(rb.st.selectedBuilding)} ` +
         `toast=${rb.st.toastMsg} walkable=${String(AoE2.walkable(rb.st, rb.b.x, rb.b.y))} ` +
         `result=${String(rb.st.result)}`);
+
+/* ---- 9h. garrison (this plan, T2) ------------------------------------- */
+/* The inside half of docs/plans/2026-11-13-garrison.md: a unit whose `garrisonedIn` is
+ * set executes nothing but the walk his garrison order started (updateUnit's guard), is
+ * not drawn (drawUnits skips him) and cannot be pointed at by a weapon — targetableAsEnemy,
+ * the new unit sibling of attackableAsEnemy, now read by autoAcquire, orderForUnit,
+ * issueOrder and ai's nearestEnemy — while population keeps counting him. Each fixture is
+ * a throwaway flatState with an own barracks and two own militia inside it, parked on the
+ * very ring tiles their garrison orders name (so the walk ends on the first step) plus one
+ * enemy militia on the next ring tile; the arrow case borrows §9f's projectile idiom, the
+ * last one releases a single unit through leaveBuilding and hits him. */
+const garrisonedAt = (ty) => {
+  const st = flatState();
+  const b = builtAt(st, 'barracks', ty);
+  const ring = AoE2.standingSpots(st, b, 3);
+  const m0 = AoE2.makeUnit(st, 'militia', 0, ring[0].x, ring[0].y);
+  const m1 = AoE2.makeUnit(st, 'militia', 0, ring[1].x, ring[1].y);
+  const g = mCall(AoE2.garrisonUnits, st, [m0.id, m1.id], b);
+  const foe = g.err ? null : AoE2.makeUnit(st, 'militia', 1, ring[2].x, ring[2].y);
+  return { st, b, m0, m1, foe, took: g.err ? null : g.v.length, err: g.err || null };
+};
+const gPick = (() => {
+  const g = garrisonedAt(30);
+  const errOf = (r) => ('err' in r ? r.err : null);            // mCall's answer has no err key on success
+  const found = g.err ? { err: g.err } : mCall(AoE2.pickUnit, g.st, g.m0.x, g.m0.y);
+  const box = g.err ? { err: g.err } : mCall(AoE2.unitsInBox, g.st, g.m0.x - 1, g.m0.y - 1, g.m0.x + 1, g.m0.y + 1);
+  return { err: g.err || errOf(found) || errOf(box) || null, took: g.took, bId: g.b.id,
+           pickNull: errOf(found) === null && found.v === null,
+           boxIds: errOf(box) === null ? box.v.map((u) => u.id).join('+') : String(errOf(box)) };
+})();
+check(gPick.err === null && gPick.took === 2 && gPick.pickNull,
+  'combat: a garrisoned unit is not picked by a click', JSON.stringify(gPick));
+check(gPick.err === null && gPick.boxIds === '',
+  'combat: a garrisoned unit is not picked by a drag box', JSON.stringify(gPick));
+const gTarget = (() => {
+  const g = garrisonedAt(31);
+  const asEnemy = g.err ? { err: g.err } : mCall(AoE2.targetableAsEnemy, g.m0, 1);
+  const asOwn = g.err ? { err: g.err } : mCall(AoE2.targetableAsEnemy, g.m0, 0);
+  const foeLive = g.err ? { err: g.err } : mCall(AoE2.targetableAsEnemy, g.foe, 0);
+  const order = g.err ? { err: g.err } : mCall(AoE2.autoAcquire, g.st, g.foe);
+  return { err: asEnemy.err || asOwn.err || foeLive.err || order.err || null,
+           asEnemy: asEnemy.v, asOwn: asOwn.v, foeLive: foeLive.v, bId: g.b.id, order: order.v };
+})();
+check(gTarget.err === null && gTarget.asEnemy === false && gTarget.asOwn === false &&
+      gTarget.foeLive === true && !!gTarget.order && gTarget.order.kind === 'attack' &&
+      gTarget.order.b === gTarget.bId,
+  'combat: a garrisoned unit is not targetable as an enemy', JSON.stringify(gTarget));
+const gArrow = (() => {
+  const st = flatState(), b = builtAt(st, 'barracks', 32);
+  const ring = AoE2.standingSpots(st, b, 2);
+  const u = mCall(AoE2.makeUnit, st, 'militia', 0, ring[0].x, ring[0].y);
+  const g = u.err ? u : mCall(AoE2.garrisonUnits, st, [u.v.id], b);
+  const archer = g.err ? g : mCall(AoE2.makeUnit, st, 'archer', 1, ring[1].x, ring[1].y);
+  const arrow = archer.err ? archer : mCall(AoE2.spawnArrow, st, archer.v, b);
+  if (arrow.err) return { err: arrow.err };
+  arrow.v.accuracy = 100;                                  // §9c owns the row's 80 % roll
+  const hp0 = b.hp;
+  let steps = 0;
+  const fly = mCall(() => { while (st.projectiles.length && steps < 60) { AoE2.updateProjectiles(st, DT); steps++; } });
+  return { err: fly.err || null, hp0, hp: b.hp, steps, uHp: u.v.hp, uMax: u.v.maxHp,
+           inside: u.v.garrisonedIn === b.id, gone: st.projectiles.length === 0 };
+})();
+check(gArrow.err === null && gArrow.gone && gArrow.hp < gArrow.hp0 && gArrow.uHp === gArrow.uMax &&
+      gArrow.inside,
+  'combat: an arrow that lands on his building never touches him', JSON.stringify(gArrow));
+const gWalk = (() => {
+  const g = garrisonedAt(33);
+  if (g.err) return { err: g.err };
+  const u = g.m0;
+  let steps = 0, err = null, a = null, later = null;
+  try {
+    while (u.order.kind !== 'idle' && steps < 300) { AoE2.stepSim(g.st, DT); steps++; }
+    a = { x: u.x, y: u.y, anim: u.anim, order: u.order.kind, slot: u.slot,
+          path: u.path === null ? 'null' : 'set' };
+    for (let i = 0; i < 30; i++) AoE2.stepSim(g.st, DT);
+    later = { x: u.x, y: u.y, anim: u.anim };
+  } catch (e) { err = e.message; }
+  const still = !!a && !!later && a.x === later.x && a.y === later.y && a.anim === later.anim;
+  return { err: err || (still ? null : 'moved'), steps, a, count: g.st.units.filter((x) => x.garrisonedIn === g.b.id).length };
+})();
+check(gWalk.err === null && !!gWalk.a && gWalk.a.order === 'idle' && gWalk.a.path === 'null' &&
+      gWalk.a.slot === null && gWalk.count === 2,
+  'combat: the garrison walk ends on the standing spot and parks him there', JSON.stringify(gWalk));
+const gOut = (() => {
+  const g = garrisonedAt(36);
+  const left = g.err ? g : mCall(AoE2.leaveBuilding, g.st, g.b, [g.m0.id]);
+  const tgt = g.err ? g : mCall(AoE2.targetableAsEnemy, g.m0, 1);
+  const found = g.err ? g : mCall(AoE2.pickUnit, g.st, g.m0.x, g.m0.y);
+  const before = g.m0 ? g.m0.hp : null;
+  const hit = left.err ? left : mCall(AoE2.hitUnit, g.st, g.m0, 10);
+  return { err: g.err || left.err || tgt.err || found.err || hit.err || null, m0Id: g.m0 && g.m0.id,
+           left: left.v, targetable: tgt.v, found: found.v && found.v.id, before,
+           after: g.m0 && g.m0.hp, armour: g.m0 && AoE2.unitArmor(g.st, g.m0, 'melee') };
+})();
+check(gOut.err === null && gOut.left === 1 && gOut.targetable === true && gOut.found === gOut.m0Id &&
+      gOut.after === gOut.before - Math.max(1, 10 - gOut.armour),
+  'combat: after leaveBuilding he is hittable again', JSON.stringify(gOut));
 
 report();

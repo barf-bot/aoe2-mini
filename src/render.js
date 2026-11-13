@@ -158,7 +158,7 @@ function drawUnits(Game, view) {
   if (!c) return;
   const cam = Game.cam;
   const atlas = Game.sprites && Game.sprites.atlas; // assets/sprites.png, see loadAtlas
-  for (const u of Game.units) {
+  for (const u of Game.units) { if (u.garrisonedIn) continue;   // inside a building: not drawn
     const x = u.x - cam.x, y = u.y - cam.y;
     if (x < -20 || y < -20 || x > view.w + 20 || y > view.h + 20) continue;
     const team = TEAM[u.team];
