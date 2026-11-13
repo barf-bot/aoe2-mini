@@ -189,9 +189,33 @@ check(cancelled.live && cancelled.drag === null &&
   'input: pointercancel drops the drag without selecting or commanding',
   JSON.stringify(cancelled));
 
+/* P2-13: the minimap drags, not just jumps. A left press recentres the camera and
+   arms Game.mmPointer; while that pointer is down every pointermove recentres
+   again; the release disarms and a later hover (no button down) leaves the camera
+   alone. A right press neither moves nor arms — right-click is the canvas's
+   contextmenu order, never a minimap drag. */
+const mmEl = doc.getElementById('minimap');
 const mmBefore = Game.cam.x;
-doc.getElementById('minimap').fire('mousedown', { clientX: 84, clientY: 84, target: doc.getElementById('minimap') });
-check(Game.cam.x !== mmBefore, 'input: minimap click moves the camera', mmBefore + ' -> ' + Math.round(Game.cam.x));
+mmEl.fire('pointerdown', { clientX: 84, clientY: 84, button: 0, pointerId: 7 });
+const mmDown = Game.cam.x;
+check(mmDown !== mmBefore && Game.mmPointer === 7,
+  'input: minimap press moves the camera and arms its pointer',
+  mmBefore + ' -> ' + Math.round(mmDown) + ', pointer ' + Game.mmPointer);
+mmEl.fire('pointermove', { clientX: 120, clientY: 40, pointerId: 7 });
+const mmDrag = Game.cam.x;
+check(mmDrag !== mmDown && Game.mmPointer === 7,
+  'input: pointermove while the press is held drags the camera',
+  mmDown + ' -> ' + Math.round(mmDrag));
+mmEl.fire('pointerup', { clientX: 120, clientY: 40, button: 0, pointerId: 7 });
+const mmUp = Game.cam.x;
+mmEl.fire('pointermove', { clientX: 20, clientY: 150, pointerId: 7 });
+check(Game.mmPointer === null && Game.cam.x === mmUp,
+  'input: release disarms and a hover with no button leaves the camera',
+  mmUp + ' -> ' + Math.round(Game.cam.x) + ', pointer ' + Game.mmPointer);
+mmEl.fire('pointerdown', { clientX: 40, clientY: 40, button: 2, pointerId: 8 });
+check(Game.mmPointer === null && Game.cam.x === mmUp,
+  'input: right-click on the minimap does not start a drag',
+  Game.mmPointer + ', ' + Math.round(Game.cam.x));
 
 /* ---- 10b. edge-scroll must ignore pointer on HUD chrome -------------- */
 // Regression (reported): "the screen starts to move when the mouse just wants

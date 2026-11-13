@@ -5,6 +5,29 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P2-13: the minimap could be clicked but not dragged
+
+- `attachInput` listened to `mousedown` on `#minimap` only, so a press jumped the
+  camera and moving with the button held did nothing — the "minimap camera drag"
+  the README advertises never followed the drag. The canvas path above it already
+  used pointer events (`src/input.js:90`), so the minimap now does too
+  (`src/input.js:191`): `pointerdown` — left button only, so a right-click on the
+  minimap neither drags nor reaches the canvas `contextmenu` order path — records
+  `Game.mmPointer` (`src/boot.js:44`, transient like `Game.mmBase`, not saved) and
+  recentres, `pointermove` recentres only while that very pointer is down, and
+  `pointerup` / `pointercancel` clear it. The press takes pointer capture where the
+  element offers one (the stub DOM does not, so it is guarded), keeping moves and
+  the release arriving at `#minimap` even when the pointer strays off it.
+- The fraction-to-camera maths left the listener body for one named helper,
+  `centerCamOnFraction` (`src/input.js:233`), called by the press and the drag
+  alike so the two cannot drift.
+- checks: 324 → 327. `tools/checks/08-input.js` replaces its `mousedown` assertion
+  with four: the `pointerdown` press moves the camera and arms `Game.mmPointer`, a
+  `pointermove` while held drags the camera again, a `pointermove` after the
+  release (no button down) leaves it where it is, and a right press neither moves
+  nor arms.
+- `preview.png` regenerates byte-identical (no render path changed).
+
 ### Fixed — `docs/TODO.md` P2-12: `W` placed a barricade instead of panning
 
 - The keydown handler (`src/input.js:145`) armed Barricade placement on `w` and returned

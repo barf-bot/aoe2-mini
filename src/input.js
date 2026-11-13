@@ -188,16 +188,35 @@ function attachInput(Game, d) {
     });
   }
 
+  /* Minimap camera drag (docs/TODO.md P2-13): mousedown alone only jumped, so
+     the drag the README advertises never followed the held button. The canvas
+     listeners above show the pattern — pointerdown arms Game.mmPointer (left
+     button only, so a right-click never starts a minimap drag), pointermove
+     recentres only while that very pointer is still down, pointerup /
+     pointercancel disarm. The capture keeps moves and the release arriving at
+     #minimap even when the pointer strays off it (the stub DOM has none, so
+     it is guarded). */
   if (Game.dom.minimap && Game.dom.minimap.addEventListener) {
-    Game.dom.minimap.addEventListener('mousedown', (e) => {
-      const r = Game.dom.minimap.getBoundingClientRect();
-      const fx = (e.clientX - r.left) / (r.width || 1), fy = (e.clientY - r.top) / (r.height || 1);
-      Game.cam.x = clamp(fx * Game.world.w * CFG.TILE - view_W(Game) / 2,
-                         0, Math.max(0, Game.world.w * CFG.TILE - view_W(Game)));
-      Game.cam.y = clamp(fy * Game.world.h * CFG.TILE - view_H(Game) / 2,
-                         0, Math.max(0, Game.world.h * CFG.TILE - view_H(Game)));
+    const mm = Game.dom.minimap;
+    const mmPoint = (e) => {
+      const r = mm.getBoundingClientRect();
+      centerCamOnFraction(Game, (e.clientX - r.left) / (r.width || 1),
+                          (e.clientY - r.top) / (r.height || 1));
+    };
+    mm.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      if (mm.setPointerCapture) mm.setPointerCapture(e.pointerId);
+      Game.mmPointer = e.pointerId;
+      mmPoint(e);
       e.stopPropagation();
     });
+    mm.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== Game.mmPointer) return;
+      mmPoint(e);
+    });
+    const mmUp = (e) => { if (e.pointerId === Game.mmPointer) Game.mmPointer = null; };
+    mm.addEventListener('pointerup', mmUp);
+    mm.addEventListener('pointercancel', mmUp);
   }
 
   if (typeof window !== 'undefined' && window.addEventListener) {
@@ -206,6 +225,16 @@ function attachInput(Game, d) {
       Game.mmBase = null;
     });
   }
+}
+
+/** The one fraction-to-camera rule: a point on the minimap, as a fraction of its
+ *  width/height, becomes the world point the camera centres on, clamped to the
+ *  map. The press and the drag both call it so they cannot drift. */
+function centerCamOnFraction(Game, fx, fy) {
+  Game.cam.x = clamp(fx * Game.world.w * CFG.TILE - view_W(Game) / 2,
+                     0, Math.max(0, Game.world.w * CFG.TILE - view_W(Game)));
+  Game.cam.y = clamp(fy * Game.world.h * CFG.TILE - view_H(Game) / 2,
+                     0, Math.max(0, Game.world.h * CFG.TILE - view_H(Game)));
 }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }

@@ -29,14 +29,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P2 — smaller defects
 
-### 13. The minimap cannot be dragged
-
-**Verified.** A press on the minimap jumps the camera; dragging does nothing. The README
-advertises "minimap camera drag".
-
-- **Cause:** `attachInput` in `src/input.js` registers only `mousedown` on `#minimap`.
-- **Fix:** use pointer events and keep following while the button is down.
-
 ### 14. Age up is instant, has no requirements, and goes one age too far
 
 **Verified.** Three clicks with enough food reach Imperial Age immediately. Nothing in

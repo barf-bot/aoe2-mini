@@ -34,7 +34,7 @@ simulation.
 | `src/sound.js` | guarded | `playSfx` (WebAudio synth of the `SFX` rows), `isMuted`/`setMuted`/`applyMuteButton` |
 | `src/render.js` | yes | `beginCanvas`, world/building/unit drawing (`drawBuildings`, `unitAnim`, `drawUnits`, `drawProjectiles`), ghost, drag box, minimap, `renderFrame` |
 | `src/hud.js` | yes | the uniform HUD frame (`renderHud`/`hudState`/`hudHtml` with `infoHtml`/`commandsHtml`/`queueHtml`) and `resultHtml` |
-| `src/input.js` | yes | picking (`pickUnit`/`pickBuilding`/`unitsInBox`), the pure `pointerDown`/`pointerUp` both pointer listeners delegate to, `attachInput`'s pointer/keyboard/mute/command-bar/minimap listeners, `buttonAt`, `clamp` |
+| `src/input.js` | yes | picking (`pickUnit`/`pickBuilding`/`unitsInBox`), the pure `pointerDown`/`pointerUp` both pointer listeners delegate to, `attachInput`'s pointer/keyboard/mute/command-bar/minimap listeners, `buttonAt`, `centerCamOnFraction`, `clamp` |
 | `src/boot.js` | yes | canvas sizing, `createState`, `resetGame`, `loadAtlas`, `boot` (mute-button sync first), the rAF loop (`startLoop`/`stepGame`) |
 | `src/main.js` | yes | the public surface — the `AoE2` object every tool reads — and the `window.Game = boot(document)` call |
 
