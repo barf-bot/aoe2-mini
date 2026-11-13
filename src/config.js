@@ -269,7 +269,7 @@ const TECHS = {
   },
 };
 
-const AGES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
+const AGES = ['Dark Age', 'Feudal Age', 'Castle Age'];
 const SAVE_PATH = 'aoe2mini:save';
 const MUTE_PATH = 'aoe2mini:muted';
 /* touch: a press this long that stayed inside this many pixels is the right-click

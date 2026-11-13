@@ -92,8 +92,18 @@ Game.res[0].food = 900;
 AoE2.upgradeAge(Game);
 check(Game.age[0] === 1 && Game.res[0].food === 400, 'age: Feudal Age costs 500 food', 'age=' + Game.age[0] + ' food=' + Game.res[0].food);
 check(AoE2.AGES[Game.age[0]] === 'Feudal Age', 'age: label follows the age', AoE2.AGES[Game.age[0]]);
-check(AoE2.upgradeAge(Game) === undefined && Game.res[0].food === 400 || true, 'age: Castle Age needs 1000 food',
-  JSON.stringify(Game.toastMsg));
+check(AoE2.upgradeAge(Game) === undefined && Game.age[0] === 1 && Game.res[0].food === 400 &&
+  Game.toastMsg === 'Need 1000 food', 'age: Castle Age needs 1000 food',
+  'age=' + Game.age[0] + ' food=' + Game.res[0].food + ' toast=' + JSON.stringify(Game.toastMsg));
+Game.res[0].food = 1000;
+AoE2.upgradeAge(Game);
+check(Game.age[0] === 2 && Game.res[0].food === 0 && Game.toastMsg === 'Castle Age reached',
+  'age: Castle Age is the last age the player can reach',
+  'age=' + Game.age[0] + ' food=' + Game.res[0].food + ' toast=' + JSON.stringify(Game.toastMsg));
+Game.res[0].food = 5000;
+check(AoE2.upgradeAge(Game) === undefined && Game.age[0] === 2 && Game.res[0].food === 5000 &&
+  Game.toastMsg === 'Castle Age reached', 'age: Castle Age is the ceiling: refused, nothing spent',
+  'age=' + Game.age[0] + ' food=' + Game.res[0].food + ' toast=' + JSON.stringify(Game.toastMsg));
 // T1: the gate in the command bar -- paired states like the half/done checks
 // above: a Dark Age village (fresh fixture) offers no Blacksmith button, and
 // the now-Feudal Game (the age check above) does.

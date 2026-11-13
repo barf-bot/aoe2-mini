@@ -5,6 +5,23 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P2-14: age up went one age too far
+
+- `AGES` (`src/config.js:272`) loses its fourth entry: the game ends at Castle Age, which is
+  what the README already promised. `upgradeAge` (`src/commands.js:267`) hardcoded
+  `Imperial Age reached` in its guard, so the refusal could name an age the table no longer
+  has; it now reports `AGES[AGES.length - 1] + ' reached'` — the same expression the success
+  path uses — so guard and toast cannot drift again.
+- Nothing in `data/buildings.json` / `data/techs.json` asks for more than Feudal, so no
+  `age:` row needed renumbering; the age up stays instant. The entry's optional Town Center
+  research time is a new mechanic (queue, ticking, save state, HUD progress) and is deferred
+  to its own item.
+- checks: 327 → 329. `tools/checks/09-hud.js` replaces the tautological
+  `age: Castle Age needs 1000 food` (its condition ended in `|| true`) with three real ones:
+  the 1000-food refusal at Feudal, the paid upgrade to Castle Age, and the refused-and-unpaid
+  `upgradeAge` there; `tools/checks/11-sound.js` pins the new refusal string.
+- `preview.png` regenerates byte-identical (no render path changed).
+
 ### Fixed — `docs/TODO.md` P2-13: the minimap could be clicked but not dragged
 
 - `attachInput` listened to `mousedown` on `#minimap` only, so a press jumped the

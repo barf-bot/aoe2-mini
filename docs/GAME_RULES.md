@@ -239,9 +239,10 @@ a bug.
 
 ## Ages (`AGES`)
 
-Dark Age → Feudal Age → Castle Age → Imperial Age.
+Dark Age → Feudal Age → Castle Age (`src/config.js:272`): Castle Age is the last age, as the
+README states, and `upgradeAge` (`src/commands.js:266`) answers `Castle Age reached` there.
 Cost (`src/config.js:17`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
-costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle, Castle → Imperial). Hotkey `T`.
+costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle). Hotkey `T`.
 Each upgrade sets `Game.ageBonus[0] = Game.age[0]`, which scales the player's unit damage; the
 enemy's half stays 0 and its tech set empty until the AI can research (docs/TODO.md P1-11).
 

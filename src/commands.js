@@ -264,7 +264,7 @@ function trade(Game, b, res, direction) {
 }
 
 function upgradeAge(Game) {
-  if (Game.age[0] >= AGES.length - 1) return toast(Game, 'Imperial Age reached');
+  if (Game.age[0] >= AGES.length - 1) return toast(Game, AGES[AGES.length - 1] + ' reached');
   const cost = { food: Game.age[0] === 0 ? CFG.AGE_FOOD : CFG.AGE_FOOD * 2 };
   if (!canAfford(Game, 0, cost)) return toast(Game, 'Need ' + cost.food + ' food');
   spend(Game, 0, cost);

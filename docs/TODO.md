@@ -29,14 +29,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P2 — smaller defects
 
-### 14. Age up is instant, has no requirements, and goes one age too far
-
-**Verified.** Three clicks with enough food reach Imperial Age immediately. Nothing in
-`BLD` or `TECHS` needs more than Feudal, and the README says the game stops at Castle.
-
-- **Fix:** decide the last age and make `AGES`, `upgradeAge` and the README agree.
-  Optional: a research time at the Town Center, as in AoE2.
-
 ### 15. Footer content is clipped
 
 **Verified** by screenshot at 1280×800: the third line of the info panel ("Order: build")
