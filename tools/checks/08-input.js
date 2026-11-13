@@ -1,10 +1,10 @@
 'use strict';
-/* checks/08-input.js -- mouse, keyboard, edge-scroll and touch input.
+/* checks/08-input.js -- mouse, keyboard, edge-scroll, touch input and garrison orders.
    Runs on its own (`node tools/checks/08-input.js`) against a freshly booted game. */
 
 const {
-  AoE2, DT, Game, blueVill, bootFixture, check, doc, flatState, freeSpotAround, html, pad,
-  path, tOf, tileCentre, report, withDpr,
+  AoE2, DT, Game, blueVill, bootFixture, builtAt, check, doc, flatState, freeSpotAround, html, pad,
+  path, siteAt, tOf, tileCentre, report, withDpr,
 } = require('../lib/harness');
 
 /* ---- 10. input ------------------------------------------------------ */
@@ -446,5 +446,199 @@ check(p1.dpr === 1 && p1.store === 1200 && p2.dpr === 2 && p2.store === 2400 &&
       p2.css === '1200px' && p1.sx === p2.sx && p1.sy === p2.sy && p1.sx === 300 && p1.sy === 200,
   'input: the cursor projection follows the logical viewport, not the device-pixel store',
   'dpr1 ' + JSON.stringify(p1) + ' / dpr2 ' + JSON.stringify(p2));
+/* ---- 10e. garrison (this plan, T1) ------------------------------------ */
+/* garrisonUnits / leaveBuilding and the right-click path that reaches them
+   (docs/plans/2026-11-13-garrison.md T1): a finished own building with capacity
+   takes the selected units into it, and every other click answers the order it
+   always gave. The first two cases drive the real page with doc.fire — exactly
+   what a right-click calls — so the listener wiring is proven too; the rest run on
+   throwaway flatState() fixtures, so the shared Game stays as the sections above
+   left it. The state builder makes `kind` at (40, ty) — finished unless `asSite` —
+   plus `n` own militia standing on the far side of its ring, so the tiles a garrison
+   order hands out are never the ones the units were standing on. */
+const garrisonState = (kind, ty, n, asSite) => {
+  const st = flatState();
+  const b = asSite ? siteAt(st, kind, ty) : builtAt(st, kind, ty);
+  const ring = AoE2.standingSpots(st, b, n + 2);
+  const us = [];
+  for (let i = 0; ring.length >= n && i < n; i++) {
+    const p = ring[ring.length - n + i];
+    us.push(AoE2.makeUnit(st, 'militia', 0, p.x, p.y));
+  }
+  return { st, b, us, ring };
+};
+const gClicked = (() => {
+  let threw = null, r = {};
+  try {
+    const out = bootFixture(undefined, (d, g) => {
+      const b = builtAt(g, 'barracks', 30);
+      const ring = AoE2.standingSpots(g, b, 4);
+      if (ring.length < 4) return null;                       // nowhere to stand the pair
+      const us = [AoE2.makeUnit(g, 'militia', 0, ring[2].x, ring[2].y),
+                  AoE2.makeUnit(g, 'militia', 0, ring[3].x, ring[3].y)];
+      g.selection = us.map((u) => u.id);
+      g.pingAt = -5; g.autosaveAt = Infinity;                 // the markDirty signature §13 pins
+      const at = tileCentre(g, b.tx, b.ty);
+      d.fire('contextmenu', { clientX: at.x - g.cam.x, clientY: at.y - g.cam.y });
+      return { bId: b.id, ids: us.map((u) => u.id), sel: g.selection.slice(),
+               linked: us.map((u) => u.garrisonedIn), orders: us.map((u) => ({ ...u.order })),
+               slots: us.map((u) => u.slot), want: ring.slice(0, 2),
+               time: g.time, ping: g.pingAt, save: g.autosaveAt };
+    });
+    r = out || {};
+    r.empty = !out;
+  } catch (e) { threw = e; }
+  return Object.assign({ threw: threw && threw.message }, r);
+})();
+check(gClicked.threw === null && !gClicked.empty && gClicked.linked.every((v) => v === gClicked.bId) &&
+      gClicked.sel.join(',') === gClicked.ids.join(',') && gClicked.ping === gClicked.time &&
+      gClicked.save === gClicked.time + AoE2.CFG.AUTOSAVE_DEBOUNCE,
+  'input: right-clicking a finished own barracks garrisons the selected militia',
+  JSON.stringify(gClicked));
+check(gClicked.threw === null && !gClicked.empty && gClicked.orders.length === gClicked.want.length &&
+      gClicked.orders.every((o, i) => o.kind === 'move' && o.garrison === gClicked.bId &&
+        o.x === gClicked.want[i].x && o.y === gClicked.want[i].y) &&
+      gClicked.slots.every((s) => s === null),
+  "input: the garrison order walks each unit onto the building's own standing spot",
+  JSON.stringify(gClicked));
+const gHalfFull = (() => {                                     // cap 5: 4 inside, 2 more ordered
+  const { st, b, us } = garrisonState('watch_tower', 31, 6);
+  let threw = null, r = {};
+  try {
+    const first = AoE2.garrisonUnits(st, us.slice(0, 4).map((u) => u.id), b);
+    const had = us.slice(4).map((u) => JSON.stringify(u.order));
+    const second = AoE2.garrisonUnits(st, us.slice(4).map((u) => u.id), b);
+    r = { cap: AoE2.BLD.watch_tower.garrisonCapacity, first: first.length, second: second.length,
+          took: second.map((u) => u.id), wantId: us[4].id, kept: had[1] === JSON.stringify(us[5].order),
+          changed: had[0] !== JSON.stringify(us[4].order), msg: st.toastMsg };
+  } catch (e) { threw = e; }
+  return Object.assign({ threw: threw && threw.message }, r);
+})();
+check(gHalfFull.threw === null && gHalfFull.cap === 5 && gHalfFull.first === 4 &&
+      gHalfFull.second === 1 && gHalfFull.took.length === 1 && gHalfFull.took[0] === gHalfFull.wantId &&
+      gHalfFull.kept && gHalfFull.changed && gHalfFull.msg === 'Watch Tower is full',
+  'input: one slot left takes one unit and toasts the second', JSON.stringify(gHalfFull));
+const gNoCap = (() => {                                        // a row with capacity 0
+  const { st, b, us } = garrisonState('house', 32, 1);
+  let threw = null, r = {};
+  try {
+    const took = AoE2.garrisonUnits(st, [us[0].id], b);
+    r = { took: took.length, msg: st.toastMsg, linked: us[0].garrisonedIn,
+          marked: st.pingAt !== -99 || st.autosaveAt !== 0 };
+  } catch (e) { threw = e; }
+  return Object.assign({ threw: threw && threw.message }, r);
+})();
+check(gNoCap.threw === null && gNoCap.took === 0 && gNoCap.msg === 'House has no garrison space' &&
+      gNoCap.linked === null && !gNoCap.marked,
+  'input: a building with no capacity refuses the order', JSON.stringify(gNoCap));
+const gSite = (() => {                                         // built < 1: the click still moves
+  const { st, b, us } = garrisonState('barracks', 33, 1, true);
+  let threw = null, r = {};
+  try {
+    const took = AoE2.garrisonUnits(st, [us[0].id], b);
+    const msg = st.toastMsg;
+    st.selection = [us[0].id];                               // the selection a right-click orders
+    AoE2.issueOrder(st, tileCentre(st, b.tx, b.ty).x, tileCentre(st, b.tx, b.ty).y);
+    r = { took: took.length, msg, linked: us[0].garrisonedIn, order: JSON.stringify(us[0].order) };
+  } catch (e) { threw = e; }
+  return Object.assign({ threw: threw && threw.message }, r);
+})();
+check(gSite.threw === null && gSite.took === 0 && gSite.msg === 'Barracks is not built yet' &&
+      gSite.linked === null && JSON.parse(gSite.order).kind === 'move',
+  'input: an unfinished own building is not a garrison target', JSON.stringify(gSite));
+const gEnemyB = (() => {                                       // team 1's barracks: attack, not shelter
+  const st = flatState();
+  const eB = AoE2.makeBuilding(st, 'barracks', 1, 60, 60);
+  eB.built = 1; eB.hp = eB.maxHp;
+  const p = AoE2.standingSpots(st, eB, 1)[0];
+  let threw = null, r = {};
+  try {
+    const u = AoE2.makeUnit(st, 'militia', 0, p.x, p.y);
+    const took = AoE2.garrisonUnits(st, [u.id], eB);
+    const msg = st.toastMsg;
+    st.selection = [u.id];
+    AoE2.issueOrder(st, eB.x, eB.y);
+    r = { bId: eB.id, took: took.length, msg, linked: u.garrisonedIn, order: { ...u.order } };
+  } catch (e) { threw = e; }
+  return Object.assign({ threw: threw && threw.message }, r);
+})();
+check(gEnemyB.threw === null && gEnemyB.took === 0 && gEnemyB.msg === 'Not your building' &&
+      gEnemyB.linked === null && gEnemyB.order.kind === 'attack' && gEnemyB.order.b === gEnemyB.bId,
+  'input: an enemy building is not yours to garrison', JSON.stringify(gEnemyB));
+const gAgain = (() => {                                        // inside A: refused by A and by B
+  const st = flatState();
+  const a = builtAt(st, 'barracks', 34), b2 = builtAt(st, 'barracks', 40);
+  let threw = null, r = {};
+  try {
+    const p = AoE2.standingSpots(st, a, 1)[0];
+    const u = AoE2.makeUnit(st, 'militia', 0, p.x, p.y);
+    const first = AoE2.garrisonUnits(st, [u.id], a);
+    const walk = JSON.stringify(u.order);
+    const ping = st.pingAt, save = st.autosaveAt;
+    const again = AoE2.garrisonUnits(st, [u.id], a);
+    const msgA = st.toastMsg;
+    const cross = AoE2.garrisonUnits(st, [u.id], b2);
+    r = { first: first.length, again: again.length, cross: cross.length, msg: msgA,
+          msg2: st.toastMsg, linked: u.garrisonedIn, aId: a.id, orderKept: JSON.stringify(u.order) === walk,
+          marked: st.pingAt !== ping || st.autosaveAt !== save };
+  } catch (e) { threw = e; }
+  return Object.assign({ threw: threw && threw.message }, r);
+})();
+check(gAgain.threw === null && gAgain.first === 1 && gAgain.again === 0 && gAgain.cross === 0 &&
+      gAgain.msg === 'Already garrisoned there' && gAgain.msg2 === 'Already garrisoned there' &&
+      gAgain.linked === gAgain.aId && gAgain.orderKept && !gAgain.marked,
+  'input: a unit already inside is not garrisoned again', JSON.stringify(gAgain));
+const gLeave = (() => {                                        // the way back out
+  const { st, b, us } = garrisonState('barracks', 37, 2);
+  let threw = null, r = {};
+  try {
+    AoE2.garrisonUnits(st, us.map((u) => u.id), b);
+    const want = AoE2.standingSpots(st, b, 2).map((p) => p.x + ',' + p.y);
+    const n = AoE2.leaveBuilding(st, b);
+    r = { n, want, pos: us.map((u) => u.x + ',' + u.y), linked: us.map((u) => u.garrisonedIn),
+          orders: us.map((u) => u.order.kind), paths: us.map((u) => u.path), msg: st.toastMsg };
+  } catch (e) { threw = e; }
+  return Object.assign({ threw: threw && threw.message }, r);
+})();
+check(gLeave.threw === null && gLeave.n === 2 && gLeave.pos.join(' ') === gLeave.want.join(' ') &&
+      gLeave.pos[0] !== gLeave.pos[1] && gLeave.linked.every((v) => v === null) &&
+      gLeave.orders.every((k) => k === 'idle') && gLeave.paths.every((p) => p === null) &&
+      gLeave.msg === '2 left Barracks',
+  'input: leaveBuilding empties the building onto its standing spots', JSON.stringify(gLeave));
+const gLeaveKind = (() => {                                    // the per-kind Leave button's call
+  const st = flatState();
+  const b = builtAt(st, 'barracks', 38);
+  const ring = AoE2.standingSpots(st, b, 4);
+  let threw = null, r = {};
+  try {
+    const m = AoE2.makeUnit(st, 'militia', 0, ring[2].x, ring[2].y);
+    const v = AoE2.makeUnit(st, 'villager', 0, ring[3].x, ring[3].y);
+    const inA = AoE2.garrisonUnits(st, [m.id, v.id], b);
+    const n = AoE2.leaveBuilding(st, b, [m.id]);                // the militia button's id list
+    r = { bId: b.id, inA: inA.length, n, mLinked: m.garrisonedIn, vLinked: v.garrisonedIn,
+          mOrder: m.order.kind, mPos: m.x + ',' + m.y, first: ring[0].x + ',' + ring[0].y,
+          msg: st.toastMsg };
+  } catch (e) { threw = e; }
+  return Object.assign({ threw: threw && threw.message }, r);
+})();
+check(gLeaveKind.threw === null && gLeaveKind.inA === 2 && gLeaveKind.n === 1 &&
+      gLeaveKind.mLinked === null && gLeaveKind.vLinked === gLeaveKind.bId &&
+      gLeaveKind.mOrder === 'idle' && gLeaveKind.mPos === gLeaveKind.first &&
+      gLeaveKind.msg === '1 left Barracks',
+  'input: leaveBuilding with an explicit unit list releases only those units',
+  JSON.stringify(gLeaveKind));
+const gLeaveEmpty = (() => {                                     // nothing inside: toast, no mark
+  const st = flatState();
+  const b = builtAt(st, 'barracks', 39);
+  let threw = null, r = {};
+  try {
+    r = { n: AoE2.leaveBuilding(st, b), msg: st.toastMsg, marked: st.pingAt !== -99 || st.autosaveAt !== 0 };
+  } catch (e) { threw = e; }
+  return Object.assign({ threw: threw && threw.message }, r);
+})();
+check(gLeaveEmpty.threw === null && gLeaveEmpty.n === 0 &&
+      gLeaveEmpty.msg === 'Barracks has nobody inside' && !gLeaveEmpty.marked,
+  'input: leaveBuilding on an empty building toasts and marks nothing',
+  JSON.stringify(gLeaveEmpty));
 
 report();

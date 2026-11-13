@@ -1,6 +1,6 @@
 'use strict';
 /* commands -- everything a player (or the AI) can order: move/attack/gather, build,
-   train, research, trade, age up, upgrade a building. Pure functions taking (Game, ...). No DOM. */
+   train, research, trade, garrison, age up, upgrade a building. Pure functions taking (Game, ...). No DOM. */
 
 /** Right-click resolution for one unit: enemy > enemy building > own site (a
  *  villager works it, docs/TODO.md P0-4) > own farm > resource > move. */
@@ -56,6 +56,9 @@ function issueOrder(Game, wx, wy) {
   const tTx = Math.floor(wx / CFG.TILE), tTy = Math.floor(wy / CFG.TILE);
   const eB = Game.buildings.find(b => attackableAsEnemy(b, sel[0].team) &&
     tTx >= b.tx && tTx < b.tx + b.w && tTy >= b.ty && tTy < b.ty + b.h);
+  const own = Game.buildings.find(b => b.team === sel[0].team && b.built >= 1 &&
+    BLD[b.kind].garrisonCapacity > 0 && tTx >= b.tx && tTx < b.tx + b.w && tTy >= b.ty && tTy < b.ty + b.h);
+  if (own) { garrisonUnits(Game, sel.map((u) => u.id), own); return; }
   const want = sel.map((u) => {                          // the order this unit asked for
     let o = enemy ? { kind: 'attack', target: enemy.id }
         : eB ? { kind: 'attack', b: eB.id }
@@ -324,6 +327,82 @@ function promoteBuilding(Game, b) {
   b.field = def.field ? def.field : 0;
   rebuildBlocks(Game);
   Game.mapEpoch++;
+}
+
+/** The tile garrison number `i` of `n` gets beside b: its standing ring, the last tile
+ *  there is, or b's own centre — a ring shorter than the group (all outer rings solid)
+ *  never lands a unit on nothing. */
+function ringSpot(Game, b, i, n) {
+  const ring = standingSpots(Game, b, n);
+  return ring[i] || ring[ring.length - 1] || { x: b.x, y: b.y };
+}
+
+/** The field half of `leaveBuilding`, shared with `removeBuilding`'s eviction: unlink
+ *  `units` from b, set each one down on b's ring and drop the order — plus the route
+ *  cached under it, because a teleported unit must not keep walking the path of the
+ *  order he no longer has (the rule `makeBuilding` applies to a new footprint). */
+function placeOnRing(Game, b, units) {
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i], p = ringSpot(Game, b, i, units.length);
+    u.garrisonedIn = null;
+    u.order = { kind: 'idle' };
+    u.slot = null;
+    u.path = null; u.pathAt = 0; u.pathFor = null; u.pathEpoch = -1;
+    u.x = p.x; u.y = p.y;
+  }
+  return units.length;
+}
+
+/** Send `unitIds` into finished building b (docs/plans/2026-11-13-garrison.md). The
+ *  link is written at command time — it IS the reserved slot, so two orders in one
+ *  frame cannot overbook b — while the unit still walks there: an accepted unit keeps a
+ *  `move` order carrying `garrison`, `sim.updateUnit` moves nobody but that walk and the
+ *  existing arrival line retires it, so a garrison order ends in exactly one place and
+ *  needs no second timer. Returns the units that went in; a refusal toasts and marks
+ *  nothing, and the unit keeps the order he had. */
+function garrisonUnits(Game, unitIds, b) {
+  const label = b ? BLD[b.kind].label : '';
+  if (!b || b.team !== 0) { toast(Game, 'Not your building'); return []; }
+  if (b.built < 1) { toast(Game, label + ' is not built yet'); return []; }
+  const cap = BLD[b.kind].garrisonCapacity;
+  if (!cap) { toast(Game, label + ' has no garrison space'); return []; }
+  const inside = Game.units.filter((u) => u.garrisonedIn === b.id);
+  const take = [], noRoom = [], already = [];
+  for (const id of unitIds) {
+    const u = Game.units.find((x) => x.id === id && !x.dead && x.team === b.team);
+    if (!u) continue;                                    // not one of their live units: nothing to refuse
+    if (u.garrisonedIn) already.push(u);                 // sheltering in another building already
+    else if (inside.length + take.length >= cap) noRoom.push(u);
+    else take.push(u);
+  }
+  const refused = noRoom.length ? label + ' is full'
+    : already.length ? 'Already garrisoned there' : '';  // room beats a repeat: the design's rule
+  if (refused) toast(Game, refused);
+  if (!take.length) return [];                           // a refusal marks nothing: no ping, no save owed
+  take.forEach((u, i) => {
+    const p = ringSpot(Game, b, i, take.length);
+    u.garrisonedIn = b.id;                               // the slot is his from this frame on
+    u.order = { kind: 'move', x: p.x, y: p.y, garrison: b.id };   // the walk that ends inside
+    u.slot = null;                                       // a garrison walk owns no formation tile
+  });
+  Game.pingAt = Game.time;
+  markDirty(Game);                                       // the acknowledgement issueOrder:79 gives an order
+  return take;
+}
+
+/** Bring units out of b: `unitIds` — default everyone inside, the panel's per-kind
+ *  `Leave` passes its own kind's ids — re-placed on b's standing ring. The list is
+ *  intersected with the units actually inside b, so one button can never release another
+ *  kind. Returns the number released; 0 inside toasts and marks nothing. */
+function leaveBuilding(Game, b, unitIds) {
+  if (!b || b.team !== 0) { toast(Game, 'Not your building'); return 0; }
+  const inside = Game.units.filter((u) => u.garrisonedIn === b.id);
+  const out = unitIds === undefined ? inside : inside.filter((u) => unitIds.indexOf(u.id) >= 0);
+  if (!out.length) { toast(Game, BLD[b.kind].label + ' has nobody inside'); return 0; }
+  const n = placeOnRing(Game, b, out);
+  markDirty(Game);
+  toast(Game, n + ' left ' + BLD[b.kind].label);
+  return n;
 }
 
 /* ------------------------------- toast --------------------------------- */

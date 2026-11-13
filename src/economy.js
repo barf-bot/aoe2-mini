@@ -124,7 +124,7 @@ function popCommitted(Game, team) {
 function selectedUnits(Game) {
   const out = [];
   for (const id of Game.selection) {
-    const u = Game.units.find(x => x.id === id && !x.dead);
+    const u = Game.units.find(x => x.id === id && !x.dead && !x.garrisonedIn);
     if (u) out.push(u);
   }
   return out;

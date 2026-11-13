@@ -63,7 +63,7 @@ function makeUnit(Game, kind, team, x, y) {
     atkType: k.atkType, range: k.range, minRange: k.minRange, reload: k.reload,
     accuracy: k.accuracy,
     face: 1, anim: 0, // sprite mirror + walking clock, both set by moveUnit
-    order: { kind: 'idle' }, carry: 0, carryRes: null, work: 0, cd: 0, dead: false,
+    order: { kind: 'idle' }, carry: 0, carryRes: null, work: 0, cd: 0, dead: false, garrisonedIn: null,
     slot: null, // the formation tile his current `move` order owns (formationSlots)
     // the A* route behind `order` (findPath/moveUnit): the tile list, the tile
     // being walked to, and the goal tile + map version that route was built for.
@@ -117,14 +117,14 @@ function rebuildBlocks(Game) {
   Game.occupied = occupied;
 }
 
-/** The one way a building leaves the world (combat raze, cancel, demolish):
- *  drop it from Game.buildings, rebuild occupancy, and clear a footer
- *  selection that points at it — hitBuilding used to splice by hand and left
- *  Game.selectedBuilding dangling on raze. */
+/** The one way a building leaves the world (combat raze, cancel, demolish): evict
+ *  anyone garrisoned in it onto the standing ring first, drop it from
+ *  Game.buildings, rebuild occupancy, and clear a footer selection that points at it
+ *  — hitBuilding used to splice by hand and left Game.selectedBuilding dangling. */
 function removeBuilding(Game, b) {
   const i = Game.buildings.indexOf(b);
   if (i < 0) return false;
-  Game.buildings.splice(i, 1);
+  placeOnRing(Game, b, Game.units.filter((u) => u.garrisonedIn === b.id)); Game.buildings.splice(i, 1);
   rebuildBlocks(Game);
   Game.mapEpoch++;                         // the walkable set moved again (findPath)
   markDirty(Game);                         // the board changed, so a save is owed
