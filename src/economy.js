@@ -53,8 +53,11 @@ function deposit(Game, unit, drop) {
 /** A resource tile whose stock reaches 0 disappears: the type reverts to GRASS
  *  (the amount stays 0), so the bush, tree or ore node stops being drawn and --
  *  per the T2 rule in walkable -- stops blocking movement. Only tile sources
- *  deplete: a farm's field empties in place (see sourceFromFarm). Returns true
- *  when a spent resource tile was actually converted. */
+ *  deplete: a farm's field empties in place (see sourceFromFarm). A conversion
+ *  also invalidates Game.mmBase (the cached minimap terrain bitmap) so the spent
+ *  tile stops being marked there too: the field is nulled, never rebuilt here --
+ *  that costs a whole world pass -- and it is DOM state, never saved. Returns
+ *  true when a spent resource tile was actually converted. */
 function depleteTile(Game, tx, ty) {
   const world = Game.world;
   if (tx < 0 || ty < 0 || tx >= world.w || ty >= world.h) return false;
@@ -62,6 +65,7 @@ function depleteTile(Game, tx, ty) {
   if (!RES_OF_TILE[world.type[i]] || world.amount[i] > 0) return false;
   world.type[i] = T.GRASS;
   Game.mapEpoch++;                         // the tile walks now: routes across it are stale
+  Game.mmBase = null;                      // the cached minimap bitmap goes stale with the tile
   return true;
 }
 

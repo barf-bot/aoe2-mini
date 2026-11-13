@@ -29,13 +29,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P2 — smaller defects
 
-### 18. Minimap terrain may not update when a resource runs out
-
-**Unverified.** `Game.mmBase` (the cached terrain bitmap in `drawMinimap`,
-`src/render.js`) is cleared on window resize only, as far as I could see. Check whether a
-depleted forest or a new game redraws it; if not, clear it in `depleteTile` and
-`resetGame`.
-
 ### 19. Blurry canvas on high-DPI screens
 
 **Unverified.** `beginCanvas` sizes the canvas in CSS pixels and never multiplies by

@@ -26,14 +26,14 @@ a bug.
 - At most **2 villagers per resource tile** (`CFG.WORKERS_PER_TILE`). The 4 starters are
   placed food-first (berries), then wood, then anything — putting all four on one berry
   bush is what used to stall the economy at 420 food (the food-stall regression, fixed).
-- A tile that runs dry disappears (T4): `depleteTile` (`src/economy.js:58`) runs on the
+- A tile that runs dry disappears (T4): `depleteTile` (`src/economy.js:61`) runs on the
   harvest tick the moment a tile's `amount` reaches 0 and reverts the tile to `T.GRASS`
   (the amount stays 0), so the bush, tree or ore node stops being drawn and — per the
   Movement rules below — stops blocking movement. Farms are not tiles: a field empties
   in place and nothing there turns to grass.
 - The emptied villager re-queues on the nearest tile of the **same** resource within
-  **5** tiles (`nextSource`, `src/economy.js:73`, and after a deposit `resumeGather`,
-  `src/economy.js:84`). The old radius-14 same-resource search and the any-resource radius-20
+  **5** tiles (`nextSource`, `src/economy.js:77`, and after a deposit `resumeGather`,
+  `src/economy.js:88`). The old radius-14 same-resource search and the any-resource radius-20
   fallback are gone: with nothing of that kind that close he stands idle instead of
   walking across the map to chop wood.
 
@@ -203,16 +203,16 @@ a bug.
 - Training: a building can only train what's in its `trains` list ("Militia needs a Town
   Center" when wrong), must be finished (`Still building`), max 5 in queue (`Queue full`),
   must be affordable, and must have population room (`Need more houses`). Room is measured by
-  one helper, `popCommitted` (`src/economy.js:114`): every living unit of the team
-  (`popUsed`, `src/economy.js:104` — villagers, militia and archers alike, docs/TODO.md
+  one helper, `popCommitted` (`src/economy.js:118`): every living unit of the team
+  (`popUsed`, `src/economy.js:108` — villagers, militia and archers alike, docs/TODO.md
   P1-10) plus every unit still queued in its buildings. `train` (`src/commands.js:215`) and
   the footer's disabled buttons (`commandsHtml`, `src/hud.js:106`) both read it, so the
   opening village reads 5/5 and a button never offers a click the command would refuse.
 
 - `built` is a **0..1 progress fraction**, not a built/not-built flag (docs/TODO.md P1-9):
   a building counts for its population cap, receives a carried load and can be worked only
-  once it is complete — `popCap` (`src/economy.js:98`), `findDropoff` (`src/economy.js:31`),
-  `resumeGather` (`src/economy.js:84`), the farm case of `orderForUnit`
+  once it is complete — `popCap` (`src/economy.js:102`), `findDropoff` (`src/economy.js:31`),
+  `resumeGather` (`src/economy.js:88`), the farm case of `orderForUnit`
   (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:173`) all test
   `built >= 1`, as does the enemy's `aiStep` (`src/ai.js:4`). An *enemy* building follows the
   other half of the rule: attackable at any progress, a 0 % foundation included, the way

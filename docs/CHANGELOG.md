@@ -5,6 +5,27 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P2-18: a spent resource tile stayed on the minimap
+
+- `depleteTile` (`src/economy.js:61`) reverted an emptied tile to `T.GRASS` and bumped
+  `Game.mapEpoch` but left `Game.mmBase` — the terrain bitmap `drawMinimap` caches and blits
+  (`src/render.js:270`) — standing, so the bush/tree/ore dot kept its colour on the minimap for
+  the rest of the game. The conversion now nulls the cache on the line that changes the tile; the
+  next frame rebuilds it. Invalidated rather than rebuilt in place, because rebuilding there costs
+  a whole world pass per tile inside a harvest tick. The item's "new game" half needed no change:
+  `resetGame` (`src/boot.js:65`) already cleared it, as the verified TODO note says.
+- `mmBase` stays DOM-only and unsaved (`src/save.js:30`, `tools/checks/10-reset-save.js:68`) —
+  clearing the field in an economy function is what that contract asks for, nothing new is persisted.
+- checks: 338 → 342, all four in `tools/checks/03-economy-movement.js` §6c, on a booted fixture so
+  the cached bitmap is a real one to read back: a tile that still holds stock and a non-resource
+  tile both answer `false` and leave that exact bitmap (same object, same painted colour) alone —
+  which also proves the fix invalidates instead of rebuilding — while emptying a resource tile
+  answers `true` and clears it, and the frame after paints that tile with the grass palette instead
+  of the forest one. The last two failed before the fix; `preview.png` regenerates byte-identical
+  (the minimap is not part of the rendered view).
+- `docs/GAME_RULES.md` line refs into `src/economy.js` moved with the file (58 → 61, 73 → 77,
+  84 → 88, 98 → 102, 104 → 108, 114 → 118); `tools/audit-line-refs.js` is what checks them.
+
 ### Fixed — `docs/TODO.md` P2-17: the docs promised fog of war the game doesn't have
 
 - `README.md:12` claimed a "procedural map … plus fog of war" and the map table

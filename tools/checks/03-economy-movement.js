@@ -3,7 +3,7 @@
    Runs on its own (`node tools/checks/03-economy-movement.js`) against a freshly booted game. */
 
 const {
-  AoE2, DT, Game, check, pad, solidTile, tOf, tc, report,
+  AoE2, DT, Game, bootFixture, check, pad, setTile, solidTile, tIdx, tOf, tc, report,
 } = require('../lib/harness');
 
 /* ---- 6. simulate 30s: economy + movement invariants ----------------- */
@@ -129,5 +129,63 @@ faceStep(30);
 check(typeof restedAt === 'number' && marcher.anim === restedAt,
   'units: walk phase frozen while idle',
   secs(restedAt) + ' -> ' + secs(marcher.anim) + ' over 1s of standing');
+
+/* ---- 6c. the minimap terrain cache vs. depletion (docs/TODO.md P2-18) --- */
+/* Game.mmBase -- the terrain bitmap drawMinimap caches and blits -- was cleared by
+   resetGame and by the window-resize handler only, so a grove a villager emptied kept
+   its wood dot on the minimap for the rest of the game. This section boots its own
+   page: the shared Game has run 30 s of sim by now, and an unbooted createState() has
+   no view, so renderFrame would bail before it ever reached drawMinimap. The stub
+   context records every fillRect with the colour it used (the same read-back
+   13-render.js uses), so the check compares the cached bitmap itself -- that also
+   distinguishes invalidating (the cheap contract: drop the cache, the next frame
+   rebuilds) from rebuilding inside depleteTile, which would cost a world pass per tile. */
+bootFixture(undefined, (doc, st) => {
+  const TX = 1, TY = 1;                             // far from the Town Centers, cheap to read back
+  setTile(st, TX, TY, AoE2.T.FOREST, 4);            // wood, still 4 in the tile
+  setTile(st, TX + 1, TY, AoE2.T.GRASS, 0);         // plain ground next to it
+  // boot paints a frame of its own (src/boot.js:192): drop that bitmap so the cache
+  // the assertions read is the world set up above, not the seeded one.
+  st.mmBase = null;
+  AoE2.renderFrame(st);
+  const base = st.mmBase;
+
+  /** The colour the cached bitmap paints tile (tx, ty) with ('none' / '2x' when that
+   *  tile was painted zero / several times) -- and the colour the world says it should be. */
+  const paintedAt = (c, tx, ty) => {
+    const ops = (c && c.getContext && c.getContext('2d').ops) || [];
+    const hits = ops.filter((o) => o[0] === 'fillRect' && o[1][0] === tx && o[1][1] === ty);
+    return hits.length === 1 ? hits[0][2] : hits.length + 'x';
+  };
+  const tileColour = (tx, ty) => {                  // minimapTerrain's own rule
+    const i = tIdx(st, tx, ty);
+    return AoE2.PAL[st.world.type[i]][st.world.shade[i] % 3];
+  };
+  const forest = tileColour(TX, TY);
+  const detail = (tx, ty, r) => 'tile ' + tx + ',' + ty + ' -> ' + r +
+    ' (want ' + tileColour(tx, ty) + '), cache ' + (st.mmBase === base ? 'is the same bitmap'
+      : st.mmBase === null ? 'is cleared' : 'is a different object');
+
+  check(AoE2.depleteTile(st, TX, TY) === false && st.mmBase === base &&
+        paintedAt(base, TX, TY) === forest,
+    'economy: depleteTile on a tile that still holds stock changes nothing, cache included',
+    detail(TX, TY, paintedAt(base, TX, TY)));
+  check(AoE2.depleteTile(st, TX + 1, TY) === false && st.mmBase === base,
+    'economy: depleteTile on a non-resource tile is refused and leaves the cache alone',
+    detail(TX + 1, TY, paintedAt(base, TX + 1, TY)));
+
+  setTile(st, TX, TY, AoE2.T.FOREST, 0);            // the last of the wood is drawn off
+  const emptied = AoE2.depleteTile(st, TX, TY);
+  check(emptied === true && st.mmBase === null,
+    'economy: emptying a resource tile clears the cached minimap terrain instead of keeping it',
+    'returned ' + emptied + ', mmBase ' + (st.mmBase === null ? 'null' : 'still ' +
+      (paintedAt(st.mmBase, TX, TY) === forest ? 'the stale forest bitmap' : 'a bitmap')));
+
+  AoE2.renderFrame(st);                             // the next frame is what rebuilds it
+  check(st.mmBase !== null && paintedAt(st.mmBase, TX, TY) === tileColour(TX, TY) &&
+        paintedAt(st.mmBase, TX, TY) !== forest,
+    'minimap: the frame after a depletion repaints the spent tile as grass, not forest',
+    detail(TX, TY, paintedAt(st.mmBase, TX, TY)));
+});
 
 report();
