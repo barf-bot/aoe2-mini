@@ -546,5 +546,38 @@ const gTower = (() => {
 check(gTower.err === null && gTower.linked && !!gTower.inside && gTower.inside.n === 0 &&
       gTower.inside.cd === 0 && !!gTower.outside && gTower.outside.n === 1 && gTower.outside.his,
   'combat: a tower cannot shoot a unit garrisoned in his own building', JSON.stringify(gTower));
+/* The plan's third hole-closing clause — "A building that goes away must evict" — had
+   no check: `removeBuilding` (src/entities.js:124) is the single door all three removal
+   paths use, and its eviction line went unproven, so deleting it would have left a dead
+   link on every garrisoned unit (invisible, unhittable, still costing population, with no
+   self-healing path) and every check green. Razing is this file's path; the assertion is
+   `leaveBuilding`'s own contract, including the route cache it drops behind a teleport
+   (`m.path` is seeded so a stale route cannot hide in the new position). */
+const gRaze = (() => {
+  const st = flatState();
+  const b = builtAt(st, 'barracks', 35);
+  const ring = AoE2.standingSpots(st, b, 2);
+  if (ring.length < 2) return { err: 'no two standing spots beside the barracks' };
+  st.units = [];
+  const ms = [AoE2.makeUnit(st, 'militia', 0, ring[0].x, ring[0].y),
+              AoE2.makeUnit(st, 'militia', 0, ring[1].x, ring[1].y)];
+  ms.forEach((m) => { m.path = [{ tx: 1, ty: 1 }]; });   // the route of the walk he no longer has
+  const g = mCall(AoE2.garrisonUnits, st, ms.map((m) => m.id), b);
+  const razed = g.err ? null : mCall(AoE2.hitBuilding, st, b, 9999);
+  return { err: g.err || (razed && razed.err) || null, took: g.err ? null : g.v.length,
+           removed: razed && razed.v, gone: razed ? !st.buildings.includes(b) : null,
+           linked: ms.map((m) => String(m.garrisonedIn)).join('+'),
+           orders: ms.map((m) => m.order.kind).join('+'),
+           pos: ms.map((m) => m.x + ',' + m.y).join(' '),
+           want: ring.map((p) => p.x + ',' + p.y).join(' '),
+           paths: ms.map((m) => (m.path === null ? 'null' : 'set')).join('+'),
+           targetable: ms.map((m) => String(AoE2.targetableAsEnemy(m, 1))).join('+'),
+           toast: st.toastMsg };
+})();
+check(gRaze.err === null && gRaze.took === 2 && gRaze.removed === true && gRaze.gone &&
+      gRaze.linked === 'null+null' && gRaze.orders === 'idle+idle' && gRaze.pos === gRaze.want &&
+      gRaze.paths === 'null+null' && gRaze.targetable === 'true+true' &&
+      gRaze.toast === 'Barracks destroyed',
+  'combat: razing a building evicts its garrison onto the standing ring', JSON.stringify(gRaze));
 
 report();
