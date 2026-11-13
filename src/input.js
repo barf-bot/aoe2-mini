@@ -248,6 +248,7 @@ function attachInput(Game, d) {
         const [res, dir] = arg.split(':');
         trade(Game, Game.selectedBuilding, res, dir);
       }
+      else if (act === 'upgrade' && Game.selectedBuilding) upgradeBuilding(Game, Game.selectedBuilding);
       else if (act === 'cancel' && Game.selectedBuilding) cancelConstruction(Game, Game.selectedBuilding);
       else if (act === 'demolish' && Game.selectedBuilding) demolish(Game, Game.selectedBuilding);
       else if (act === 'age') upgradeAge(Game);

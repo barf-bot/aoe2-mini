@@ -130,6 +130,16 @@ function commandsHtml(Game) {
         (canAfford(Game, b.team, { gold: rates.buy }) ? '' : ' disabled') + '>' +
         'Buy ' + label + '<span class="c">' + fmtCost({ gold: rates.buy }) + '</span></button>');
     }
+    /* the tower chain: the row's own next tier, offered exactly when `upgradeBuilding`
+       would accept it — an age-locked tier is not offered at all (the rule the villager
+       build list below follows) and an unaffordable one is offered `disabled` (the rule
+       the train and market buttons above follow). */
+    const up = BLD[b.kind].upgradesTo;
+    if (up && (BLD[up].age ?? 0) <= Game.age[b.team]) {
+      out.push('<button data-act="upgrade" data-arg="' + up + '"' +
+        (canAfford(Game, b.team, BLD[up].cost) ? '' : ' disabled') + '>Upgrade to ' +
+        BLD[up].label + '<span class="c">' + fmtCost(BLD[up].cost) + '</span></button>');
+    }
   }
   if (b && b.built < 1) {
     out.push('<button data-act="cancel">Cancel<span class="c">80% back</span></button>');

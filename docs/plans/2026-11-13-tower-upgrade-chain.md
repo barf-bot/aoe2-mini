@@ -231,7 +231,7 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
     `cancel: cancelling an in-progress upgrade refunds 80% of the tier under construction and
     keeps the Watch Tower standing`.
 
-- [ ] T3: the Upgrade button in the command grid and its click handler
+- [x] T3: the Upgrade button in the command grid and its click handler
   - files: `src/hud.js:106-159` (`commandsHtml`: the button lines added inside the existing
     `if (b && b.built >= 1)` block, after the Market trade block that ends at
     `src/hud.js:132` — `src/hud.js:161`/`:181` shift by the added lines and nothing cites

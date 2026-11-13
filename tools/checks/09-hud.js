@@ -1,9 +1,9 @@
 'use strict';
-/* checks/09-hud.js -- command bar, the uniform HUD frame, the responsive layout.
-   Runs on its own (`node tools/checks/09-hud.js`) against a freshly booted game. */
+/* checks/09-hud.js -- command bar (train / research / trade / upgrade), the uniform
+   HUD frame, the responsive layout: `node tools/checks/09-hud.js` on a fresh game. */
 
 const {
-  AoE2, Game, blueVill, bootFixture, check, domHtml, finishedHouse, fundedGame, html, stubEl, styleCss, tileCentre, report,
+  AoE2, DT, Game, blueVill, bootFixture, check, domHtml, finishedHouse, fundedGame, html, stubEl, styleCss, tileCentre, report,
 } = require('../lib/harness');
 
 /* ---- 11. command bar buttons ---------------------------------------- */
@@ -197,6 +197,81 @@ check(mkShort.includes('data-act="trade" data-arg="food:sell" disabled') &&
   !mkShort.includes('data-act="trade" data-arg="wood:sell" disabled'),
   'ui: a sell button is disabled while that stockpile is short',
   (mkShort.match(/data-act="trade" data-arg="[^"]+"( disabled)?/g) || []).join(' ') || 'no trade buttons');
+Game.selectedBuilding = null;
+
+// T3 (tower upgrade chain): the grid's Upgrade button. The two affordance rules the
+// design pairs on it are the file's own — an age-locked tier is not offered at all
+// (the villager build list), an unaffordable one is offered `disabled` (the train
+// and market buttons) — then the delegated click runs the command and the info
+// panel names the tier the tower became once the site finishes.
+const towerAt = (kind, dx) => {
+  const v = blueVill()[0];
+  if (!v) return null;
+  const b = AoE2.makeBuilding(Game, kind, 0, Math.floor(v.x / AoE2.CFG.TILE) + dx,
+    Math.floor(v.y / AoE2.CFG.TILE));
+  b.built = 1; b.hp = b.maxHp;
+  return b;
+};
+const upB = towerAt('watch_tower', 0);
+const upMark = (markup) => (markup.match(/data-act="upgrade"[^>]*>/g) || []).join(' ');
+const upGrid = !upB ? null : (() => {
+  Game.selection = [];
+  Game.placing = null;                             // infoHtml answers placing first
+  Game.selectedBuilding = upB;
+  Game.res[0] = { food: 0, wood: AoE2.BLD.guard_tower.cost.wood, gold: 0,
+    stone: AoE2.BLD.guard_tower.cost.stone };                 // exactly the tier's price
+  const paid = AoE2.commandsHtml(Game);
+  Game.res[0].stone = AoE2.BLD.guard_tower.cost.stone - 1;    // one stone short
+  return { paid, short: AoE2.commandsHtml(Game) };
+})();
+check(!!upGrid && upGrid.paid.includes('data-act="upgrade" data-arg="guard_tower">' +
+      'Upgrade to Guard Tower<span class="c">35 W 125 S</span></button>') &&
+      !upMark(upGrid.paid).includes('disabled') &&
+      upMark(upGrid.short) === 'data-act="upgrade" data-arg="guard_tower" disabled>',
+  'ui: a finished Watch Tower offers Upgrade to Guard Tower, enabled when the tier is ' +
+  'payable and disabled when it is not',
+  !upGrid ? 'no watch_tower site'
+    : 'paid=' + JSON.stringify(upMark(upGrid.paid)) + ' short=' + JSON.stringify(upMark(upGrid.short)));
+const noUpGrid = {};
+for (const [kind, dx] of [['house', 4], ['keep', 7]]) {
+  const b = towerAt(kind, dx);
+  Game.selectedBuilding = b;
+  noUpGrid[kind] = b ? upMark(AoE2.commandsHtml(Game)) : null;
+}
+Game.selectedBuilding = upB;
+check(noUpGrid.house === '' && noUpGrid.keep === '',
+  'ui: a House and a finished Keep offer no upgrade button',
+  'house=' + JSON.stringify(noUpGrid.house) + ' keep=' + JSON.stringify(noUpGrid.keep));
+
+const upBtn = upB && stubEl('button', 'btnUpgrade', 60, 24);
+let gridAfter = null;
+if (upBtn) {
+  upBtn.setAttribute('data-act', 'upgrade');
+  upBtn.setAttribute('data-arg', 'guard_tower');
+  Game.res[0] = { food: 0, wood: AoE2.BLD.guard_tower.cost.wood, gold: 0,
+    stone: AoE2.BLD.guard_tower.cost.stone };                 // pay for the tier again
+  Game.dom.commands.listeners.click.forEach((fn) => fn({ target: upBtn }));
+  gridAfter = AoE2.commandsHtml(Game);
+}
+check(!!upB && upB.upgrade === 'guard_tower' && upB.built < 1 &&
+      upB.time === AoE2.BLD.guard_tower.time && Game.res[0].wood === 0 &&
+      Game.res[0].stone === 0 && gridAfter.includes('data-act="cancel"') &&
+      !gridAfter.includes('data-act="upgrade"'),
+  "ui: clicking the Upgrade button starts the upgrade and spends the tier's cost",
+  !upB ? 'no watch_tower site'
+    : 'upgrade=' + String(upB.upgrade) + ' built=' + upB.built + ' time=' + upB.time +
+      ' res=' + JSON.stringify(Game.res[0]) + ' grid=' + JSON.stringify(gridAfter));
+
+if (upB) {                              // one frame of the drafted builder's work
+  upB.built = 1 - DT / Math.max(0.5, upB.time);
+  AoE2.stepSim(Game, DT);
+}
+const upInfo = upB && AoE2.infoHtml(Game);
+check(!!upB && upB.kind === 'guard_tower' && upB.upgrade === null && upB.built === 1 &&
+      String(upInfo).includes('Guard Tower') && String(upInfo).includes('width:100%'),
+  'ui: the info panel names the tier the tower became',
+  !upB ? 'no watch_tower site'
+    : 'kind=' + upB.kind + ' built=' + upB.built + ' info=' + String(upInfo).slice(0, 60));
 Game.selectedBuilding = null;
 
 /* ---- 11b. uniform HUD frame (this plan, T1) -------------------------- */
