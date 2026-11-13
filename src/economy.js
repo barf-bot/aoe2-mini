@@ -103,7 +103,17 @@ function popCap(Game, team) {
 
 function popUsed(Game, team) {
   let n = 0;
-  for (const u of Game.units) if (u.team === team && !u.dead && u.kind === 'villager') n++;
+  for (const u of Game.units) if (u.team === team && !u.dead) n++;
+  return n;
+}
+
+/** Every population slot a team has spent: the living units plus the units still
+ *  queued in its buildings. `train` (`src/commands.js:215`) and the footer's button
+ *  state (`src/hud.js:106`) both ask this one helper, so a command and its button
+ *  cannot disagree (docs/TODO.md P1-10). */
+function popCommitted(Game, team) {
+  let n = popUsed(Game, team);
+  for (const b of Game.buildings) if (b.team === team) n += b.queue.length;
   return n;
 }
 

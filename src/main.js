@@ -13,7 +13,7 @@ const AoE2 = {
   unitAnim,
   build, canPlaceAt, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, attackableAsEnemy, spawnArrow, updateProjectiles, stepBuildingAttacks,
-  popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
+  popCap, popUsed, popCommitted, selectedUnits, canAfford, spend, refund, resetGame,
   SAVE_PATH, saveGame, loadGame, markDirty, storageGet, storageSet, applyMuteButton, setMuted,
   infoHtml, hudState, hudHtml, commandsHtml, queueHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,

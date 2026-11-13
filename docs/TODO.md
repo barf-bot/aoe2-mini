@@ -25,19 +25,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P1 — wrong behaviour you notice within a minute
 
-### 10. The population cap does not hold
-
-**Verified.** At 4/5, five villagers can be queued; all five spawn and the display reads
-9/5. Militia and archers do not count at all (`popUsed` counts villagers only).
-
-- **Cause:** `train` in `src/commands.js` compares `popUsed` with `popCap` and ignores the
-  queue; `popUsed` in `src/economy.js` filters on `kind === 'villager'`; `aiStep` has the
-  same gap for the enemy.
-- **Fix:** count every living unit, and in `train` add the units already queued across the
-  team's buildings. Mirror it in `commandsHtml` so the button disables correctly.
-- **Done when:** queueing past the cap is refused with "Need more houses" and the starting
-  militia counts (the opening display becomes 5/5).
-
 ### 11. The player's age and Blacksmith upgrades also strengthen the enemy
 
 **Verified.** An enemy militia's attack goes from 4 to 7 when the *player* reaches Castle

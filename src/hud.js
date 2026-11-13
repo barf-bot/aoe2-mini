@@ -109,7 +109,7 @@ function commandsHtml(Game) {
   const out = [];
   if (b && b.built >= 1) {
     for (const k of BLD[b.kind].trains || []) {
-      const ok = canAfford(Game, b.team, KINDS[k].cost) && popUsed(Game, b.team) < popCap(Game, b.team);
+      const ok = canAfford(Game, b.team, KINDS[k].cost) && popCommitted(Game, b.team) < popCap(Game, b.team);
       out.push('<button data-act="train" data-arg="' + k + '"' + (ok ? '' : ' disabled') + '>' +
         KINDS[k].label + '<span class="c">' + fmtCost(KINDS[k].cost) + '</span></button>');
     }

@@ -5,6 +5,30 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P1-10: the population cap does not hold
+
+- `popUsed` (`src/economy.js:104`) counted villagers only — the starting militia and every
+  archer cost no population — and `train` (`src/commands.js:215`) compared that number with
+  the cap while ignoring what was already queued, so five villagers could be bought at 4/5
+  and the header ended at 9/5. `popUsed` now counts every living unit (the opening header
+  reads 5/5), and the new `popCommitted` (`src/economy.js:114`) adds the units waiting in the
+  team's building queues. That single number is what `train` refuses on (`Need more houses`)
+  and what the footer's train buttons are disabled by (`commandsHtml`, `src/hud.js:106`), so
+  a button can no longer offer a click the command would refuse.
+- The enemy inherits both halves through the same helpers: `aiStep` (`src/ai.js:4`) now sees
+  five units at its seeded keep, answers with the attack wave instead of buying a sixth
+  villager, and keeps the villager line for a village of fewer than five units.
+- checks: five new ones (315 → 320) — `tools/checks/06-training-research-trade.js` gains the
+  refusal at a full cap with an empty queue, the queued-villager-counts assertion, the queue
+  filled exactly to the cap and the finished Barracks that must respect the cap its Town
+  Center filled; `tools/checks/09-hud.js` gains the four button states of that rule (full,
+  with room, one queued, queue full). The checks that pinned the old rule were rewritten
+  rather than dropped: `01-world-roster.js` now reads 5/5, `06` now reads 6/10 after
+  training, the `12-ai.js` village fixture keeps its roster below the cap the way the game
+  does (dead-flagging the extra villagers), and the `fundedGame` fixture gained a house — a
+  5/5 village cannot train, and a refused command never marks the game dirty.
+- `preview.png` regenerates byte-identical (no render path changed).
+
 ### Fixed — `docs/TODO.md` P1-9: a foundation counts as a finished building
 
 - `b.built` is a 0..1 progress fraction and every own-building test read it as a boolean

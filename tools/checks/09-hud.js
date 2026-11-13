@@ -67,6 +67,27 @@ check(!cmdHalfBarracks.includes('data-act="train"') && cmdHalfBarracks.includes(
   'ui: a half-built Barracks offers no train buttons, a finished one trains Militia',
   'half: ' + (cmdHalfBarracks.match(/data-act="\w+"/g) || []).join(' ') +
   ' | done: ' + (cmdDoneBarracks.match(/data-act="\w+"/g) || []).join(' '));
+/* The footer half of docs/TODO.md P1-10: `commandsHtml` (`src/hud.js:106`) decides the
+ * disabled flag with the same number `train` consults (`popCommitted`,
+ * `src/economy.js:114`), so a village whose queue already fills its cap greys the button
+ * out instead of offering a click that only toasts. Four states of one throwaway
+ * village: full, with room, one queued, queue full. */
+const popSt = AoE2.createState();
+popSt.res[0] = { food: 9000, wood: 9000, gold: 9000, stone: 9000 };
+const popTc = popSt.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+popSt.selection = [];
+popSt.selectedBuilding = popTc;
+const VILL_BTN = '<button data-act="train" data-arg="villager"';
+const off = (markup) => markup.includes(VILL_BTN + ' disabled>');
+const popHtml = (mutate) => { if (mutate) mutate(); return AoE2.commandsHtml(popSt); };
+const popAtCap = off(popHtml());                                        // 5 living, cap 5
+const popRoom = off(popHtml(() => finishedHouse(popSt)));               // cap 10, nothing queued
+const popOne = off(popHtml(() => AoE2.train(popSt, popTc, 'villager')));  // 6 committed of 10
+const popMax = off(popHtml(() => { for (let i = 0; i < 4; i++) AoE2.train(popSt, popTc, 'villager'); }));
+check(popAtCap && !popRoom && !popOne && popMax,
+  'ui: the Villager button disables exactly when train would answer "Need more houses"',
+  'atCap=' + popAtCap + ' room=' + popRoom + ' oneQueued=' + popOne + ' queueFull=' + popMax);
+
 Game.res[0].food = 900;
 AoE2.upgradeAge(Game);
 check(Game.age === 1 && Game.res[0].food === 400, 'age: Feudal Age costs 500 food', 'age=' + Game.age + ' food=' + Game.res[0].food);

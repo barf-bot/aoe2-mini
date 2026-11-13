@@ -22,17 +22,65 @@ stepRender(Math.ceil(AoE2.KINDS.villager.time / DT) + 2);     // the table's tra
 check(ownUnits() === unitsBt + 1, 'train: unit spawns when the timer expires',
   unitsBt + ' -> ' + ownUnits());
 check(blueVill().length === 5, 'train: the new unit is a villager', String(blueVill().length));
-check(AoE2.popUsed(Game, 0) === 5 && AoE2.popCap(Game, 0) === 10, 'pop: 5/10 after training',
+check(AoE2.popUsed(Game, 0) === 6 && AoE2.popCap(Game, 0) === 10,
+  'pop: 6/10 after training (the starting militia counts)',
   AoE2.popUsed(Game, 0) + '/' + AoE2.popCap(Game, 0));
 const houseTrain = AoE2.train(Game, house, 'villager');
 check(houseTrain === undefined && Game.toastMsg === 'Villager needs a House',
   'train: houses cannot train', JSON.stringify(Game.toastMsg));
+
+/* P1-10 (docs/TODO.md): the cap counts every LIVING unit - not just the villagers - and
+ * every unit already queued in the team's buildings. `popCommitted` (`src/economy.js:114`)
+ * is the single helper `train` (`src/commands.js:215`) and the footer's button state
+ * (`src/hud.js:106`) both consult, so a command and its button cannot disagree (the UI half
+ * is pinned in tools/checks/09-hud.js). */
+const capSt = AoE2.createState();                     // 4 villagers + 1 militia at a cap-5 Town Center
+capSt.res[0] = { food: 9000, wood: 9000, gold: 9000, stone: 9000 };
+const capTc = capSt.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+const capFood = capSt.res[0].food;
+const capRefused = AoE2.train(capSt, capTc, 'villager');
+check(capRefused === undefined && capSt.toastMsg === 'Need more houses' &&
+      capTc.queue.length === 0 && capSt.res[0].food === capFood,
+  'train: the starting militia fills the cap, so an empty Town Center queue still refuses',
+  capRefused === undefined
+    ? capSt.toastMsg + ' queue=' + capTc.queue.length + ' food ' + capFood + ' -> ' + capSt.res[0].food
+    : 'trained anyway');
+finishedHouse(capSt);                                // cap 5 -> 10, so the queue below has room
+const capFirst = AoE2.train(capSt, capTc, 'villager');
+check(capFirst === capTc && capTc.queue.length === 1 && AoE2.popUsed(capSt, 0) === 5 &&
+      AoE2.popCommitted(capSt, 0) === 6 && AoE2.popCap(capSt, 0) === 10,
+  'pop: a queued villager counts against the cap before it exists',
+  'used=' + AoE2.popUsed(capSt, 0) + ' committed=' + AoE2.popCommitted(capSt, 0) +
+    ' cap=' + AoE2.popCap(capSt, 0) + ' queue=' + capTc.queue.length);
+let capExtra = 0;
+for (let i = 0; i < 4; i++) if (AoE2.train(capSt, capTc, 'villager') === capTc) capExtra++;
+check(capExtra === 4 && capTc.queue.length === 5 && AoE2.popUsed(capSt, 0) === 5 &&
+      AoE2.popCommitted(capSt, 0) === 10,
+  'pop: the team cannot queue more units than its cap allows',
+  'extra=' + capExtra + ' queue=' + capTc.queue.length +
+    ' used=' + AoE2.popUsed(capSt, 0) + ' committed=' + AoE2.popCommitted(capSt, 0));
+const capBar = (() => {
+  const s = freeSpotAround(capSt.world, capSt, tOf(capTc.x), tOf(capTc.y), 2, 2, 8);
+  if (!s) return null;
+  const b = AoE2.makeBuilding(capSt, 'barracks', 0, s.tx, s.ty);
+  b.built = 1;                                        // pop 0: it adds no cap of its own
+  return b;
+})();
+const capBarGold = capSt.res[0].gold;
+const capBarTry = capBar && AoE2.train(capSt, capBar, 'militia');
+check(!!capBar && capBarTry === undefined && capBar.queue.length === 0 &&
+      capSt.toastMsg === 'Need more houses' && capSt.res[0].gold === capBarGold,
+  'train: a Barracks with an empty queue still respects the cap its Town Center filled',
+  !capBar ? 'no 2x2 site for the barracks'
+    : String(capBarTry) + ' queue=' + capBar.queue.length + ' ' + capSt.toastMsg +
+      ' gold=' + capSt.res[0].gold);
 
 /* T4 of the 2026-11-11 content port: the archer line. A throwaway state (the
  * §7c pattern) funded with exactly the two table prices - 175 wood to raise the
  * range, 25 wood + 45 gold to train the archer - so no cost can pass by
  * accident, and the trained unit is checked against KINDS.archer, not literals. */
 const ar = AoE2.createState();
+finishedHouse(ar);                     // room to train: 5 living at a cap of 5 would refuse (P1-10)
 const arVill = ar.units.find((u) => u.team === 0 && u.kind === 'villager');
 ar.selection = [arVill.id];
 ar.res[0].wood = dataBuildings.buildings.archery_range.cost.wood + AoE2.KINDS.archer.cost.wood;

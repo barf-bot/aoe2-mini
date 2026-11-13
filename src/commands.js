@@ -218,7 +218,7 @@ function train(Game, bld, kind) {
   if (bld.built < 1) return toast(Game, 'Still building');
   if (bld.queue.length >= 5) return toast(Game, 'Queue full');
   if (!canAfford(Game, bld.team, KINDS[kind].cost)) return toast(Game, 'Not enough ' + missing(Game, bld.team, KINDS[kind].cost));
-  if (popUsed(Game, bld.team) >= popCap(Game, bld.team)) return toast(Game, 'Need more houses');
+  if (popCommitted(Game, bld.team) >= popCap(Game, bld.team)) return toast(Game, 'Need more houses');
   spend(Game, bld.team, KINDS[kind].cost);
   bld.queue.push({ kind, t: KINDS[kind].time });
   markDirty(Game);                         // the paid-for queue is a change

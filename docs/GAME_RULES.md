@@ -201,7 +201,12 @@ a bug.
   building is finished, its train buttons plus `Demolish` for a non-Town Center building (T5).
 - Training: a building can only train what's in its `trains` list ("Militia needs a Town
   Center" when wrong), must be finished (`Still building`), max 5 in queue (`Queue full`),
-  must be affordable, and must have population room (`Need more houses`).
+  must be affordable, and must have population room (`Need more houses`). Room is measured by
+  one helper, `popCommitted` (`src/economy.js:114`): every living unit of the team
+  (`popUsed`, `src/economy.js:104` — villagers, militia and archers alike, docs/TODO.md
+  P1-10) plus every unit still queued in its buildings. `train` (`src/commands.js:215`) and
+  the footer's disabled buttons (`commandsHtml`, `src/hud.js:106`) both read it, so the
+  opening village reads 5/5 and a button never offers a click the command would refuse.
 
 - `built` is a **0..1 progress fraction**, not a built/not-built flag (docs/TODO.md P1-9):
   a building counts for its population cap, receives a carried load and can be worked only
@@ -241,8 +246,9 @@ Each upgrade sets `Game.ageBonus = Game.age`, which scales unit damage.
 
 Every **45 s** (`CFG.WAVE_EVERY`): if Red is at population cap, every free militia is
 ordered to attack the nearest blue unit ("Red attack wave!"); otherwise a **finished** Town
-Center (`src/ai.js:4`) queues a villager (up to 5 villagers) or a militia, and never
-double-queues — a Red keep still at 50 % caps nobody, trains nobody and sends no wave
+Center (`src/ai.js:4`) queues a villager while the village holds fewer than 5 units — every
+kind counts, since `popUsed` counts them all (docs/TODO.md P1-10) — else a militia, and never
+double-queues: a Red keep still at 50 % caps nobody, trains nobody and sends no wave
 (docs/TODO.md P1-9).
 
 ## Win / lose

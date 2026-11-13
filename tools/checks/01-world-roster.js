@@ -72,7 +72,7 @@ check(Game.units.filter(u => u.team === 0 && u.kind === 'militia').length === 1,
 check(blueVill().every(v => v.order.kind === 'harvest'), 'roster: every villager starts on a harvest order',
   blueVill().map(v => v.order.kind).join(','));
 check(AoE2.popCap(Game, 0) === 5, 'pop: Town Center caps population at 5', String(AoE2.popCap(Game, 0)));
-check(AoE2.popUsed(Game, 0) === 4, 'pop: 4 of 5 used', String(AoE2.popUsed(Game, 0)));
+check(AoE2.popUsed(Game, 0) === 5, 'pop: 5 of 5 used (the starting militia counts)', String(AoE2.popUsed(Game, 0)));
 const startRes = JSON.stringify(Game.res[0]);
 check(Game.res[0].wood === 100 && Game.res[0].food === 100, 'roster: starting stock 100 food / 100 wood', startRes);
 // T1 pinned six numbers by hand; they now come from data/, so compare against the

@@ -13,11 +13,16 @@ const {
 const red = (g) => g.units.filter((u) => u.team === 1 && !u.dead);
 const redTc = (g) => g.buildings.find((b) => b.team === 1 && b.kind === 'town_center');
 const oneWave = (g) => { for (let i = 0; i < Math.ceil(AoE2.CFG.WAVE_EVERY / DT) + 1; i++) AoE2.stepSim(g, DT); };
-/** A state whose red villagers stand idle, so the only thing that can move red's stockpile is the AI. */
-const village = (started) => {
+/** A state whose red villagers stand idle, so the only thing that can move red's stockpile
+ *  is the AI. `keep` leaves that many villagers standing and marks the rest dead the way
+ *  hitUnit does: popUsed counts every living unit (docs/TODO.md P1-10), so a red village
+ *  below its cap is one with fewer than five units, not one with five villagers minus one. */
+const village = (started, keep) => {
   const g = AoE2.createState();
   g.started = started;
-  for (const u of red(g)) u.order = { kind: 'idle' };
+  const vill = g.units.filter((u) => u.team === 1 && u.kind === 'villager');
+  for (const u of (keep === undefined ? [] : vill.slice(keep))) u.dead = true;
+  for (const u of g.units) if (!u.dead) u.order = { kind: 'idle' };
   return g;
 };
 const orders = (g) => red(g).filter((u) => u.kind === 'militia').map((u) => u.order.kind + ':' + u.order.target).join(',');
@@ -35,7 +40,8 @@ check(idle.started === false && idle.wave === 0 && redTc(idle).queue.length === 
 //    idle militia at the blue unit closest to the red Town Center
 const full = village(true);
 const fullTc = redTc(full);
-// popUsed counts villagers only, so the cap is reached by villagers
+// P1-10: popUsed counts every living unit, so the seeded roster (four villagers and a
+// militia) already fills the cap of 5; the loop closes whatever gap that leaves.
 for (let n = AoE2.popCap(full, 1) - AoE2.popUsed(full, 1); n > 0; n--) AoE2.makeUnit(full, 'villager', 1, fullTc.x, fullTc.y + 60);
 const cap = AoE2.popCap(full, 1), used = AoE2.popUsed(full, 1);
 const home = redTc(full);
@@ -48,8 +54,9 @@ check(used >= cap && sentAt.length > 0 && sentAt.every((u) => u.order.kind === '
   'ai: at the population cap the wave sends its militia at the nearest blue unit',
   'pop ' + used + '/' + cap + ' prey=' + prey.id + ' militia=' + orders(full) + ' toast=' + JSON.stringify(full.toastMsg));
 
-// 3. below the cap with a small village: it queues a villager and pays for it
-const grow = village(true);
+// 3. below the cap with a small village - two villagers and a militia, three of five - so
+//    the militia counting toward the cap (P1-10) does not stop it wanting a villager
+const grow = village(true, 2);
 const before = AoE2.popUsed(grow, 1), food0 = grow.res[1].food;
 oneWave(grow);
 const q = redTc(grow).queue;

@@ -312,11 +312,15 @@ const withStorage = (fn) => {
   try { return fn(s); } finally { global.localStorage = keep; }
 };
 /* A settlement with every cost payable and Feudal unlocked, so each command
-   actually commits instead of refusing (a refusal never marks). */
+   actually commits instead of refusing (a refusal never marks). The house is
+   population room: the seeded roster of five fills its own cap of five now that
+   popUsed counts every living unit (docs/TODO.md P1-10), so without it a plain
+   `train` here would be refused and never mark the game dirty. */
 const fundedGame = () => {
   const g = AoE2.createState();
   g.res[0] = { food: 9000, wood: 9000, gold: 9000, stone: 9000 };
   g.age = 1;
+  finishedHouse(g);
   return g;
 };
 const builtAt = (g, kind, ty) => {
