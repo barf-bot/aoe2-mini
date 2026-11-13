@@ -31,15 +31,19 @@ commits on `main`.
 - The command grid (`commandsHtml`, `src/hud.js:106`) offers `Upgrade to Guard Tower` on a finished
   tower and nothing for a House or a finished Keep, and its click reaches
   `upgradeBuilding` (`src/input.js:251`).
-- checks: 364 → 381. `tools/checks/05-construction.js` went 67 → 80 — two of them §7e's
-  table-driven age loop picking up the new rows for free, the other nine the plan's §7f (both age
-  refusals with the bank untouched, the Feudal spend and the Guard Tower it completes into, the
-  Keep edge, a half-upgraded tower holding fire while the finished one's arrow carries attack 7,
-  `Keep has no upgrade` and `Not your building`, the no-villager refusal and the cancel refund) —
-  and `tools/checks/09-hud.js` 31 → 35 (§11's button markup, the missing button on a House and a
-  Keep, the click that spends the tier and the info panel naming the tier the tower became). The
-  plan's arithmetic said 376 and 380; its §7f list names nine checks where its `done when` counts
-  eight, so the tree is one ahead of its own total.
+- checks: 364 → 382 — 381 across the plan, 382 with its review round.
+  `tools/checks/05-construction.js` went 67 → 81 — two of them §7e's table-driven age loop
+  picking up the new rows for free, the other ten the plan's §7f (both age refusals with the
+  bank untouched, the Feudal spend and the Guard Tower it completes into, the Keep edge, a
+  half-upgraded tower holding fire while the finished one's arrow carries attack 7,
+  `Keep has no upgrade`, `Not your building` and `Already under construction`, the
+  no-villager refusal and the cancel refund) — and `tools/checks/09-hud.js` 31 → 35 (§11's
+  button markup, the missing button on a House and a Keep, the click that spends the tier and
+  the info panel naming the tier the tower became). The review round added the §7f check the
+  design asked for but the plan's list had dropped (a tower already upgrading is refused
+  `Already under construction` and cannot spend the cost twice — deleting that guard from
+  `upgradeBuilding` had left every other check green) and restamped the plan's `done when`
+  totals to the measured numbers.
 - `preview.png` now carries the chain's middle tier: the render fixture places a finished
   `guard_tower` on the tile `findSite` answers next to the Watch Tower's pad, so the committed
   frame shows the blacksmith, Market, Watch Tower, Barricade and Guard Tower footprints.

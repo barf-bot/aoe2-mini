@@ -75,7 +75,7 @@ those five and outside `npm run check`: it opens the page in a real Chrome (Play
 `1.58.0` — the version whose bundled Chromium build is the one this box ships), asserts the
 app booted on both the working copy and the live site, writes `tools/out/local.png` and
 `tools/out/live.png` and prints a JSON summary per target. It needs a browser and network,
-so `tools/headless-check.js` must never require it: the 381-check suite stays plain node.
+so `tools/headless-check.js` must never require it: the 382-check suite stays plain node.
 The generated `tools/out/` is scratch, not committed.
 
 `tools/headless-check.js` runs every file in `tools/checks/`, each in its own process.

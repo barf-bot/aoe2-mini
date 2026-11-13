@@ -671,6 +671,32 @@ check(noTier.ok && foeSite.ok, 'upgrade: a Keep has no further tier and an enemy
   'not yours to upgrade',
   'keep: ' + noTier.detail + ' | enemy watch_tower: ' + foeSite.detail);
 
+/* the design's other named refusal (its "a building with no `upgradesTo` and a
+   tower already upgrading are both refused with `Game.res` untouched"): a tower
+   mid-upgrade is an unfinished site, so ordering the tier again -- the second call
+   a double click on the exported command makes -- answers `Already under
+   construction` and cannot spend the cost twice. */
+const twice = (() => {
+  const f = chainState('watch_tower', 1);
+  if (!f) return null;
+  AoE2.upgradeBuilding(f.st, f.b);                    // pay for the Guard Tower once
+  const mid = Object.assign({}, f.st.res[0]);         // the row's cost, all spent
+  const r = AoE2.upgradeBuilding(f.st, f.b);          // then order the same tier again
+  return { f, r, mid, res: Object.assign({}, f.st.res[0]), toast: f.st.toastMsg,
+           upgrade: f.b.upgrade, built: f.b.built, order: Object.assign({}, f.v.order) };
+})();
+check(!!twice && twice.r === undefined && twice.toast === 'Already under construction' &&
+      JSON.stringify(twice.mid) === ZERO &&
+      JSON.stringify(twice.res) === JSON.stringify(twice.mid) &&
+      twice.upgrade === 'guard_tower' && twice.built < 1 &&
+      twice.f.b.kind === 'watch_tower' && twice.order.b === twice.f.b.id,
+  'upgrade: a tower already upgrading is not upgraded again and the cost is not spent twice',
+  !twice ? 'no villager to stand the Watch Tower on'
+    : 'r=' + String(twice.r) + ' toast=' + JSON.stringify(twice.toast) + ' res=' +
+      JSON.stringify(twice.res) + ' after-first-spend=' + JSON.stringify(twice.mid) +
+      ' upgrade=' + String(twice.upgrade) + ' built=' + twice.built +
+      ' kind=' + twice.f.b.kind + ' order=' + JSON.stringify(twice.order));
+
 /* the cost is never spent when nobody can be drafted: the same pair of toasts
    `build` chooses (a team with villagers but none free says 'All villagers are
    building', an empty one 'No villager available'). */

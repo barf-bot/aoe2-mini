@@ -194,8 +194,8 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
     `b.upgrade = null`, `b.built = 1`, `b.hp = b.maxHp`, `markDirty`,
     `toast(Game, BLD[<the refunded tier>].label + ' upgrade cancelled')`, return `true`, and
     never call `removeBuilding`.
-  - done when: `node tools/headless-check.js -q` prints `376/376 checks passed`
-    (05-construction.js 71 → 79) and every number the new checks read comes off the rows, not
+  - done when: `node tools/headless-check.js -q` prints `378/378 checks passed`
+    (05-construction.js 71 → 81) and every number the new checks read comes off the rows, not
     from literals — a Feudal upgrade spends `{ wood: 35, stone: 125 }` and finishes with
     `b.maxHp === 1500`, `unitAttack(st, b) === 7`, `unitArmor(st, b, 'pierce') === 8`,
     `unitArmor(st, b, 'melee') === 2`, `b.w === 1 && b.h === 1`,
@@ -206,7 +206,7 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
     `src/commands.js` header comment at `src/commands.js:2-3` still describes itself
     accurately (build/train/research/trade/orders + the chain) and §4 stays DOM-free
     (the audit's DOM-free rule passes for the file).
-  - test: 8 checks in `tools/checks/05-construction.js` §7f, written before the code, on
+  - test: 10 checks in `tools/checks/05-construction.js` §7f, written before the code, on
     throwaway `flatState()` fixtures built with the §7d idiom (select the villager, bank the
     exact cost under test, `makeBuilding` + `built = 1` for the tier being upgraded, then step
     with `for (let i = 0; i < Math.ceil(AoE2.BLD[next].time / DT) + 2; i++) AoE2.stepSim(st, DT)`):
@@ -226,6 +226,8 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
     Castle team, same shape: spend, step, `b.kind === 'keep'` with the numbers above);
     `upgrade: a Keep has no further tier and an enemy tower is not yours to upgrade` (both
     refusals, `Game.res` untouched in each);
+    `upgrade: a tower already upgrading is not upgraded again and the cost is not spent twice`
+    (the design's second refusal half — the review round added it; the pre-review §7f had nine);
     `upgrade: with no villager to spare the cost is never spent` (`st.units = []` →
     `No villager available`, res untouched);
     `cancel: cancelling an in-progress upgrade refunds 80% of the tier under construction and
@@ -250,7 +252,7 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
     `src/hud.js:112`/`:127`). No new CSS (the fixed grid takes another button), no new
     `hudState` value (`src/hud.js:38` already answers `building`), no hotkey — an upgrade
     needs no tile to place.
-  - done when: `node tools/headless-check.js -q` prints `380/380 checks passed`
+  - done when: `node tools/headless-check.js -q` prints `382/382 checks passed`
     (09-hud.js 31 → 35) and the grid for a finished Watch Tower contains
     `data-act="upgrade" data-arg="guard_tower"` with the label `Upgrade to Guard Tower` and
     the cost `35 W 125 S`, for a finished House and a finished Keep contains no
@@ -289,7 +291,7 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
   - test: visual — `node tools/render-preview.js` plus looking at `preview.png`. The draw path
     it proves (the `noSprite` procedural rectangle, `src/render.js:116`) is already asserted by
     `tools/checks/02-sprites.js` §5b3 and `tools/checks/13-render.js`, so no new assertion
-    belongs here; `node tools/headless-check.js -q` still prints `380/380`.
+    belongs here; `node tools/headless-check.js -q` still prints `382/382`.
 
 - [x] T5: docs sync and the full verification pass
   - files: `docs/GAME_RULES.md`, `docs/ARCHITECTURE.md`, `docs/CHANGELOG.md`,
@@ -322,7 +324,7 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
   - test: `node tools/audit-line-refs.js` green (line refs, file map, DOM-free rule, tool
     inventory) — it is red from T1 onward, the house precedent, and this commit closes it.
     Then the full `AGENTS.md` set on the final tree: `node tools/headless-check.js -q`
-    (`380/380 checks passed`, exit 0), `node tools/check-stats.mjs` (exit 0,
+    (`382/382 checks passed`, exit 0), `node tools/check-stats.mjs` (exit 0,
     `373 fields checked (CFG, 3 kinds, 14 buildings, 4 techs)`),
     `node tools/render-preview.js` + look at `preview.png`, `node tools/gen-atlas.js`
     (`assets/sprites.png` byte-identical), `node tools/audit-line-refs.js`.
