@@ -25,20 +25,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P1 — wrong behaviour you notice within a minute
 
-### 9. A foundation counts as a finished building
-
-**Verified.** A house at 32 % raises the population cap from 5 to 10; a lumber camp at 1 %
-is chosen as the wood drop-off; right-clicking a 5 %-built farm starts a harvest.
-
-- **Cause:** `b.built` is a 0..1 fraction, but these places test it as a boolean:
-  `popCap`, `findDropoff`, `resumeGather` (`src/economy.js`), the farm case in
-  `orderForUnit` (`src/commands.js`), `decodeOrder` (`src/save.js`). `aiStep` and
-  `nearestEnemy` (`src/ai.js`) do the same for the red Town Center.
-- **Fix:** `b.built >= 1` in all of them. The two enemy-building tests in `orderForUnit` /
-  `issueOrder` and the one in `autoAcquire` also use truthiness; decide deliberately
-  whether an enemy foundation should be attackable (in AoE2 it is) and write it explicitly.
-- **Done when:** a check for each of the three verified cases above.
-
 ### 10. The population cap does not hold
 
 **Verified.** At 4/5, five villagers can be queued; all five spawn and the display reads

@@ -164,8 +164,8 @@ function hitBuilding(Game, b, dmg, type = 'melee') {
 }
 
 /** What an idle fighter sees: the nearest enemy unit within ACQUIRE tiles, else
- *  the nearest built enemy building within BUILDING_ACQUIRE. Villagers (atk 3)
- *  never start fights; they only attack when ordered. */
+ *  the nearest enemy building within BUILDING_ACQUIRE — any progress counts, the
+ *  rule being attackableAsEnemy. Villagers (atk 3) never start fights. */
 function autoAcquire(Game, u) {
   if (u.kind === 'villager') return null;
   const RU = (KINDS[u.kind].range || 0) > 0 ? KINDS[u.kind].range * CFG.TILE   /* the table's own reach */
@@ -180,7 +180,7 @@ function autoAcquire(Game, u) {
   const RB = CFG.BUILDING_ACQUIRE * CFG.TILE;
   let bestB = null, db = Infinity;
   for (const b of Game.buildings) {
-    if (b.team === u.team || !b.built) continue;
+    if (!attackableAsEnemy(b, u.team)) continue;
     const d = Math.hypot(b.x - u.x, b.y - u.y);
     if (d <= RB && d < db) { db = d; bestB = b; }
   }
@@ -298,4 +298,18 @@ function updateUnit(Game, u, dt) {
     }
     return;
   }
+}
+
+/** The rule for pointing a weapon at a hostile building, written once
+ *  (docs/TODO.md P1-9): a building of another team is attackable at ANY progress —
+ *  a 0 % foundation included, the way AoE2 does it — because `b.built` is a 0..1
+ *  progress fraction, not a built/not-built flag. A player's OWN buildings follow
+ *  the other half of the same rule and count for population, drop-off and work only
+ *  at `built >= 1` (`popCap`/`findDropoff`/`resumeGather` in src/economy.js, the
+ *  farm case and `decodeOrder`). The four call sites that used to test the fraction
+ *  as a boolean — orderForUnit, issueOrder, autoAcquire and aiStep's live-order
+ *  check — now all read this one, so an unfinished enemy building is never invisible
+ *  to a sword again. */
+function attackableAsEnemy(b, team) {
+  return !!b && b.team !== team;
 }

@@ -6,7 +6,7 @@ function aiStep(Game, dt) {
   Game.wave += dt;
   if (Game.wave < CFG.WAVE_EVERY) return;
   Game.wave = 0;
-  const tc = Game.buildings.find(b => b.team === 1 && b.built);
+  const tc = Game.buildings.find(b => b.team === 1 && b.built >= 1);
   if (!tc) return;
 
   if (popUsed(Game, 1) >= popCap(Game, 1)) {
@@ -17,7 +17,7 @@ function aiStep(Game, dt) {
       if (u.team !== 1 || u.kind !== 'militia' || u.dead) continue;
       const o = u.order;
       const live = o.kind === 'attack' && (o.b !== undefined
-        ? Game.buildings.some(z => z.id === o.b)
+        ? Game.buildings.some(z => z.id === o.b && attackableAsEnemy(z, 1))
         : Game.units.some(z => z.id === o.target && !z.dead));
       if (live) continue;
       if (!prey) continue;
@@ -36,7 +36,7 @@ function nearestEnemy(Game, team) {
   let best = null, bd = Infinity;
   for (const u of Game.units) {
     if (u.team === team || u.dead) continue;
-    const home = Game.buildings.find(b => b.team === team && b.built);
+    const home = Game.buildings.find(b => b.team === team && b.built >= 1);
     if (!home) return u;
     const d = (u.x - home.x) ** 2 + (u.y - home.y) ** 2;
     if (d < bd) { bd = d; best = u; }

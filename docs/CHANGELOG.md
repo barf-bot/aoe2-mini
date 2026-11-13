@@ -5,6 +5,32 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P1-9: a foundation counts as a finished building
+
+- `b.built` is a 0..1 progress fraction and every own-building test read it as a boolean
+  flag: a house at 32 % raised the population cap from 5 to 10 (`popCap`,
+  `src/economy.js:98`), a lumber camp at 1 % was chosen as the wood drop-off
+  (`findDropoff`, `src/economy.js:31`), a 5 % farm was harvested and re-linked from a save
+  (`resumeGather`, `src/economy.js:84`, `decodeOrder`, `src/save.js:163`), the farm case of
+  `orderForUnit` (`src/commands.js:7`) offered it as a harvest source, and the enemy's
+  `aiStep` (`src/ai.js:4`) trained from a half-built keep of its own. All of them now test
+  `built >= 1`.
+- The enemy half is written down instead of left to truthiness: a hostile building is
+  attackable at any progress — a 0 % foundation included, as in AoE2 — while a player's own
+  building counts only once it is finished. `attackableAsEnemy(b, team)` (`src/sim.js:313`)
+  is the single rule, and `orderForUnit`, `issueOrder`, `autoAcquire` and the live-order
+  check in `aiStep` all read it instead of each reinventing the test.
+- Save/load: the payload shape is unchanged — `built` was already stored as a fraction — so
+  no `VERSION` bump; an old save simply stops counting its half-built houses, camps and
+  farms, and a stored `harvest` order on a farm that never finished retires to `idle`.
+- checks: five new ones (310 → 315) — `tools/checks/05-construction.js` gains the 32 %
+  house cap, the 1 % lumber camp and the 5 % farm cases, `tools/checks/07-combat.js` the
+  attackable 0 % enemy foundation (the helper plus what `autoAcquire` and a right-click
+  answer), `tools/checks/12-ai.js` the half-built enemy Town Center. All five failed before
+  the fix and pass after; none of the existing checks pinned the old truthiness, so no
+  coverage was rewritten.
+- `preview.png` regenerates byte-identical (no render path changed).
+
 ### Fixed — `docs/TODO.md` P1-8: construction looks like nothing is happening
 
 - `drawBuildings` (`src/render.js:58`) gave every site the same anonymous look — a flat

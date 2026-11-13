@@ -31,6 +31,27 @@ check(house.hp === house.maxHp, 'build: hp scales with progress to full', house.
 check(AoE2.popCap(Game, 0) === 10, 'pop: house raises the cap to 10', String(AoE2.popCap(Game, 0)));
 check(AoE2.siteFree(Game, house.tx, house.ty, 2, 2) === false, 'site: occupied land rejected after building', 'rejected');
 
+/* docs/TODO.md P1-9: `built` is a 0..1 progress fraction, not a built/not-built flag,
+   and popCap read it as one — a 32 % house raised the cap from 5 to 10, so a village
+   kept queueing men into a house that was not standing yet. Only a finished building
+   counts. Its own state, so §7's house and its build timing stay untouched. */
+const popFnd = (() => {
+  const st = AoE2.createState();
+  const home = st.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+  const padNear = freeSpotAround(st.world, st, home.tx, home.ty, 2, 2, 8);
+  if (!padNear) return null;
+  const b = AoE2.makeBuilding(st, 'house', 0, padNear.tx, padNear.ty);
+  const capEmpty = AoE2.popCap(st, 0);
+  b.built = 0.32;
+  const capFnd = AoE2.popCap(st, 0);
+  b.built = 1; b.hp = b.maxHp;
+  return { capEmpty, capFnd, capDone: AoE2.popCap(st, 0) };
+})();
+check(!!popFnd && popFnd.capEmpty === 5 && popFnd.capFnd === 5 && popFnd.capDone === 10,
+  'pop: a 32 % foundation raises no cap — only the finished house does',
+  !popFnd ? 'no free 2x2 pad near the Town Center'
+    : popFnd.capEmpty + ' -> ' + popFnd.capFnd + ' at 32% -> ' + popFnd.capDone + ' at 100%');
+
 // T5 multi-build (docs/CHANGELOG.md: pickBuilder assigns the nearest idle
 // villager so a second placement never yanks a builder off his first site) plus
 // docs/TODO.md P0-4: a placement now drafts EVERY free villager in the selection
@@ -261,6 +282,25 @@ check(Math.floor(cg.res[0].wood) === 0,
   'build: every site costs exactly its table price (' +
   ['lumber_camp', 'mining_camp', 'mill', 'farm'].map((k) => k.replace('_camp', '') + ' ' + woodCost(k)).join(', ') + ' wood)',
   String(Math.floor(cg.res[0].wood)));
+
+/* docs/TODO.md P1-9, the drop-off and farm half: before §7b declares the four sites
+   finished, a 1 % Lumber Camp must not receive wood and a 5 % farm must not be worked
+   (ordered or resumed) — both read the progress fraction as a flag. */
+if (lc) lc.built = 0.01;
+if (f2) f2.built = 0.05;
+check(!!lc && dropId('wood') === vt.id,
+  'dropoff: a 1 % Lumber Camp is no drop-off yet — the wood still walks to the Town Center',
+  String(dropId('wood')) + ' (want ' + String(vt.id) + ')');
+const farm5 = !!f2 && (() => {
+  const at = { x: f2.tx * AoE2.CFG.TILE + AoE2.CFG.TILE / 2,
+               y: f2.ty * AoE2.CFG.TILE + AoE2.CFG.TILE / 2 };
+  return { order: JSON.stringify(AoE2.orderForUnit(cg, cv, at.x, at.y)),
+           resume: JSON.stringify(AoE2.resumeGather(cg, cv, AoE2.sourceFromFarm(f2))) };
+})();
+check(!!farm5 && farm5.order === JSON.stringify({ kind: 'build', b: f2 && f2.id }) &&
+      farm5.resume === JSON.stringify({ kind: 'idle' }),
+  'farm: a 5 % farm is neither ordered nor re-worked as a harvest source',
+  farm5 ? farm5.order + ' / ' + farm5.resume : 'no farm placed');
 [lc, mc, ml, f2].forEach((b) => { if (b) b.built = 1; });
 check(dropId('wood') === lc.id, 'dropoff: wood walks to the Lumber Camp, not the Town Center',
   String(dropId('wood')));

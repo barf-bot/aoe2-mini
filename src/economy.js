@@ -33,7 +33,7 @@ function findDropoff(Game, unit, src) {
   if (!res) return null;
   let best = null, bestScore = Infinity;
   for (const b of Game.buildings) {
-    if (b.team !== unit.team || !b.built) continue;
+    if (b.team !== unit.team || b.built < 1) continue;
     if (src && src.kind === 'farm' && b.id === src.b) continue;   // never its own farm
     const score = dropTargetScore(res, b);
     if (score === Infinity) continue;
@@ -89,7 +89,7 @@ function resumeGather(Game, u, src) {
     return next ? { kind: 'harvest', src: next } : { kind: 'idle' };
   }
   const b = Game.buildings.find(x => x.id === src.b);
-  if (!b || !b.built || b.field <= 0) return { kind: 'idle' };
+  if (!b || b.built < 1 || b.field <= 0) return { kind: 'idle' };
   return { kind: 'harvest', src: sourceFromFarm(b) };
 }
 
@@ -97,7 +97,7 @@ function resumeGather(Game, u, src) {
 
 function popCap(Game, team) {
   let cap = 0;
-  for (const b of Game.buildings) if (b.team === team && b.built) cap += BLD[b.kind].pop || 0;
+  for (const b of Game.buildings) if (b.team === team && b.built >= 1) cap += BLD[b.kind].pop || 0;
   return cap;
 }
 

@@ -65,4 +65,21 @@ check(red(grow).length === redBefore + 1,
   'ai: the queued villager spawns after the table train time',
   redBefore + ' -> ' + red(grow).length + ' red units');
 
+/* 5. docs/TODO.md P1-9, the red side of the same rule: a Town Center at 50 % is a
+   foundation, not a keep — it caps nobody (popCap 0), so aiStep has no building to
+   train from and the village neither queues nor pays. */
+const site = (() => {
+  const g = village(true);
+  g.res[1] = { food: 9000, wood: 9000, gold: 9000, stone: 9000 };
+  const tc = redTc(g);
+  if (!tc) return null;
+  tc.built = 0.5;                                     // the keep is still going up
+  const cap = AoE2.popCap(g, 1), res = JSON.stringify(g.res[1]);
+  oneWave(g);
+  return { cap, res, now: JSON.stringify(g.res[1]), queue: redTc(g).queue.length };
+})();
+check(!!site && site.cap === 0 && site.queue === 0 && site.now === site.res,
+  'ai: a half-built enemy Town Center counts for nothing and trains nobody',
+  !site ? 'no red Town Center'
+    : 'cap=' + site.cap + ' queue=' + site.queue + ' res ' + site.res + ' -> ' + site.now);
 report();

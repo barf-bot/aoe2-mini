@@ -12,7 +12,7 @@ function orderForUnit(Game, u, wx, wy) {
   const enemy = Game.units.find(v => v.team !== u.team && !v.dead &&
     Math.hypot(v.x - wx, v.y - wy) < CFG.TILE * 0.8);
   if (enemy) return { kind: 'attack', target: enemy.id };
-  const eB = Game.buildings.find(b => b.team !== u.team && b.built &&
+  const eB = Game.buildings.find(b => attackableAsEnemy(b, u.team) &&
     tx >= b.tx && tx < b.tx + b.w && ty >= b.ty && ty < b.ty + b.h);
   if (eB) return { kind: 'attack', b: eB.id };
 
@@ -25,7 +25,7 @@ function orderForUnit(Game, u, wx, wy) {
     const site = Game.buildings.find(b => b.team === u.team && b.built < 1 &&
       tx >= b.tx && tx < b.tx + b.w && ty >= b.ty && ty < b.ty + b.h);
     if (site) return { kind: 'build', b: site.id };
-    const farm = Game.buildings.find(b => b.team === u.team && b.built && b.kind === 'farm' &&
+    const farm = Game.buildings.find(b => b.team === u.team && b.built >= 1 && b.kind === 'farm' &&
       b.field > 0 && tx >= b.tx && tx < b.tx + b.w && ty >= b.ty && ty < b.ty + b.h);
     if (farm) return { kind: 'harvest', src: sourceFromFarm(farm) };
     if (RES_OF_TILE[world.type[ty * world.w + tx]]) {
@@ -54,7 +54,7 @@ function issueOrder(Game, wx, wy) {
   const enemy = Game.units.find(v => v.team !== sel[0].team && !v.dead &&
     Math.hypot(v.x - wx, v.y - wy) < CFG.TILE * 0.8);
   const tTx = Math.floor(wx / CFG.TILE), tTy = Math.floor(wy / CFG.TILE);
-  const eB = Game.buildings.find(b => b.team !== sel[0].team && b.built &&
+  const eB = Game.buildings.find(b => attackableAsEnemy(b, sel[0].team) &&
     tTx >= b.tx && tTx < b.tx + b.w && tTy >= b.ty && tTy < b.ty + b.h);
   const want = sel.map((u) => {                          // the order this unit asked for
     let o = enemy ? { kind: 'attack', target: enemy.id }

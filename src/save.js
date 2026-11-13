@@ -167,7 +167,7 @@ function decodeOrder(Game, u, o, byId) {
   let src = null;
   if (e.src.kind === 'farm') {
     const b = byId.get(e.src.b);
-    if (b && b.built) src = sourceFromFarm(b);
+    if (b && b.built >= 1) src = sourceFromFarm(b);
   } else {
     src = sourceFromTile(Game, u, e.src.tx, e.src.ty);
   }

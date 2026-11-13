@@ -70,6 +70,35 @@ check(AoE2.hitBuilding(ag, gb, 99999) === true && !ag.buildings.includes(gb) &&
   ag.buildings.some((b) => b.team === 1) ? 'still there'
     : 'removed, selection=' + String(ag.selectedBuilding));
 
+/* docs/TODO.md P1-9, the enemy half: `attackableAsEnemy(b, team)` (`src/sim.js`) is now
+ * the one place that says what a hostile building is, and the rule is ANY progress — a
+ * 0 % foundation included, as in AoE2 — because `built` is progress, not existence. The
+ * builder's own side keeps the other rule (`built >= 1`), so the fraction is never
+ * tested as a flag again by orderForUnit / issueOrder / autoAcquire / aiStep. */
+const fndF = (() => {
+  const st = AoE2.createState();
+  const own = st.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+  const spot = freeSpotAround(st.world, st, own.tx + 3, own.ty + 1, 1, 1, 1);
+  if (!spot) return null;
+  const fnd = AoE2.makeBuilding(st, 'barricade', 1, spot.tx, spot.ty);   // red, 0 % laid
+  st.units = [];                                                         // nothing else to prefer
+  const m = AoE2.makeUnit(st, 'militia', 0, fnd.x - 8, fnd.y);           // blue, at its side
+  const at = { x: fnd.tx * AoE2.CFG.TILE + AoE2.CFG.TILE / 2,
+               y: fnd.ty * AoE2.CFG.TILE + AoE2.CFG.TILE / 2 };
+  const has = typeof AoE2.attackableAsEnemy === 'function';
+  return { id: fnd.id, has, enemy: has ? AoE2.attackableAsEnemy(fnd, 0) : null,
+           kin: has ? AoE2.attackableAsEnemy(own, 0) : null,
+           acq: JSON.stringify(AoE2.autoAcquire(st, m)),
+           ord: JSON.stringify(AoE2.orderForUnit(st, m, at.x, at.y)) };
+})();
+check(!!fndF && fndF.has && fndF.enemy === true && fndF.kin === false &&
+      fndF.acq === JSON.stringify({ kind: 'attack', b: fndF.id }) &&
+      fndF.ord === JSON.stringify({ kind: 'attack', b: fndF.id }),
+  'combat: a 0 % enemy foundation is attackable — helper, autoAcquire and orderForUnit agree',
+  !fndF ? 'no free tile east of the Town Center'
+    : 'helper=' + fndF.has + ' enemy=' + String(fndF.enemy) + ' own=' + String(fndF.kin) +
+      ' acquire=' + fndF.acq + ' rightClick=' + fndF.ord + ' (want b=' + (fndF && fndF.id) + ')');
+
 const gv = g0.find((u) => u.kind === 'villager');
 gv.order = { kind: 'idle' };
 const nearRed = reds()[0];

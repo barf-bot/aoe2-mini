@@ -100,9 +100,9 @@ a bug.
   `stepBuildingAttacks` (`src/sim.js:136`).
 - Auto-acquire (`autoAcquire`, `src/sim.js:169`): non-villager fighters spot the nearest
   enemy unit within their own reach — `range` tiles for a shooter, `CFG.ACQUIRE` (6) for a
-  melee unit — else the nearest built enemy building within `CFG.BUILDING_ACQUIRE` (5), and
-  snap to the next target the moment their current one dies. Villagers never start fights;
-  they only attack when ordered.
+  melee unit — else the nearest enemy building within `CFG.BUILDING_ACQUIRE` (5), at any
+  progress (`attackableAsEnemy`, `src/sim.js:313`). Snap to the next target the moment
+  their current one dies. Villagers never start fights; they only attack when ordered.
 - Damage is computed in one place (`unitAttack`/`unitArmor`, `src/sim.js:55`/`src/sim.js:69`):
   attack = the row's `atk` × `(1 + 0.25 × ageBonus)` — the age multiplier, `ageBonus` is
   the age index (1× at Dark Age) — plus every researched tech's attack for the attacker's
@@ -203,6 +203,15 @@ a bug.
   Center" when wrong), must be finished (`Still building`), max 5 in queue (`Queue full`),
   must be affordable, and must have population room (`Need more houses`).
 
+- `built` is a **0..1 progress fraction**, not a built/not-built flag (docs/TODO.md P1-9):
+  a building counts for its population cap, receives a carried load and can be worked only
+  once it is complete — `popCap` (`src/economy.js:98`), `findDropoff` (`src/economy.js:31`),
+  `resumeGather` (`src/economy.js:84`), the farm case of `orderForUnit`
+  (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:163`) all test
+  `built >= 1`, as does the enemy's `aiStep` (`src/ai.js:4`). An *enemy* building follows the
+  other half of the rule: attackable at any progress, a 0 % foundation included, the way
+  AoE2 does it (`attackableAsEnemy`, `src/sim.js:313`).
+
 ## Technologies (`TECHS`)
 
 | Tech | From | Cost | Time | Effect |
@@ -231,8 +240,10 @@ Each upgrade sets `Game.ageBonus = Game.age`, which scales unit damage.
 ## Enemy AI (Red)
 
 Every **45 s** (`CFG.WAVE_EVERY`): if Red is at population cap, every free militia is
-ordered to attack the nearest blue unit ("Red attack wave!"); otherwise the Town Center
-queues a villager (up to 5 villagers) or a militia, and never double-queues.
+ordered to attack the nearest blue unit ("Red attack wave!"); otherwise a **finished** Town
+Center (`src/ai.js:4`) queues a villager (up to 5 villagers) or a militia, and never
+double-queues — a Red keep still at 50 % caps nobody, trains nobody and sends no wave
+(docs/TODO.md P1-9).
 
 ## Win / lose
 
