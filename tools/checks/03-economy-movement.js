@@ -98,7 +98,7 @@ for (let r = 1; r <= 12 && !lot; r++) {
 const caught = lot && AoE2.makeUnit(fresh, 'villager', 0,
   lot.tx * AoE2.CFG.TILE + AoE2.CFG.TILE / 2, lot.ty * AoE2.CFG.TILE + AoE2.CFG.TILE / 2);
 const houseHere = lot && AoE2.makeBuilding(fresh, 'house', 0, lot.tx, lot.ty);
-const expect = houseHere && typeof AoE2.workPos === 'function' ? AoE2.workPos(fresh, houseHere) : null;
+const expect = houseHere && typeof AoE2.workPos === 'function' ? AoE2.workPos(fresh, houseHere, caught) : null;
 check(!!expect && !!caught && Math.hypot(caught.x - expect.x, caught.y - expect.y) < 0.01 &&
       solidTile(fresh, tOf(caught.x), tOf(caught.y)) === null,
   'build: a unit caught under a new footprint is relocated to workPos',

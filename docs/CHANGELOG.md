@@ -5,6 +5,29 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P1-6: every unit uses the same corner of a building
+
+- `workPos(Game, b, u)` (`src/entities.js:159`) answered one fixed tile — the first free
+  tile around the footprint, its north-west corner — no matter who asked: four calls for
+  the Town Center gave one spot, and a villager south-east of a site walked all the way
+  around it to stand at the opposite corner. It now takes the unit and answers with the
+  walkable ring tile nearest to him, taken from the ring `standingSpots` already
+  enumerates, so a builder east of a 3x3 site works from its east side and two villagers
+  arriving from opposite sides take different tiles. With no unit to be near yet — a
+  trained unit (`src/sim.js:14`), boot's roster fallback (`src/boot.js:81`), a fixture
+  placing one (`src/entities.js:95`) — the answer is the ring's first tile, the single
+  spot spawning used before.
+- `standTarget` (`src/movement.js:259`) passes its own unit through, so the `build`,
+  `go_deposit` and `attack` branches all get the spot on the side the unit is on, and
+  `makeBuilding` relocates each unit caught under a new footprint to the ring tile nearest
+  to him instead of shipping everybody to one corner.
+- checks: `tools/checks/04-pathfinding.js` gains section 6f, the two tiles the item
+  promises (28 → 30 checks, 302 → 304 in the suite), and the checks that used to read the
+  single corner — the footprint-relocation check in `tools/checks/03-economy-movement.js`,
+  the three T3 fixtures in `tools/checks/04-pathfinding.js` and the spawn fixtures in
+  `tools/checks/10-reset-save.js` / `tools/checks/11-sound.js` — now pass the unit they are
+  placing instead of relying on the fixed answer (both failed before the fix, pass after).
+
 ### Fixed — `docs/TODO.md` P1-5: units walk in zigzags
 
 - `findPath` (`src/movement.js:63`) priced a diagonal step and a straight one both at 1

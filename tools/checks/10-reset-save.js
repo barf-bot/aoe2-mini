@@ -524,7 +524,7 @@ const savedFixture = (at = 1000) => {
   g.started = true;                                     // a save always comes from a booted game
   g.age = 1;
   g.res[0] = { food: 100, wood: 100, gold: 999, stone: 50 };
-  const p = AoE2.workPos(g, g.buildings.find((b) => b.team === 0 && b.kind === 'town_center'));
+  const p = AoE2.workPos(g, g.buildings.find((b) => b.team === 0 && b.kind === 'town_center'), null);
   AoE2.makeUnit(g, 'archer', 0, p.x, p.y);
   return [g, AoE2.saveGame(AoE2.SAVE_PATH, g, at)];
 };

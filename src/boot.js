@@ -78,7 +78,7 @@ function resetGame(Game) {
   for (const team of [0, 1]) {
     const tc = team === 0 ? tcA : tcB;
     const spots = standingSpots(Game, tc, 5);
-    const at = (i) => spots[i] || workPos(Game, tc);
+    const at = (i) => spots[i] || workPos(Game, tc, null);
     for (let i = 0; i < 4; i++) {
       const v = makeUnit(Game, 'villager', team, at(i).x, at(i).y);
       assignStarter(Game, v);

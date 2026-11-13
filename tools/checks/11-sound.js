@@ -273,7 +273,7 @@ soundCheck("sound: a finished building plays the build row's note once", () => {
       const b = siteAt(g, 'house', ty);
       b.built = built;
       b.hp = Math.max(1, Math.round(b.maxHp * built));
-      const spot = AoE2.workPos(g, b);
+      const spot = AoE2.workPos(g, b, null);
       AoE2.makeUnit(g, 'villager', 0, spot.x, spot.y).order = { kind: 'build', b: b.id };
       return b;
     };

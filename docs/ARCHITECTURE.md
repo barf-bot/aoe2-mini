@@ -117,7 +117,8 @@ building went up, a tile ran dry) drops it and the next step re-paths.
 `CFG.ASTAR_MAX_NODES` caps a single query, and an unreachable goal costs one capped query
 answer instead of one per tile. `standTarget` (`src/movement.js:259`) turns a solid order target into
 a standable tile — the ordered point itself when it is walkable or already within the
-order's arrival radius, else `workPos` for a building / `workSpot` for a tile — so every
+order's arrival radius, else `workPos` for a building (asked with the unit, so it answers
+with the ring tile nearest to him) / `workSpot` for a tile — so every
 order kind runs one pipeline, order → standTarget → findPath → step, and
 `formationSlots` (`src/movement.js:280`) hands a group's move orders one distinct tile each,
 the ranks that replaced the golden-angle `spread`.

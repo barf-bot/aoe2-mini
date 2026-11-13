@@ -43,8 +43,12 @@ a bug.
   stock (`amount > 0`) and building tiles — foundations included, via `Game.occupied`
   (`rebuildBlocks`, `src/entities.js:102`). Units work from the neighbour tile instead of
   standing on the thing: `workSpot` (`src/entities.js:42`) offers only free walkable
-  neighbours, `workPos` (`src/entities.js:150`) is the standing spot beside a building, and a
-  unit caught under a new footprint is moved there (`makeBuilding`, `src/entities.js:76`).
+  neighbours, `workPos` (`src/entities.js:150`) is the walkable ring tile beside a building
+  nearest to the unit asking for it — a builder east of a 3x3 site works from its east side
+  instead of walking around to one fixed corner, and two villagers arriving from opposite
+  sides take different tiles; a spawn, with no unit to be near yet, takes the ring's first
+  tile. A unit caught under a new footprint is moved to the ring tile nearest to him
+  (`makeBuilding`, `src/entities.js:76`).
 - Orders route over the tile grid instead of sliding at the target (`findPath`,
   `src/movement.js:63`): A\*, 8-connected, every step priced by the octile rule
   (`stepCost`, `src/movement.js:19` — 1 for a straight step, √2 for a diagonal) with the
@@ -61,9 +65,10 @@ a bug.
 - A solid target is never walked into (`standTarget`, `src/movement.js:259`): harvest, build,
   deposit and attack orders first ask it for a tile to stand on — the ordered point itself
   when it is walkable or already within the order's arrival radius, else the spot the game
-  assigns for what was ordered to (`workPos` for a building, `workSpot` for a tile) — and
-  route to that, so a builder works from the edge of the footprint instead of stalling on
-  it. A target with no reachable spot leaves the order unroutable instead of queued.
+  assigns for what was ordered to (`workPos` for a building — asked WITH the unit, so it
+  names the ring tile nearest to him — or `workSpot` for any other tile) — and route to
+  that, so a builder works from the edge of the footprint instead of stalling on it. A
+  target with no reachable spot leaves the order unroutable instead of queued.
 - A group move gets ranks instead of a scatter (`formationSlots`, `src/movement.js:280`): a
   centred `cols = ceil(sqrt(n))` grid, one tile per unit (the `max(CFG.UNIT_SEP, CFG.TILE)`
   pitch expressed on the tile grid), solid or already-held cells skipped and the grid

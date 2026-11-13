@@ -88,11 +88,11 @@ function makeBuilding(Game, kind, team, tx, ty) {
      the work spot beside the building instead of living inside it (AoE2 does the
      same when a house goes up under a villager). */
   const tiles = Game.blocks.get(b.id) || [];
-  const spot = workPos(Game, b);
   for (const u of Game.units) {
     if (u.dead) continue;
     const i = Math.floor(u.y / CFG.TILE) * Game.world.w + Math.floor(u.x / CFG.TILE);
     if (tiles.indexOf(i) < 0) continue;
+    const spot = workPos(Game, b, u);              // the ring tile nearest to him
     u.x = spot.x; u.y = spot.y;
   }
   return b;
@@ -146,21 +146,26 @@ function setResult(Game) {
   playSfx(Game, Game.result);          // one statement serves both result rows
 }
 
-/** Free tile next to a building for a unit to spawn / stand on. */
-function workPos(Game, b) {
-  const tiles = Game.blocks.get(b.id) || [];
-  for (const i of tiles) {
-    const ux = i % Game.world.w, uy = (i / Game.world.w) | 0;
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const x = ux + dx, y = uy + dy;
-        const px = x * CFG.TILE + CFG.TILE / 2, py = y * CFG.TILE + CFG.TILE / 2;
-        if (!walkable(Game, px, py)) continue;
-        return { x: px, y: py };
-      }
-    }
+/** workPos(Game, b, u): the walkable ring tile nearest to u — the tile a unit
+ *  works or stands at beside building b, so a builder east of the site works from
+ *  its east side instead of walking around to the far corner, and two villagers
+ *  arriving from opposite sides take different tiles. The ring itself is
+ *  standingSpots', the one the starting squad lines up on. With no unit to be
+ *  near — the unit makeUnit has not placed yet (sim's training queue, boot's
+ *  roster fallback) — the answer is the ring's first tile, the single spot every
+ *  spawn used before; a building whose rings out to 8 are all solid has no spot
+ *  at all and answers with its own centre, the point moveUnit accepts for such a
+ *  site. */
+function workPos(Game, b, u) {
+  const ring = standingSpots(Game, b, 2 * (b.w + b.h) + 4);   // every tile touching b
+  const first = ring[0] || { x: b.x, y: b.y };
+  if (!u) return first;
+  let best = first, d2 = Infinity;
+  for (const p of ring) {
+    const dx = p.x - u.x, dy = p.y - u.y, dd = dx * dx + dy * dy;
+    if (dd < d2) { d2 = dd; best = p; }
   }
-  return { x: b.x, y: b.y };
+  return best;
 }
 
 /** n walkable tile centres to stand units around a building: the footprint is

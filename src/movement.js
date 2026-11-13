@@ -252,18 +252,18 @@ function moveUnit(Game, u, x, y, dt, stop) {
  *  point itself when it is walkable or the unit already stands within `stop` of it
  *  (a villager on the keep he feeds, an archer's enemy already at arrow range),
  *  otherwise the spot the game assigns for the kind of thing ordered to — `workPos`
- *  for a building (the ring `standingSpots` draws squads along, stood at `reachOf`),
- *  `workSpot` for any other tile — and otherwise nothing. Every order kind then runs
- *  one path, order → standTarget → findPath → step, which is the design's "harvest /
- *  build / move orders all route the same way". */
+ *  for a building, asked WITH the unit so it names the ring tile nearest to him
+ *  (the side he came from, not the one corner every builder walked around to),
+ *  `workSpot` for any other tile — and otherwise nothing. Every order kind then
+ *  runs one path, order → standTarget → findPath → step (the design's rule). */
 function standTarget(Game, u, x, y, stop) {
   const s = stop || 1;                                   // the caller's arrival radius
   if (walkable(Game, x, y) || Math.hypot(x - u.x, y - u.y) <= s) return { x, y };
   const { tx, ty } = tileOf(x, y);
   const site = Game.buildings.find((b) => tx >= b.tx && tx < b.tx + b.w &&
                                           ty >= b.ty && ty < b.ty + b.h);
-  return site ? workPos(Game, site)                      // its own ring tile
-              : workSpot(Game, u, tx, ty);               // its nearest walkable neighbour
+  return site ? workPos(Game, site, u)             // the ring tile nearest to him
+              : workSpot(Game, u, tx, ty);         // its nearest walkable neighbour
 }
 
 /** The tiles the `move` orders of `sel` take around the ordered point (x, y) — the

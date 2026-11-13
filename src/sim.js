@@ -11,7 +11,7 @@ function stepSim(Game, dt) {
     b.queue[0].t -= dt;
     while (b.queue.length && b.queue[0].t <= 0) {
       const job = b.queue.shift();
-      const p = workPos(Game, b);
+      const p = workPos(Game, b, null);          // a unit with no position yet: the ring's first tile
       makeUnit(Game, job.kind, b.team, p.x, p.y);
       markDirty(Game);                     // a unit appearing is a change the sim made
       if (!b.queue.length) break;

@@ -25,23 +25,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P1 — wrong behaviour you notice within a minute
 
-### 6. Every unit uses the same corner of a building
-
-**Verified.** `workPos` returns one fixed tile — the first free tile around the footprint,
-which is its north-west corner — no matter where the unit is. Four calls for the Town
-Center give one spot.
-
-- **Effect:** builders, villagers dropping off and newly trained units all go to the same
-  tile. A villager south-east of a site walks around it to stand at the opposite corner,
-  which reads as "he walked there and is not building".
-- **Cause:** `workPos(Game, b)` in `src/entities.js` takes no unit. `standTarget` in
-  `src/movement.js` calls it for build, drop-off and attack.
-- **Fix:** give `workPos` the unit and return the walkable ring tile nearest to it
-  (`standingSpots` already enumerates the ring). Spawning can keep the current rule or
-  spread over the ring.
-- **Done when:** a villager east of a 3×3 building stops on its east side, and two
-  villagers approaching from opposite sides stop on different tiles.
-
 ### 7. Villagers are tiny and distorted
 
 **Verified.** Every unit frame is drawn into a fixed box (20×20, militia 22×22)

@@ -348,7 +348,7 @@ const atkBuildF = (() => {
   const f = scene('militia', 0, 65, 51);
   const tc = f.st.buildings.find((b) => b.team === 1 && b.kind === 'town_center');
   if (!tc) return null;
-  const spot = AoE2.workPos(f.st, tc);
+  const spot = AoE2.workPos(f.st, tc, f.u);
   f.u.order = { kind: 'attack', b: tc.id };
   const hp0 = tc.hp, w = walkOrder(f.st, f.u, 900);
   return { f, tc, spot, hp0, w, route: routeOf(f.u) };
@@ -370,7 +370,7 @@ const atkRangedF = (() => {
   const f = scene('archer', 0, 65, 50);
   const tc = f.st.buildings.find((b) => b.team === 1 && b.kind === 'town_center');
   if (!tc) return null;
-  const spot = AoE2.workPos(f.st, tc);
+  const spot = AoE2.workPos(f.st, tc, f.u);
   const hp0 = tc.hp;
   f.u.order = { kind: 'attack', b: tc.id };
   const w = walkOrder(f.st, f.u, 900);
@@ -398,7 +398,7 @@ const buildOrderF = (() => {
   setTile(f.st, 61, 61, AoE2.T.WATER, 0);
   if (!AoE2.siteFree(f.st, 62, 60, 1, 1)) return null;
   const house = AoE2.makeBuilding(f.st, 'house', 0, 62, 60);
-  const spot = AoE2.workPos(f.st, house);
+  const spot = AoE2.workPos(f.st, house, f.u);
   f.u.order = { kind: 'build', b: house.id };
   const w = walkOrder(f.st, f.u, 2400);
   return { f, house, spot, w, route: routeOf(f.u) };
@@ -712,5 +712,45 @@ check(!!diagF && diagF.tiles === 11 && Math.abs(diagF.len - diagF.straight) <= 0
     : `${diagF.w.n} steps, ${diagF.len.toFixed(1)}px walked for a ${diagF.straight.toFixed(1)}px order ` +
       `(${(100 * (diagF.len / diagF.straight - 1)).toFixed(1)}% over); route kept ${diagF.tiles} tiles, ` +
       `whose staircases cost ${diagF.stairs.toFixed(1)}px and whose line costs ${diagF.straight.toFixed(1)}px`);
+
+/* ---- 6f. the work spot beside a building (TODO P1-6: every unit uses the
+ * same corner of a building) ------------------------------------------ *
+ * `workPos(Game, b)` answered one fixed tile for every unit — the first free
+ * tile around the footprint, its north-west corner — so every villager sent to
+ * a site queued up at the corner opposite the one he walked up to. The rule now
+ * is the walkable ring tile nearest the unit, read off the same ring
+ * `standingSpots` draws squads along, and `standTarget` asks it WITH the unit it
+ * is moving. The fixture is the seeded 3x3 Town Center of team 0 with the rest of
+ * the board cleared (the same trick 11-sound uses: no stray separation pushes),
+ * one villager standing on its east ring tile and one on its west ring tile: the
+ * two tiles the game must hand out, and the fact that the eastern one builds
+ * without walking anywhere. */
+const ringF = (() => {
+  const st = flatState();
+  const b = st.buildings.find((x) => x.team === 0 && x.kind === 'town_center');
+  if (!b) return null;
+  st.units = [];                                        // nobody on the board but the two
+  const at = (tx, ty) => { const p = tileCentre(st, tx, ty); return AoE2.makeUnit(st, 'villager', 0, p.x, p.y); };
+  const east = at(b.tx + b.w, b.ty + 1), west = at(b.tx - 1, b.ty + 1);
+  const spots = { east: AoE2.workPos(st, b, east), west: AoE2.workPos(st, b, west) };
+  const eastTile = (b.tx + b.w) + ',' + (b.ty + 1), westTile = (b.tx - 1) + ',' + (b.ty + 1);
+  b.built = 0.9; b.hp = Math.max(1, Math.round(b.maxHp * 0.9));   // finishable inside the budget
+  east.order = { kind: 'build', b: b.id };
+  const w = walkOrder(st, east, 900);
+  return { b, east, west, spots, eastTile, westTile, w };
+})();
+check(!!ringF && tileKey(ringF.spots.east) === ringF.eastTile && tileKey(ringF.spots.west) === ringF.westTile,
+  'path: workPos answers the ring tile nearest the unit, not one fixed corner',
+  !ringF ? 'no Town Center of team 0 in a fresh state'
+    : `site ${ringF.b.tx},${ringF.b.ty} (${ringF.b.w}x${ringF.b.h}): the villager on ${ringF.eastTile} is sent to ` +
+      `${tileKey(ringF.spots.east)} (want ${ringF.eastTile}), the one on ${ringF.westTile} to ` +
+      `${tileKey(ringF.spots.west)} (want ${ringF.westTile})`);
+check(!!ringF && ringF.b.built === 1 && ringF.east.order.kind === 'idle' &&
+      tOf(ringF.east.x) === ringF.b.tx + ringF.b.w && tOf(ringF.east.y) === ringF.b.ty + 1,
+  'path: a villager east of a 3x3 site builds it from its east side',
+  !ringF ? 'no Town Center of team 0 in a fresh state'
+    : `he stands on ${tOf(ringF.east.x)},${tOf(ringF.east.y)} (want ${ringF.eastTile}, the east ring tile), ` +
+      `walked ${distTo(ringF.w.from, ringF.east).toFixed(1)}px in ${ringF.w.n} steps, the site is ` +
+      `${(100 * ringF.b.built).toFixed(0)}% built and the order is ${ringF.east.order.kind}`);
 
 report();
