@@ -64,13 +64,12 @@ function drawBuildings(Game, view) {
     const x = b.tx * TS - cam.x, y = b.ty * TS - cam.y, w = b.w * TS, h = b.h * TS;
     if (x > view.w || y > view.h || x + w < 0 || y + h < 0) continue;
     const team = TEAM[b.team];
-    if (b.built < 1) {
-      c.fillStyle = 'rgba(200,165,88,.16)'; c.fillRect(x, y, w, h);
-      c.strokeStyle = team.main; c.lineWidth = 1; c.strokeRect(x + .5, y + .5, w - 1, h - 1);
-      c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(x, y + h - 4, w, 4);
-      c.fillStyle = '#c8a558'; c.fillRect(x, y + h - 4, w * b.built, 4);
-      continue;
-    }
+    /* A site is the finished drawing faded in (docs/TODO.md P1-8): the old look -- a
+       flat tan rectangle with a 4 px bar -- never said which building was going up and
+       swapped for the art the moment it finished. The alpha carries the progress now: .2
+       at 0 % (where that rectangle sat) up to 1, so the building solidifies as it rises. */
+    const site = b.built < 1;
+    if (site) c.globalAlpha = .2 + .8 * b.built;
     // Built: the atlas cell whenever we have one (bldSpriteFor, src/config.js);
     // a harvested farm and unknown kinds keep the procedural look.
     const frame = bldSpriteFor(b.kind, b.team);
@@ -114,6 +113,7 @@ function drawBuildings(Game, view) {
       c.fillRect(x + 4, y + 4, w - 8, 4);
       c.fillRect(x + 4, y + h - 8, w - 8, 4);
     }
+    if (site) { c.globalAlpha = 1; continue; }   // the fade is the readout: no job/hp bar yet
     const job = b.research ? { t: b.research.t, total: TECHS[b.research.id].time }
       : b.queue.length ? { t: b.queue[0].t, total: KINDS[b.queue[0].kind].time } : null;
     if (job) {
@@ -130,7 +130,7 @@ function drawBuildings(Game, view) {
 
 /** The SPRITES animation a unit plays right now, from its order (pure, so
  *  tools/checks/02-sprites.js pins it). Work/swing frames alternate a<->b at 4 Hz off the
- *  activity clock u.anim; idle units hold their single idle cell. */
+ *  activity clock u.anim; a builder swings only once he is at the site (o.atSite, P1-8). */
 function unitAnim(u) {
   const o = u.order;
   const swing = () => (Math.floor(u.anim * 4) % 2 ? 'b' : 'a');
@@ -140,7 +140,7 @@ function unitAnim(u) {
   }
   switch (o.kind) {
     case 'harvest':   return (WORK_ANIM[o.src && o.src.res] || 'farm') + '_' + swing();
-    case 'build':     return 'farm_' + swing();  // generic hammering pose
+    case 'build':     return o.atSite ? 'farm_' + swing() : 'walk';  // hammer at the site, walk there
     case 'move':
     case 'go_deposit': return 'walk';
     default:          return 'idle';

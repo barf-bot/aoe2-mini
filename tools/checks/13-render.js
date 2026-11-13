@@ -133,4 +133,55 @@ bootFixture(undefined, (doc, st) => {
     bad.length ? bad.join(' | ') : 'villager and militia, facing right and left, drawn at their cell size');
 });
 
+/* ---- 16d. render: a construction site is the building fading in (docs/TODO.md P1-8) - */
+/* A site was a flat tan rectangle with a 4 px bar: nothing said *which* building was
+   going up, and the moment it finished the rectangle swapped for the art. drawBuildings
+   now paints the same thing a finished building paints -- the atlas cell, or the
+   procedural body for the kinds without one -- at `FADE(built)`, so the building
+   solidifies as it rises and a 0 % site is still on screen (.2, where the old rectangle
+   sat) instead of waiting for the bar to move. The two kinds are covered separately
+   because they draw differently: house has a BLD_SPRITES cell (blitted with drawImage),
+   blacksmith is a noSprite kind (the flat inset rectangle). The old ghost colour must be
+   gone with them, which is the half a count of draw calls could never see. */
+const FADE = (built) => .2 + .8 * built;             // the ramp drawBuildings documents
+const OLD_GHOST = 'rgba(200,165,88,.16)';
+
+/** The alpha the frame painted `b`'s own body with, from the ops of the last rendered
+ *  frame ('none' / '2x' when that body was painted zero / several times). */
+const bodyAlpha = (st, b) => {
+  const x = b.tx * TS - st.cam.x, y = b.ty * TS - st.cam.y, w = b.w * TS, h = b.h * TS;
+  const frame = AoE2.bldSpriteFor(b.kind, b.team);
+  const body = (o) => (frame && o[0] === 'drawImage')
+    ? o[1][1] === frame.sx && o[1][2] === frame.sy && o[1][5] === x && o[1][6] === y &&
+      o[1][7] === w && o[1][8] === h
+    : o[0] === 'fillRect' && [o[1][0], o[1][1], o[1][2], o[1][3]].join() === [x + 2, y + 2, w - 4, h - 4].join();
+  const hits = st.view.ctx.ops.filter(body);
+  return hits.length === 1 ? String(hits[0][4]) : hits.length + 'x';
+};
+
+bootFixture(undefined, (doc, st) => {
+  AoE2.setAtlas(st, { tag: 'probe-atlas' });        // the sheet to blit, no canvas backend needed
+  const own = st.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+  const houseSpot = freeSpotAround(st.world, st, own.tx, own.ty, 2, 2, 8);
+  const house = houseSpot && AoE2.makeBuilding(st, 'house', 0, houseSpot.tx, houseSpot.ty);
+  const smithSpot = house && freeSpotAround(st.world, st, house.tx, house.ty, 1, 1, 4);
+  const smith = smithSpot && AoE2.makeBuilding(st, 'blacksmith', 0, smithSpot.tx, smithSpot.ty);
+  check(!!house && !!smith, 'site: a 2x2 and a 1x1 pad next to the Town Center exist to build on',
+    house && smith ? 'house ' + house.tx + ',' + house.ty + ' / blacksmith ' + smith.tx + ',' + smith.ty : 'none');
+  if (!smith) return;
+
+  house.built = .45; smith.built = .45;
+  st.cam = { x: house.tx * TS, y: house.ty * TS };   // both sites inside the view
+  st.view.ctx.clearOps();
+  AoE2.renderFrame(st);
+  const ops = st.view.ctx.ops;
+  const want = String(FADE(.45));
+  const bad = [['house', bodyAlpha(st, house)], ['blacksmith', bodyAlpha(st, smith)]]
+    .filter((row) => row[1] !== want).map((row) => row[0] + ' painted at ' + row[1]);
+  check(bad.length === 0 && !ops.some((o) => o[2] === OLD_GHOST),
+    'render: a half-built site draws the building itself at the fade alpha, ghost rectangle gone',
+    (bad.length ? bad.join(' | ') : 'house + blacksmith both at ' + want) +
+    (ops.some((o) => o[2] === OLD_GHOST) ? ', ghost rect still painted' : ', no ghost rect'));
+});
+
 report();

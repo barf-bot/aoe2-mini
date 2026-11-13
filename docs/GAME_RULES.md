@@ -118,7 +118,8 @@ a bug.
   is placed with its feet anchor (`ax`/`ay`) on the unit — see `drawUnits`
   (`src/render.js:150`). The sprite is mirrored when the unit walks left,
   `tools/gen-atlas.js` regenerates the PNG from `data/sprites.json`, and `unitAnim`
-  picks the cell from the unit's order.
+  picks the cell from the unit's order — a `build` order plays the work pose only once
+  its builder is standing at the site (`atSite`, docs/TODO.md P1-8), before that `walk`.
 
 ## Buildings (`BLD`)
 

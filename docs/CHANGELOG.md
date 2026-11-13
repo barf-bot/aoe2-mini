@@ -5,6 +5,32 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P1-8: construction looks like nothing is happening
+
+- `drawBuildings` (`src/render.js:58`) gave every site the same anonymous look — a flat
+  `rgba(200,165,88,.16)` rectangle with a 4 px bar — so a half-built house was hard to
+  tell from empty grass and swapped for the art only once it finished. A site now draws
+  the body the finished building draws (the atlas cell, or the procedural body for the
+  `noSprite` kinds) at `globalAlpha = .2 + .8 * built`: the building solidifies as it is
+  built, a 0 % site is still visible at exactly the alpha the old rectangle used, and the
+  separate progress bar goes away because the fade itself is the readout. The finished
+  building's job and health bars are untouched.
+- `unitAnim(u)` (`src/render.js:134`) answered the farm pose for *any* `build` order, so
+  a villager still three tiles off hammered while walking to the site. The pose is gated
+  on arrival now: `updateUnit` (`src/sim.js:190`) marks the order `atSite` the moment
+  `moveUnit` (`src/movement.js:212`) puts the builder on the site's ring tile, and while
+  the order is walking it plays `walk`. The flag rides into the save (orders are copied
+  field by field), so a reloaded game keeps the pose it was at.
+- checks: `tools/checks/13-render.js` gains section 16d — it builds a 2x2 house and a 1x1
+  blacksmith site at 45 %, reads the alpha each body was painted with out of the recorded
+  draw calls and asserts the old ghost rectangle is gone (9 → 11), and
+  `tools/checks/02-sprites.js` splits its single `build` assertion into the two phases,
+  walk en route and `farm_a`/`farm_b` at the site (13 → 14). Both failed before the fix
+  and pass after (307 → 310 in the suite).
+- `preview.png` regenerates byte-identical (the stock frame's buildings are all finished,
+  so no site is in it); the site look was judged on a scratch frame of a 45 %-built house
+  with a builder on its ring.
+
 ### Fixed — `docs/TODO.md` P1-6: every unit uses the same corner of a building
 
 - `workPos(Game, b, u)` (`src/entities.js:159`) answered one fixed tile — the first free

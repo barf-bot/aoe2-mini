@@ -25,19 +25,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P1 — wrong behaviour you notice within a minute
 
-### 8. Construction looks like nothing is happening
-
-**Verified** by screenshot: a site is a faint square with a 4 px bar, and the builder shows
-his idle frame.
-
-- **Cause:** `drawBuildings` in `src/render.js` draws only the ghost footprint while
-  `built < 1`; `unitAnim` has no animation for a `build` order.
-- **Fix:** draw the site clearly (scaffold outline plus a thicker bar, or the building
-  sprite at alpha = `built`), and let `unitAnim` return a work animation (`chop_a/b` is
-  close enough) while the builder is at the site.
-- **Done when:** `unitAnim` returns a work cell for a villager with a `build` order who has
-  arrived.
-
 ### 9. A foundation counts as a finished building
 
 **Verified.** A house at 32 % raises the population cap from 5 to 10; a lumber camp at 1 %

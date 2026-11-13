@@ -245,6 +245,7 @@ function updateUnit(Game, u, dt) {
     const at = standTarget(Game, u, b.x, b.y, CFG.TILE);    // the site's ring tile (was workPos)
     if (!at) { u.order = { kind: 'idle' }; return; }        // no way to reach the site
     if (!moveUnit(Game, u, at.x, at.y, dt, CFG.TILE)) return;
+    o.atSite = true;                               // at the site: render.js plays his work pose
     b.built = Math.min(1, b.built + dt / Math.max(0.5, b.time));
     b.hp = Math.max(1, Math.round(b.maxHp * b.built));
     if (b.built >= 1) {

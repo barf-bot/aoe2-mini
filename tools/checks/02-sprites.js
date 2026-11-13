@@ -135,9 +135,18 @@ av.order = { kind: 'idle' };
 check(AoE2.unitAnim(av) === 'idle', 'anim: idle villager holds its idle cell', AoE2.unitAnim(av));
 av.order = { kind: 'go_deposit', b: 'x', src: { kind: 'tile', res: 'food' } };
 check(AoE2.unitAnim(av) === 'walk', 'anim: a carrying villager shows the walk cell', AoE2.unitAnim(av));
+/* A build order has two phases and only the second one hammers (docs/TODO.md P1-8):
+   the old cell was the work pose for the whole order, so a villager still three tiles
+   away hammered while walking. `atSite` is the flag updateUnit sets the moment moveUnit
+   says the builder reached the site's ring tile; before it the order walks. */
 av.order = { kind: 'build', b: 'x' };
-check(AoE2.unitAnim(av).indexOf('farm') === 0, 'anim: a villager building hammers (farm pose)',
+check(AoE2.unitAnim(av) === 'walk', 'anim: a villager walking to his site shows the walk cell',
   AoE2.unitAnim(av));
+av.order = { kind: 'build', b: 'x', atSite: true };
+av.anim = 0;    const h0 = AoE2.unitAnim(av);
+av.anim = 0.3;  const h1 = AoE2.unitAnim(av);
+check(h0 === 'farm_a' && h1 === 'farm_b',
+  'anim: a villager at his site hammers (farm pose, a/b alternating)', h0 + '/' + h1);
 const enemy = animGame.units.find(u => u.team === 1);
 am.order = { kind: 'attack', target: enemy.id };
 am.anim = 0;    const s0 = AoE2.unitAnim(am);
