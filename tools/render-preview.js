@@ -140,6 +140,13 @@ function simulateAndRender(G, Game, realView) {
   // other flat team-coloured footprints drawn through the shared procedural draw.
   if (villagers[0]) { const site = G.findSite(Game.world, Math.floor(villagers[0].x / G.CFG.TILE) + 2, Math.floor(villagers[0].y / G.CFG.TILE) + 1, 1);
     const ba = G.makeBuilding(Game, 'barricade', 0, site.tx, site.ty); ba.built = 1; }
+  // T4 of the tower upgrade chain: the chain's middle tier, one tile north of the
+  // Watch Tower's pad and a tile east — clear of the blacksmith (+1, 0), the Market
+  // (+4, −1) and the barricade (+2, +1). Also noSprite, so it paints the same flat
+  // team-coloured footprint; the frame is the only place it can appear until item 8
+  // rips the tower art.
+  if (villagers[0]) { const site = G.findSite(Game.world, Math.floor(villagers[0].x / G.CFG.TILE) - 1, Math.floor(villagers[0].y / G.CFG.TILE) + 2, 1);
+    const gt = G.makeBuilding(Game, 'guard_tower', 0, site.tx, site.ty); gt.built = 1; }
   G.renderFrame(Game);
 
   const png = realView.toBuffer('image/png');

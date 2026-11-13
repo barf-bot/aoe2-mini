@@ -270,7 +270,7 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
     `tools/checks/09-hud.js:5-7` — then `AoE2.infoHtml(Game)` contains `Guard Tower` and
     `width:100%`, the design's "label, hp bar and attack change to the new row's numbers").
 
-- [ ] T4: the committed frame — a Guard Tower in `preview.png`
+- [x] T4: the committed frame — a Guard Tower in `preview.png`
   - files: `tools/render-preview.js` (the `simulateAndRender` fixture, after the Watch Tower /
     Barricade lines at `tools/render-preview.js:135-142`), `preview.png`.
   - change: one more building line —
