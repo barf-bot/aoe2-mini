@@ -13,7 +13,8 @@ in `src/`.
 - The Pages root *is* the repo root, so `index.html` at the top level is the deployed page
   and `src/` + `assets/` are served as they are.
 - No framework, no bundler, no npm dependencies for the game itself. `tools/package.json`
-  exists only for the tools' one dev dependency (`@napi-rs/canvas`).
+  exists only for the tools' two dev dependencies (`@napi-rs/canvas` for the canvas,
+  `playwright` for the browser smoke test).
 
 ## The one hard constraint
 
@@ -61,6 +62,14 @@ The first three are `npm run check --prefix tools`, and `.github/workflows/check
 all five on every push and pull request. The last two need
 `npm install --prefix tools` once (`tools/node_modules` is gitignored); both are
 deterministic, so on an unchanged tree they leave `git status` clean.
+
+`tools/browser-smoke.js` (`npm run browser-smoke --prefix tools`) is a sixth tool, outside
+those five and outside `npm run check`: it opens the page in a real Chrome (Playwright,
+`1.58.0` — the version whose bundled Chromium build is the one this box ships), asserts the
+app booted on both the working copy and the live site, writes `tools/out/local.png` and
+`tools/out/live.png` and prints a JSON summary per target. It needs a browser and network,
+so `tools/headless-check.js` must never require it: the 364-check suite stays plain node.
+The generated `tools/out/` is scratch, not committed.
 
 `tools/headless-check.js` runs every file in `tools/checks/`, each in its own process.
 A check file starts by requiring `tools/lib/harness.js`, which stubs the DOM and boots the
@@ -129,7 +138,7 @@ reports the right dimensions can still paint nothing (see `tools/lib/harness.js`
 | `docs/ROADMAP.md` | prioritized open work (features and process) |
 | `docs/CHANGELOG.md` | dated entries of what shipped |
 | `docs/plans/` | historical design plans; they predate the `src/` split and cite the old single-file line numbers |
-| `tools/` | `headless-check.js` (runner for `tools/checks/`), `check-stats.mjs`, `render-preview.js`, `gen-atlas.js`, `audit-line-refs.js`, and `tools/lib/` (`load-game.js`, the loader every tool uses, and `harness.js`, the stub DOM + fixtures the checks start from) |
+| `tools/` | `headless-check.js` (runner for `tools/checks/`), `check-stats.mjs`, `render-preview.js`, `gen-atlas.js`, `audit-line-refs.js`, `browser-smoke.js` (the Playwright smoke test, with `tools/out/` for its screenshots), and `tools/lib/` (`load-game.js`, the loader every tool uses, and `harness.js`, the stub DOM + fixtures the checks start from) |
 
 The docs are not trusted by eye: `tools/audit-line-refs.js` is what proves the line
 references above and in `docs/` still match the code, and AGENTS/README must list every

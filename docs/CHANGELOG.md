@@ -5,6 +5,35 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Added — `docs/ROADMAP.md` P0-1: real-browser smoke test (`tools/browser-smoke.js`)
+
+- Playability used to be proven by a stub DOM (`tools/lib/harness.js`) plus a headless render
+  (`tools/render-preview.js`); no browser had ever opened the page. `tools/browser-smoke.js`
+  launches the Chrome for Testing build the box ships — resolved from
+  `/etc/hermes/chromium-executable-path`, falling back to a `$PLAYWRIGHT_BROWSERS_PATH` glob —
+  through Playwright with `--no-sandbox --disable-gpu --hide-scrollbars` at a fixed 1280×800
+  viewport, and opens `file://<repo>/index.html` *and* https://barf-bot.github.io/aoe2-mini/.
+- Boot is asserted from inside the page, not by eye: `window.AoE2` (`src/main.js:23`) exists,
+  `Game.started` (`src/boot.js:191`) is set — that flag only goes up once the view canvas came
+  up — and `#hud`/`#view` are in the DOM. The canvas rectangle in the screenshot holds 1530
+  distinct colours for the working copy and 1581 for the live site, where a blank canvas holds
+  one; the count comes from decoding the PNG with `@napi-rs/canvas`, so a page that paints
+  nothing can no longer pass by having the right DOM.
+- Output is one PNG per target under `tools/out/` plus one JSON line per target
+  (`target`, `title`, `aoe2`, `consoleErrors`, `screenshotSha256`); `--verbose` adds the page
+  state and the captured error text. Exit is 0 only when every target booted with no page
+  errors, which is the artefact the "Gate the deploy on CI" process item was waiting for.
+  `tools/out/` is scratch and gitignored; the repo keeps tracking one generated image,
+  `preview.png`.
+- `tools/package.json` gains its second dev dependency, pinned `playwright@1.58.0`: that
+  release's Chromium build *is* the `chromium-1208` (Chrome 145.0.7632.6) this box ships, so
+  installing it fetches nothing — `1.52.0`, the other pairing verified here, expects
+  `chromium-1169` and would download one. The game still ships zero dependencies and still has
+  no build step: no `src/` file or `index.html` changed — only the dev-only `tools/`.
+- checks: 364, unchanged. `tools/headless-check.js` requires nothing new — the browser test is
+  a separate tool with its own entry (`npm run browser-smoke --prefix tools`), so the suite
+  stays runnable in plain node; the tool's check is running it.
+
 ### Added — `docs/ROADMAP.md` P1-4 (age-gate half): every building row now carries its real age
 
 - `data/buildings.json` gated four rows — `blacksmith`, `market`, `watch_tower`, `barricade`, all

@@ -64,15 +64,17 @@ Start with `AGENTS.md` if you're an agent picking the repo up cold.
 | `tools/gen-atlas.js` | composes `assets/sprites.png` from `data/sprites.json` + `data/sprites/` and regenerates the sprite tables in `src/config.js` |
 | `tools/render-preview.js` | boots the same code against a real canvas (`@napi-rs/canvas`) and writes `preview.png`, so the renderer is verified, not just assumed |
 | `tools/audit-line-refs.js` | checks that every `file:NNN` reference in the docs still points at the code it names, that the documented file map matches what `index.html` loads, and that the logic files stay DOM-free |
+| `tools/browser-smoke.js` | opens the page in a real Chrome (Playwright) — the working copy and the live site — asserts the app booted, writes `tools/out/local.png` + `tools/out/live.png` and prints one JSON line per target; exits non-zero when a target fails |
 | `preview.png` | a real frame of the game rendered headlessly |
 
 ```bash
 node tools/headless-check.js        # 294/294 checks passed
 node tools/check-stats.mjs          # verifies src/config.js against the vendored stat tables
 node tools/audit-line-refs.js       # verifies the docs against the code
-npm install --prefix tools          # once: the canvas backend the next two need
+npm install --prefix tools          # once: the canvas backend and playwright the next three need
 node tools/render-preview.js        # rewrites preview.png
 node tools/gen-atlas.js             # composes assets/sprites.png from data/sprites/ and rewrites the tables
+node tools/browser-smoke.js         # real-browser smoke test: screenshots index.html and the live site
 ```
 
 ## How to run locally

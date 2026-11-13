@@ -5,9 +5,11 @@
   "scripts": {
     "check": "node headless-check.js -q && node check-stats.mjs && node audit-line-refs.js",
     "preview": "node render-preview.js",
-    "atlas": "node gen-atlas.js"
+    "atlas": "node gen-atlas.js",
+    "browser-smoke": "node browser-smoke.js"
   },
   "devDependencies": {
-    "@napi-rs/canvas": "^1.1.0"
+    "@napi-rs/canvas": "^1.1.0",
+    "playwright": "1.58.0"
   }
 }

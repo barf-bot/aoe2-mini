@@ -9,10 +9,18 @@ that before starting anything below.
 
 ## P0 — make it actually playable by someone else
 
-1. **Real-browser smoke test.** No browser here means "playable" is currently proven by a
-   stub DOM + a headless render, not by a human clicking. Run the page in
-   `browser_navigate`/Playwright, screenshot the live site and compare against
-   `preview.png`. *Done when:* a live-site screenshot is attached and matches the sim state.
+1. **Real-browser smoke test.** Shipped 2026-11-13 by `tools/browser-smoke.js`: Playwright
+   (pinned to `1.58.0`, whose bundled Chromium build is the Chrome for Testing the image
+   ships, resolved through `/etc/hermes/chromium-executable-path`) opens
+   `file://<repo>/index.html` *and* https://barf-bot.github.io/aoe2-mini/ and asserts the app
+   booted — `window.AoE2` present, `#hud` and `#view` in the DOM, `Game.started`, and a `#view`
+   canvas whose painted pixels are non-blank (counted from the screenshot, not by eye) — then
+   collects console and page errors. The tool is the proof: `node tools/browser-smoke.js`
+   writes `tools/out/local.png` and `tools/out/live.png`, prints one JSON line per target and
+   exits non-zero when a target fails to boot or throws, which is what the deploy-gating
+   Process item below needs. Both screenshots render the seeded village `preview.png` shows —
+   same seed 1337, same two Town Centers and their villagers — so the live page matches the
+   simulated state instead of merely opening.
 2. **A\* pathfinding around water.** Shipped 2026-11-11 by the pathfinding plan
    (`docs/plans/2026-11-11-astar-pathfinding.md`): `findPath` routes over the tile grid
    (uniform cost, 8-connected, no diagonal cut between two solid tiles), the route is
