@@ -1,6 +1,6 @@
 'use strict';
 /* commands -- everything a player (or the AI) can order: move/attack/gather, build,
-   train, research, trade, age up. Pure functions taking (Game, ...). No DOM. */
+   train, research, trade, age up, upgrade a building. Pure functions taking (Game, ...). No DOM. */
 
 /** Right-click resolution for one unit: enemy > enemy building > own site (a
  *  villager works it, docs/TODO.md P0-4) > own farm > resource > move. */
@@ -161,21 +161,21 @@ function canPlaceAt(Game, kind, tx, ty) {
 
 /** Cancel an in-progress site: refund the floored CANCEL_REFUND share of the
  *  *defined* cost — the AoE2 rule refunds the whole cost, not the worked
- *  fraction — free every builder assigned to it, and remove the building
- *  (removeBuilding also drops a footer selection pointing at it). */
+ *  fraction — free every builder assigned to it and remove the building; an
+ *  upgrade in progress refunds the tier being paid for and leaves the old one up. */
 function cancelConstruction(Game, b) {
   if (!b || b.team !== 0) return toast(Game, 'Not your building');
-  const def = BLD[b.kind];
-  if (b.built >= 1) return toast(Game, 'Already built — use demolish');
+  const upgrading = !!b.upgrade, def = BLD[upgrading ? b.upgrade : b.kind];
+  if (b.built >= 1 && !upgrading) return toast(Game, 'Already built — use demolish');
   const back = {};
   for (const k in def.cost) back[k] = Math.floor(def.cost[k] * CFG.CANCEL_REFUND);
   refund(Game, b.team, back);
   for (const u of Game.units) {
     if (!u.dead && u.order.kind === 'build' && u.order.b === b.id) u.order = { kind: 'idle' };
   }
-  markDirty(Game);                         // the refund and the lost site are a change
-  removeBuilding(Game, b);
-  toast(Game, def.label + ' cancelled');
+  markDirty(Game);                         // the refund is a change, the site or tier lost
+  if (upgrading) { b.upgrade = null; b.built = 1; b.hp = b.maxHp; } else removeBuilding(Game, b);
+  toast(Game, def.label + (upgrading ? ' upgrade cancelled' : ' cancelled'));
   return true;
 }
 
@@ -273,6 +273,57 @@ function upgradeAge(Game) {
   playSfx(Game, 'age');
   markDirty(Game);                         // the age up is a change
   toast(Game, AGES[Game.age[0]] + ' reached');
+}
+/** The chain's front half: order the next tier onto a building that already stands. */
+function upgradeBuilding(Game, b) {
+  if (!b || b.team !== 0) return toast(Game, 'Not your building');
+  if (b.built < 1) return toast(Game, 'Already under construction');
+  const nextKind = BLD[b.kind].upgradesTo;
+  if (!nextKind) return toast(Game, BLD[b.kind].label + ' has no upgrade');
+  const next = BLD[nextKind];
+  /* the tier being entered has to be reached, not the one standing: same age gate
+     and the same wording `build` uses two functions up. */
+  if ((next.age ?? 0) > Game.age[b.team]) return toast(Game, next.label + ' requires ' + AGES[next.age]);
+  if (!canAfford(Game, b.team, next.cost)) return toast(Game, 'Not enough ' + missing(Game, b.team, next.cost));
+  const crew = pickBuilders(Game, { tx: b.tx, ty: b.ty });
+  if (!crew.length) return toast(Game, Game.units.some(u => u.team === 0 && u.kind === 'villager')
+    ? 'All villagers are building' : 'No villager available');
+  spend(Game, b.team, next.cost);
+  /* The site restarts on the new row's clock instead of growing a second timer:
+     `b.upgrade` names the tier coming, `built` / `time` say how far along it is, and
+     sim's existing `b.built >= 1` branch promotes it (src/sim.js:253). A tower mid-
+     upgrade shoots nobody, exactly like any other half-built site (src/sim.js:138). */
+  b.upgrade = nextKind;
+  b.built = 0;
+  b.time = next.time;
+  for (const u of crew) {
+    u.order = { kind: 'build', b: b.id };
+    u.slot = null;                             // a site owns no tile, as `build` rules
+  }
+  markDirty(Game);                         // the spend and the new site are a change
+  toast(Game, next.label + ' started');
+  return b;
+}
+
+/** The chain's back half, called by sim the moment the site finishes: the building
+ *  becomes the row it was building toward, so every number the game reads off BLD —
+ *  hp, attack, armours, footprint, drop-off field — is the new tier's, and the
+ *  `Watch Tower complete` toast two lines later names it. The three tower rows share
+ *  a 1x1 footprint, so no route can change; rebuildBlocks and the epoch bump are
+ *  still called because a chain that ever changes size must tell the pathfinder the
+ *  walkable set moved. */
+function promoteBuilding(Game, b) {
+  b.kind = b.upgrade;
+  b.upgrade = null;
+  const def = BLD[b.kind];
+  b.w = def.w; b.h = def.h;
+  b.x = (b.tx + def.w / 2) * CFG.TILE;
+  b.y = (b.ty + def.h / 2) * CFG.TILE;
+  b.maxHp = def.hp;
+  b.hp = b.maxHp;                            // the tier stands finished, not at 80 %
+  b.field = def.field ? def.field : 0;
+  rebuildBlocks(Game);
+  Game.mapEpoch++;
 }
 
 /* ------------------------------- toast --------------------------------- */

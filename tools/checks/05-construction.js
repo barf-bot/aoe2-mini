@@ -1,7 +1,7 @@
 'use strict';
 /* checks/05-construction.js -- construction, camps + drop-offs, cancel / demolish, the
-   barricade, every row's age gate. Runs on its own (`node tools/checks/05-construction.js`)
-   against a freshly booted game. */
+   barricade, every row's age gate, the tower upgrade chain. Runs on its own
+   (`node tools/checks/05-construction.js`) against a freshly booted game. */
 
 const {
   AoE2, DT, Game, blueVill, check, dataBuildings, flatState, freeSpotAround, pad, setTile, stepRender,
@@ -519,5 +519,206 @@ for (const kind of Object.keys(dataBuildings.buildings)) {
       def.label + ' (row age ' + def.age + ')', got);
   }
 }
+
+/* ---- 7f. the tower upgrade chain (this plan, T2) --------------------------- */
+/* One fixture per tier of the Watch Tower -> Guard Tower -> Keep chain (T1's two
+   data rows, T2's command): a flat world, one villager selected and the team's
+   stockpile funded with exactly the NEXT row's cost -- so a BLD row cheaper than
+   the data row leaves a number behind -- plus the tier being upgraded standing at
+   built 1, the `feudalSite` idiom from §7d. The site is then finished by stepping
+   the sim the next row's own `time`, the same completion path every other site
+   takes, so `promoteBuilding` is the only thing that can change the kind. */
+const chainState = (tier, age, team = 0) => {
+  const st = AoE2.createState();
+  const v = st.units.filter((u) => u.team === 0 && u.kind === 'villager')[0];
+  if (!v) return null;
+  const at = { tx: tOf(v.x), ty: tOf(v.y) };
+  st.buildings = []; st.projectiles = []; st.units = [v];
+  const b = AoE2.makeBuilding(st, tier, team, at.tx, at.ty);
+  b.built = 1; b.hp = b.maxHp;
+  st.age[0] = age;
+  st.selection = [v.id];                              // pin the builder, as §7 does
+  const next = AoE2.BLD[tier].upgradesTo;
+  const cost = next ? AoE2.BLD[next].cost : {};
+  for (const k in st.res[team]) st.res[team][k] = 0;
+  for (const k in cost) st.res[team][k] = cost[k];
+  return { st, v, b, next, cost, bank: Object.assign({}, st.res[team]) };
+};
+
+/* one rung of the refusal ladder: `undefined` back, nothing spent, nothing written
+   on the building, and the toast says why in the words `build` uses for the same
+   class of refusal. */
+const refuse = (tier, age, msg, team = 0) => {
+  const f = chainState(tier, age, team);
+  if (!f) return { ok: false, detail: 'no villager to stand the ' + tier + ' on' };
+  let threw = null, r;
+  try { r = AoE2.upgradeBuilding(f.st, f.b); } catch (e) { threw = e; }
+  const res = JSON.stringify(Object.assign({}, f.st.res[team]));
+  return {
+    ok: !threw && r === undefined && !f.b.upgrade && f.b.kind === tier &&
+        f.st.toastMsg === msg && res === JSON.stringify(f.bank),
+    detail: threw ? 'threw: ' + threw.message
+      : 'r=' + String(r) + ' toast=' + JSON.stringify(f.st.toastMsg) +
+        ' want=' + JSON.stringify(msg) + ' res=' + res + ' bank=' + JSON.stringify(f.bank) +
+        ' upgrade=' + String(f.b.upgrade) + ' kind=' + f.b.kind,
+  };
+};
+const darkWatch = refuse('watch_tower', 0, 'Guard Tower requires Feudal Age');
+check(darkWatch.ok,
+  'age: a Dark Age team cannot upgrade a Watch Tower (Guard Tower requires Feudal Age)',
+  darkWatch.detail);
+const feudalGuard = refuse('guard_tower', 1, 'Keep requires Castle Age');
+check(feudalGuard.ok, 'age: a Feudal team cannot upgrade a Guard Tower (Keep requires Castle Age)',
+  feudalGuard.detail);
+
+/* one edge walked end to time to finish, so the two ends of an edge the plan names
+   separately are measured on the same tower. */
+const chainEdge = (tier, age) => {
+  const f = chainState(tier, age);
+  if (!f) return null;
+  const r = AoE2.upgradeBuilding(f.st, f.b);
+  const s = { r, upgrade: f.b.upgrade, built: f.b.built, time: f.b.time,
+              order: Object.assign({}, f.v.order), toast: f.st.toastMsg,
+              res: Object.assign({}, f.st.res[0]) };
+  const steps = Math.ceil(AoE2.BLD[f.next].time / DT) + 2;
+  for (let i = 0; i < steps; i++) AoE2.stepSim(f.st, DT);
+  const row = AoE2.BLD[f.next];
+  return { f, s, steps, row, d: { kind: f.b.kind, maxHp: f.b.maxHp, hp: f.b.hp, w: f.b.w,
+    h: f.b.h, blocks: (f.st.blocks.get(f.b.id) || []).length, atk: AoE2.unitAttack(f.st, f.b),
+    pierce: AoE2.unitArmor(f.st, f.b, 'pierce'), melee: AoE2.unitArmor(f.st, f.b, 'melee'),
+    upgrade: f.b.upgrade, time: f.b.time } };
+};
+const up1 = chainEdge('watch_tower', 1);
+check(!!up1 && up1.s.r === up1.f.b && up1.s.upgrade === 'guard_tower' && up1.s.built < 1 &&
+      up1.s.time === AoE2.BLD.guard_tower.time && up1.s.order.kind === 'build' &&
+      up1.s.order.b === up1.f.b.id && up1.s.toast === 'Guard Tower started' &&
+      JSON.stringify(up1.s.res) === ZERO,
+  "upgrade: a Feudal Watch Tower spends exactly the Guard Tower row's cost and becomes " +
+  'a half-built Watch Tower',
+  !up1 ? 'no villager to stand the Watch Tower on'
+    : 'r=' + String(up1.s.r) + ' upgrade=' + String(up1.s.upgrade) + ' built=' + up1.s.built +
+      ' time=' + up1.s.time + ' order=' + JSON.stringify(up1.s.order) + ' toast=' +
+      JSON.stringify(up1.s.toast) + ' res=' + JSON.stringify(up1.s.res) + ' (row ' +
+      JSON.stringify(up1.f.cost) + ')');
+check(!!up1 && up1.d.kind === 'guard_tower' && up1.d.maxHp === up1.row.hp &&
+      up1.d.hp === up1.row.hp && up1.d.w === 1 && up1.d.h === 1 && up1.d.blocks === 1 &&
+      up1.d.atk === up1.row.attack && up1.d.pierce === up1.row.pierceArmor &&
+      up1.d.melee === up1.row.meleeArmor && up1.d.upgrade === null &&
+      up1.d.time === up1.row.time,
+  "upgrade: completing it is a Guard Tower with the row's hp, attack and armours",
+  !up1 ? 'no villager to stand the Watch Tower on'
+    : 'kind=' + up1.d.kind + ' hp=' + up1.d.hp + '/' + up1.d.maxHp + ' atk=' + up1.d.atk +
+      ' pierce=' + up1.d.pierce + ' melee=' + up1.d.melee + ' w=' + up1.d.w + 'x' + up1.d.h +
+      ' blocks=' + up1.d.blocks + ' upgrade=' + String(up1.d.upgrade) + ' time=' + up1.d.time +
+      ' (row ' + JSON.stringify({ hp: up1.row.hp, attack: up1.row.attack,
+        pierceArmor: up1.row.pierceArmor, meleeArmor: up1.row.meleeArmor }) + ')');
+const up2 = chainEdge('guard_tower', 2);
+check(!!up2 && up2.s.r === up2.f.b && up2.s.upgrade === 'keep' && up2.s.built < 1 &&
+      up2.s.time === AoE2.BLD.keep.time && up2.s.order.kind === 'build' &&
+      up2.s.order.b === up2.f.b.id && up2.s.toast === 'Keep started' &&
+      JSON.stringify(up2.s.res) === ZERO && up2.d.kind === 'keep' &&
+      up2.d.maxHp === up2.row.hp && up2.d.hp === up2.row.hp && up2.d.w === 1 &&
+      up2.d.h === 1 && up2.d.blocks === 1 && up2.d.atk === up2.row.attack &&
+      up2.d.pierce === up2.row.pierceArmor && up2.d.melee === up2.row.meleeArmor &&
+      up2.d.upgrade === null && up2.d.time === up2.row.time,
+  "upgrade: that Guard Tower upgrades to a Keep for the Keep row's cost",
+  !up2 ? 'no villager to stand the Guard Tower on'
+    : 'upgrade=' + String(up2.s.upgrade) + ' built=' + up2.s.built + ' time=' + up2.s.time +
+      ' res=' + JSON.stringify(up2.s.res) + ' (row ' + JSON.stringify(up2.f.cost) + ') toast=' +
+      JSON.stringify(up2.s.toast) + ' -> kind=' + up2.d.kind + ' hp=' + up2.d.hp + '/' +
+      up2.d.maxHp + ' atk=' + up2.d.atk + ' pierce=' + up2.d.pierce);
+
+/* The design's stepBuildingAttacks clause in words: `built < 1` never shoots, so
+   a tower mid-upgrade holds fire (src/sim.js:138) -- and one frame of the
+   builder's work later the same tower's arrow is the Guard Tower's own numbers.
+   The fixture keeps a single builder and a single enemy, so any arrow in the air
+   belongs to the tower being upgraded (the §9c/§9f way of isolating a shooter). */
+const shot = (() => {
+  const f = chainState('watch_tower', 1);
+  if (!f) return null;
+  AoE2.upgradeBuilding(f.st, f.b);
+  const foe = AoE2.makeUnit(f.st, 'militia', 1, f.b.x + 3 * AoE2.CFG.TILE, f.b.y);
+  f.b.cd = 0;
+  AoE2.stepBuildingAttacks(f.st, DT);
+  const half = { n: f.st.projectiles.length, cd: f.b.cd, built: f.b.built };
+  f.b.built = 1 - DT / AoE2.BLD.guard_tower.time;      // exactly one frame of work left
+  AoE2.stepSim(f.st, DT);
+  f.st.projectiles = [];
+  f.b.cd = 0;
+  AoE2.stepBuildingAttacks(f.st, DT);
+  const arrow = f.st.projectiles[0];
+  return { f, foe, half, n: f.st.projectiles.length, arrow: !!arrow && arrow.t === foe,
+           dmg: arrow && arrow.dmg, acc: arrow && arrow.accuracy,
+           kind: f.b.kind, maxHp: f.b.maxHp };
+})();
+check(!!shot && shot.half.n === 0 && shot.half.built < 1 && shot.kind === 'guard_tower' &&
+      shot.maxHp === AoE2.BLD.guard_tower.hp && shot.n === 1 && shot.arrow &&
+      shot.dmg === AoE2.BLD.guard_tower.attack * (1 + 0.25 * shot.f.st.ageBonus[0]) &&
+      shot.acc === AoE2.BLD.guard_tower.accuracy,
+  'upgrade: a half-upgraded tower shoots nobody and the finished one does',
+  !shot ? 'no villager to stand the Watch Tower on'
+    : 'while upgrading: projectiles=' + shot.half.n + ' built=' + shot.half.built +
+      ' cd=' + shot.half.cd + '; after: kind=' + shot.kind + ' n=' + shot.n +
+      ' targetIsFoe=' + shot.arrow + ' dmg=' + String(shot.dmg) + ' accuracy=' + String(shot.acc) +
+      ' (row ' + AoE2.BLD.guard_tower.attack + '/' + AoE2.BLD.guard_tower.accuracy + ')');
+
+/* the two ends nobody can pass: a row with no `upgradesTo` (the Keep) and a tower
+   that belongs to the other team -- the string `cancelConstruction` / `demolish`
+   use for the same refusal, and the enemy's own stockpile untouched either. */
+const noTier = refuse('keep', 2, 'Keep has no upgrade');
+const foeSite = refuse('watch_tower', 1, 'Not your building', 1);
+check(noTier.ok && foeSite.ok, 'upgrade: a Keep has no further tier and an enemy tower is ' +
+  'not yours to upgrade',
+  'keep: ' + noTier.detail + ' | enemy watch_tower: ' + foeSite.detail);
+
+/* the cost is never spent when nobody can be drafted: the same pair of toasts
+   `build` chooses (a team with villagers but none free says 'All villagers are
+   building', an empty one 'No villager available'). */
+const noVill = (() => {
+  const f = chainState('watch_tower', 1);
+  if (!f) return null;
+  f.st.units = [];                                     // nobody left to draft
+  const r = AoE2.upgradeBuilding(f.st, f.b);
+  return { f, r, toast: f.st.toastMsg, res: Object.assign({}, f.st.res[0]) };
+})();
+check(!!noVill && noVill.r === undefined && noVill.toast === 'No villager available' &&
+      JSON.stringify(noVill.res) === JSON.stringify(noVill.f.bank) &&
+      !noVill.f.b.upgrade && noVill.f.b.kind === 'watch_tower',
+  'upgrade: with no villager to spare the cost is never spent',
+  !noVill ? 'no villager to stand the Watch Tower on'
+    : 'r=' + String(noVill.r) + ' toast=' + JSON.stringify(noVill.toast) + ' res=' +
+      JSON.stringify(noVill.res) + ' bank=' + JSON.stringify(noVill.f.bank) +
+      ' upgrade=' + String(noVill.f.b.upgrade));
+
+/* Cancel mid-upgrade -- the hole the design closes: the plain rule would refund the
+   standing tier's 80 % and delete a finished tower, so the upgrade branch refunds
+   the tier being paid for and puts the Watch Tower back at built 1 rather than
+   calling removeBuilding. */
+const canc = (() => {
+  const f = chainState('watch_tower', 1);
+  if (!f) return null;
+  AoE2.upgradeBuilding(f.st, f.b);
+  const mid = Object.assign({}, f.st.res[0]);
+  const r = AoE2.cancelConstruction(f.st, f.b);
+  return { f, r, mid, res: Object.assign({}, f.st.res[0]), toast: f.st.toastMsg,
+           standing: f.st.buildings.indexOf(f.b) >= 0, order: Object.assign({}, f.v.order) };
+})();
+check(!!canc && canc.r === true && canc.f.b.upgrade === null && canc.f.b.built === 1 &&
+      canc.f.b.kind === 'watch_tower' && canc.f.b.hp === canc.f.b.maxHp &&
+      canc.f.b.maxHp === AoE2.BLD.watch_tower.hp && canc.standing &&
+      canc.res.wood === Math.floor(AoE2.BLD.guard_tower.cost.wood * AoE2.CFG.CANCEL_REFUND) &&
+      canc.res.stone === Math.floor(AoE2.BLD.guard_tower.cost.stone * AoE2.CFG.CANCEL_REFUND) &&
+      canc.res.food === 0 && canc.res.gold === 0 && canc.order.kind === 'idle' &&
+      canc.toast === 'Guard Tower upgrade cancelled',
+  'cancel: cancelling an in-progress upgrade refunds 80% of the tier under ' +
+  'construction and keeps the Watch Tower standing',
+  !canc ? 'no villager to stand the Watch Tower on'
+    : 'r=' + String(canc.r) + ' upgrade=' + String(canc.f.b.upgrade) + ' built=' +
+      canc.f.b.built + ' hp=' + canc.f.b.hp + '/' + canc.f.b.maxHp + ' standing=' +
+      canc.standing + ' res=' + JSON.stringify(canc.res) + ' (mid-upgrade ' +
+      JSON.stringify(canc.mid) + ', row refund ' +
+      Math.floor(AoE2.BLD.guard_tower.cost.wood * AoE2.CFG.CANCEL_REFUND) + ' W / ' +
+      Math.floor(AoE2.BLD.guard_tower.cost.stone * AoE2.CFG.CANCEL_REFUND) + ' S) toast=' +
+      JSON.stringify(canc.toast));
 
 report();

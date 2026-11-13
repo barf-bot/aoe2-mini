@@ -157,7 +157,7 @@ scratch copy of the repo with exactly T1's data + `check-stats.mjs` change appli
     `tools/checks/02-sprites.js` covers the new kinds without being edited (its count stays
     14), and `tools/checks/13-render.js` proves the flat procedural draw the rows inherit.
 
-- [ ] T2: `upgradeBuilding` / `promoteBuilding` — the command, the sim hook, `§7f`
+- [x] T2: `upgradeBuilding` / `promoteBuilding` — the command, the sim hook, `§7f`
   - files: `src/commands.js` (both functions inserted between `upgradeAge`
     (`src/commands.js:266-276`) and the `/* ------------------------------- toast --------`
     banner at `src/commands.js:278`, so `upgradeBuilding` starts at line 278 and every

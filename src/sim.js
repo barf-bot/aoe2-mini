@@ -250,6 +250,7 @@ function updateUnit(Game, u, dt) {
     b.hp = Math.max(1, Math.round(b.maxHp * b.built));
     if (b.built >= 1) {
       b.built = 1;
+      if (b.upgrade) promoteBuilding(Game, b);   // the tower chain: become the tier built toward
       playSfx(Game, 'build');
       if (u.team === 0) toast(Game, BLD[b.kind].label + ' complete');
       u.order = { kind: 'idle' };
