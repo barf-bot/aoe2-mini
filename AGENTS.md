@@ -125,7 +125,8 @@ reports the right dimensions can still paint nothing (see `tools/lib/harness.js`
 | `docs/GAME_RULES.md` | the ruleset as implemented, with line refs — update with the code |
 | `docs/ARCHITECTURE.md` | file map, data shapes, render/input model, test harness design |
 | `docs/CONVENTIONS.md` | code style and the rules above in full |
-| `docs/ROADMAP.md` | prioritized open work |
+| `docs/TODO.md` | known bugs, prioritized, each with its cause, fix direction and the check that proves it — fix these before new features |
+| `docs/ROADMAP.md` | prioritized open work (features and process) |
 | `docs/CHANGELOG.md` | dated entries of what shipped |
 | `docs/plans/` | historical design plans; they predate the `src/` split and cite the old single-file line numbers |
 | `tools/` | `headless-check.js` (runner for `tools/checks/`), `check-stats.mjs`, `render-preview.js`, `gen-atlas.js`, `audit-line-refs.js`, and `tools/lib/` (`load-game.js`, the loader every tool uses, and `harness.js`, the stub DOM + fixtures the checks start from) |

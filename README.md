@@ -39,6 +39,7 @@ no framework, no dependencies, one PNG of unit art. Open `index.html` and play.
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | file map, the `Game` shape, sim/render/input models |
 | [`docs/GAME_RULES.md`](docs/GAME_RULES.md) | the implemented ruleset — every stat, cost and rule, with line refs |
 | [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) | naming, formatting, the feature recipe, anti-rules |
+| [`docs/TODO.md`](docs/TODO.md) | known bugs in fix order, with causes and reproductions |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | prioritized next work, each with an exit condition |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | dated history of what shipped and what was fixed |
 

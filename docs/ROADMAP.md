@@ -4,6 +4,9 @@ Ordered by what would make the biggest difference to the game existing as a *gam
 item says how we'd know it's done, because "polish" without an exit condition is how
 prototypes stall.
 
+**Bugs come first:** `docs/TODO.md` lists the known defects in fix order. Work through
+that before starting anything below.
+
 ## P0 — make it actually playable by someone else
 
 1. **Real-browser smoke test.** No browser here means "playable" is currently proven by a
