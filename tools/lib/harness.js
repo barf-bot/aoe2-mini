@@ -84,6 +84,10 @@ const domHtml = (markup) => String(markup)
 function stubEl(tag, id, w, h) {
   const e = { tagName: tag.toUpperCase(), id, _text: '', _html: '', _htmlSets: 0, attrs: {}, listeners: {} };
   e.clientWidth = w; e.clientHeight = h; e.width = w; e.height = h;
+  /* The CSS box (docs/TODO.md P2-19): a real element has a style object, and `beginCanvas`
+     writes the CSS size into it while scaling the backing store by devicePixelRatio. The
+     stub had none, so that half of the fix could not be observed from node. */
+  e.style = {};
   Object.defineProperty(e, 'textContent', { get() { return e._text; }, set(v) { e._text = String(v); } });
   Object.defineProperty(e, 'innerHTML', {
     get() { return e._html; },
@@ -311,6 +315,16 @@ const withStorage = (fn) => {
   global.localStorage = s;
   try { return fn(s); } finally { global.localStorage = keep; }
 };
+
+/** Run fn with `window.devicePixelRatio` pinned, restoring whatever the stub held --
+ *  including its absence, which is the node case `beginCanvas` falls back to dpr 1 on. */
+const withDpr = (dpr, fn) => {
+  const keep = global.window.devicePixelRatio;
+  if (dpr === undefined) delete global.window.devicePixelRatio; else global.window.devicePixelRatio = dpr;
+  try { return fn(); } finally {
+    if (keep === undefined) delete global.window.devicePixelRatio; else global.window.devicePixelRatio = keep;
+  }
+};
 /* A settlement with every cost payable and Feudal unlocked, so each command
    actually commits instead of refusing (a refusal never marks). The house is
    population room: the seeded roster of five fills its own cap of five now that
@@ -357,5 +371,5 @@ module.exports = {
   html, makeAudioStub, makeDoc, napiImage, ok, pad, path, rafQueue,
   report, results, scriptSrc, setTile, siteAt, solidTile, stepRender, stubCtx,
   stubEl, stubVoices, styleCss, tIdx, tOf, tc, tileCentre, uiCheck,
-  voicesOf, withAudio, withStorage,
+  voicesOf, withAudio, withDpr, withStorage,
 };

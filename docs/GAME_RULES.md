@@ -117,7 +117,7 @@ a bug.
   `data/sprites.json` authors per kind (`draw.idleTiles`: a kind's idle frame draws
   1.4 tiles tall, so a 28×46 cell measures 19×31 instead of a squashed 20×20), and
   is placed with its feet anchor (`ax`/`ay`) on the unit — see `drawUnits`
-  (`src/render.js:150`). The sprite is mirrored when the unit walks left,
+  (`src/render.js:156`). The sprite is mirrored when the unit walks left,
   `tools/gen-atlas.js` regenerates the PNG from `data/sprites.json`, and `unitAnim`
   picks the cell from the unit's order — a `build` order plays the work pose only once
   its builder is standing at the site (`atSite`, docs/TODO.md P1-8), before that `walk`.
@@ -175,7 +175,7 @@ a bug.
   answer was to move the site to `findSite` (`src/world.js:144`) next to the villager, and a
   tile more than 7 tiles off the builder failed too (docs/TODO.md P0-3). Distance is no
   longer part of the rule — the builder walks — so `findSite` only answers the button call
-  without a tile, and `drawGhost` (`src/render.js:240`) paints with the same `canPlaceAt`.
+  without a tile, and `drawGhost` (`src/render.js:246`) paints with the same `canPlaceAt`.
   Placement also needs enough resources. The crew (`pickBuilders` via
   `build`, `src/commands.js:114`) is every free villager in the current selection, else
   the nearest free team-0 villager: a villager on a harvest/move order, or one whose
@@ -314,12 +314,12 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   (`src/boot.js:233-235`) so the saved frame is the one just run, and `stepSim` never writes —
   driving the simulation from a test touches no storage. `resetGame` sets `Game.autosaveAt =
   Game.time` (`src/boot.js:61`): a new settlement is written by the very next frame, which is
-  what makes `N` (`storageSet` + `resetGame`, `src/input.js:227`) overwrite the slot instead of waiting out the debounce.
+  what makes `N` (`storageSet` + `resetGame`, `src/input.js:230`) overwrite the slot instead of waiting out the debounce.
 - **The page surface** — the header's `Save` button (`index.html:19`) writes the slot through
   `saveGame` (`src/boot.js:185`) and toasts `Saved`; `boot` (`src/boot.js:138`) calls
   `storageGet` / `loadGame` (`src/boot.js:143-144`) right after `createState` (`src/boot.js:38`),
   so reopening the page lands on the saved game; the three new-game paths — `N`
-  (`storageSet`, `src/input.js:227`), the footer's `New map` (the `restart` action, `src/input.js:251`) and the victory overlay's
+  (`storageSet`, `src/input.js:230`), the footer's `New map` (the `restart` action, `src/input.js:254`) and the victory overlay's
   `New game` (`src/boot.js:181`) — clear the slot before `resetGame`, which schedules the rewrite.
 
 ## Sound (SFX)
@@ -393,11 +393,11 @@ villagers) · right click, or a hold of `LONG_PRESS_MS` 600 ms that stays within
 press (`src/config.js:278`), issues move / attack / gather / build (context decided by
 what is under the cursor) · panning is
 `WASD / arrows` at 620 px/s (`W` pans — the Barricade hotkey moved to `Q`), or the 1:1
-two-finger pan (`panCamera`, `src/input.js:314`) · 14 px
+two-finger pan (`panCamera`, `src/input.js:317`) · 14 px
 edge-scroll band, active only while the pointer is over the
 canvas (not over header/footer chrome) · `Ctrl+1..9` store group, `1..9` recall · `H`
 house, `F` farm, `B` barracks, `L` lumber camp, `G` mining camp, `M` mill, `R` archery
 range, `K` blacksmith, `E` market, `C` watch tower, `Q` barricade, `T` upgrade age,
-`Esc` cancels placement then clears selection · `N` new game (`src/input.js:227`) · minimap
+`Esc` cancels placement then clears selection · `N` new game (`src/input.js:230`) · minimap
 click/drag moves the camera ·
 "New map" reseeds and resets.

@@ -3,7 +3,8 @@
    Runs on its own (`node tools/checks/08-input.js`) against a freshly booted game. */
 
 const {
-  AoE2, DT, Game, blueVill, check, doc, flatState, freeSpotAround, html, pad, path, tOf, tileCentre, report,
+  AoE2, DT, Game, blueVill, bootFixture, check, doc, flatState, freeSpotAround, html, pad,
+  path, tOf, tileCentre, report, withDpr,
 } = require('../lib/harness');
 
 /* ---- 10. input ------------------------------------------------------ */
@@ -430,5 +431,20 @@ check(mousePan.panOne === null && mousePan.panTwo === null &&
       mousePan.x1 === mousePan.mx + 5,
   'input: a mouse pointer never enters pan mode, and still drags its box',
   JSON.stringify(mousePan));
+
+/* P2-19: the projection. `toWorld` scaled clientX/clientY by the canvas *element*'s size,
+   which is the device-pixel backing store: once that doubles on a HiDPI screen every
+   pointer coordinate inflates by the ratio while the renderer draws in logical pixels, so
+   the cursor and the drag box land short of the pointer. One click, both page sizes. */
+const projected = (dpr, cx, cy) => withDpr(dpr, () => bootFixture(undefined, (d, g) => {
+  d.fire('pointermove', { clientX: cx, clientY: cy });
+  return { sx: g.cursor.x - g.cam.x, sy: g.cursor.y - g.cam.y,
+           store: g.dom.view.width, css: g.dom.view.style.width, dpr: g.view.dpr };
+}));
+const p1 = projected(1, 300, 200), p2 = projected(2, 300, 200);
+check(p1.dpr === 1 && p1.store === 1200 && p2.dpr === 2 && p2.store === 2400 &&
+      p2.css === '1200px' && p1.sx === p2.sx && p1.sy === p2.sy && p1.sx === 300 && p1.sy === 200,
+  'input: the cursor projection follows the logical viewport, not the device-pixel store',
+  'dpr1 ' + JSON.stringify(p1) + ' / dpr2 ' + JSON.stringify(p2));
 
 report();

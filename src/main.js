@@ -9,7 +9,7 @@ const AoE2 = {
   makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,
   tileOf, findPath, formationSlots, separate,
-  setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame, playSfx, isMuted,
+  setAtlas, createState, boot, beginCanvas, loadAtlas, stepGame, stepSim, renderFrame, playSfx, isMuted,
   unitAnim,
   build, canPlaceAt, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, attackableAsEnemy, spawnArrow, updateProjectiles, stepBuildingAttacks,

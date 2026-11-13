@@ -5,6 +5,40 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P2-19: blurry canvas on high-DPI screens
+
+- `beginCanvas` (`src/render.js:4`) set `canvas.width/height` to the CSS pixel size and never
+  read `devicePixelRatio`, so on a 2x display the browser stretched a half-resolution bitmap and
+  everything drew soft. The backing store is now `max(1, round(w * dpr))` ×
+  `max(1, round(h * dpr))` device pixels, the CSS box stays `w + 'px'` / `h + 'px'`, and the
+  scale is applied with `ctx.setTransform(dpr, 0, 0, dpr, 0, 0)` — not `ctx.scale(...)`, which
+  compounds because `beginCanvas` runs again on every window resize (`src/input.js:291`). The
+  returned record keeps `w`/`h` in logical pixels (the space every draw call works in, e.g.
+  `clearRect(0, 0, Game.view.w, Game.view.h)` at `src/render.js:312`) and carries `dpr`.
+- the projection had to follow: `toWorld` (`src/input.js:136`) derived its scale from the canvas
+  *element*, i.e. from the backing store, so a doubled store would have moved the cursor and the
+  drag box to twice the pointer while the renderer drew in logical pixels. It now reads
+  `Game.view.w`/`Game.view.h` with the old element/`view_W`/`view_H` fallbacks kept for a
+  `Game` with no `view`. `Game.mm` (`src/boot.js:172`) inherits the fix through the same
+  `beginCanvas`; `drawMinimap` (`src/render.js:272`) already scaled from the record's logical
+  `mm.w`/`mm.h` rather than `canvas.width`, so nothing else in the render path changed.
+- `beginCanvas` joins the `AoE2` export (`src/main.js:12`) so the checks can call it directly, and
+  the harness stub gained what that needed: a `style` object on every stub element (the stub had
+  none, so the CSS box half of the fix was unobservable from node) and a `withDpr` helper beside
+  `withStorage` for pinning `window.devicePixelRatio` and restoring it, including its absence.
+- checks: 342 → 345. Two in `tools/checks/00-boot.js` — a 2x screen doubles the backing store,
+  leaves the CSS box and the logical `w`/`h` alone and transforms via `setTransform` instead of
+  `scale`; with no `devicePixelRatio` the canvas stays 1:1, which is the node path
+  `tools/render-preview.js` renders through — and one in `tools/checks/08-input.js`: the same
+  `clientX`/`clientY` project to the same `sx`/`sy` whether the store is `w` or `2 * w`. All three
+  failed before the fix; `preview.png` regenerates byte-identical, as it must on the dpr-1 path.
+- the TODO entry was **unverified** and still is on real glass: this box has no display and no
+  browser, so the sharpness itself waits on `docs/ROADMAP.md` item 1 (the real-browser smoke test).
+  Item 19 is deleted, which empties `docs/TODO.md`.
+- doc line refs moved with the two files they cite: `src/render.js` 58 → 64, 134 → 140, 150 → 156,
+  240 → 246 (`docs/ARCHITECTURE.md`, `docs/GAME_RULES.md`) and `src/input.js` 227 → 230,
+  251 → 254, 314 → 317 (`docs/GAME_RULES.md`).
+
 ### Fixed — `docs/TODO.md` P2-18: a spent resource tile stayed on the minimap
 
 - `depleteTile` (`src/economy.js:61`) reverted an emptied tile to `T.GRASS` and bumped

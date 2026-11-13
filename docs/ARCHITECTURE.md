@@ -99,7 +99,7 @@ Every unit also carries its rendering state: `u.face` (`+1`/`-1`) and `u.anim`, 
 activity clock behind every animation (walk, work, swing), plus the `atSite` mark a
 `build` order gets from `updateUnit` (`src/sim.js:190`) the moment its builder stands on
 the site's ring tile — before it he walks, after it he hammers (docs/TODO.md P1-8).
-`unitAnim(u)` (`src/render.js:134`) maps it to the sprite cell to show; `moveUnit`
+`unitAnim(u)` (`src/render.js:140`) maps it to the sprite cell to show; `moveUnit`
 (`src/movement.js:212`) is the only writer of `u.face`, so units never flip for no reason.
 
 ### Pathfinding (`findPath`, `src/movement.js:63`)
@@ -179,7 +179,7 @@ frame it just ran and `stepSim` itself never touches storage. The ruleset is in
 Terrain tiles come from `PAL` (three variants per terrain, chosen by a per-tile hash),
 trees/ore/berries are drawn as vector paths (`drawTree`, `drawOre`, `drawBerry`), and
 built buildings blit their team cell from the atlas (`drawBuildings`,
-`src/render.js:58`); the `noSprite` kinds (Blacksmith, Market, Watch Tower and Barricade)
+`src/render.js:64`); the `noSprite` kinds (Blacksmith, Market, Watch Tower and Barricade)
 have no atlas cell and draw the flat team-coloured footprint instead, so a new building
 never grows `assets/sprites.png`; a site (`built < 1`) is the same drawing faded in --
 `globalAlpha = .2 + .8 * built`, so what you watch appear is the building you paid for
@@ -190,10 +190,10 @@ Units come from `assets/sprites.png`: `SPRITES` (`src/config.js:77`) maps every 
 its animation cells and `spriteFor(kind, team, anim)` (`src/config.js:130`) resolves one;
 `BLD_SPRITES` (`src/config.js:144`) holds the built-building cells of the same sheet and
 `bldSpriteFor(kind, team)` (`src/config.js:164`) resolves those, each cell drawn at the
-building's exact footprint. `unitAnim(u)` (`src/render.js:134`) decides which animation a
+building's exact footprint. `unitAnim(u)` (`src/render.js:140`) decides which animation a
 unit plays from its order — villagers farm/chop/mine (a/b frames per harvested resource)
 plus idle/walk, militia and archer idle/walk plus attack_a/attack_b. `drawUnits`
-(`src/render.js:150`) blits the cell at integer pixels with `drawImage`, placing the
+(`src/render.js:156`) blits the cell at integer pixels with `drawImage`, placing the
 cell's feet anchor (`ax`/`ay`, measured from the frame's opaque box by
 `tools/gen-atlas.js`) on the unit and mirroring it with `scale(-1, 1)` when `u.face`
 is `-1`.

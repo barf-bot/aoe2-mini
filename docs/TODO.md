@@ -28,9 +28,3 @@ Functions are named instead of line numbers so this file does not go stale as co
 ---
 
 ## P2 — smaller defects
-
-### 19. Blurry canvas on high-DPI screens
-
-**Unverified.** `beginCanvas` sizes the canvas in CSS pixels and never multiplies by
-`devicePixelRatio`. Check on a HiDPI display; if blurry, scale the backing store and the
-context.

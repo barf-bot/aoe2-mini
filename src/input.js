@@ -130,9 +130,12 @@ function attachInput(Game, d) {
     try { return view.getBoundingClientRect(); } catch (e) { return { left: 0, top: 0, width: view_W(Game), height: view_H(Game) }; }
   };
   const isView = (t) => !t || t === view || t === Game.dom.stage;
+  /* Game.view.w/h, never the canvas element's width: that is the device-pixel backing store,
+     which doubles on a HiDPI screen (P2-19) and would put the cursor and the drag box at
+     twice the pointer while the renderer draws in the logical space. */
   const toWorld = (e) => {
     const r = rect();
-    const cw = view.width || r.width || 1, ch = view.height || r.height || 1;
+    const cw = (Game.view && Game.view.w) || r.width || 1, ch = (Game.view && Game.view.h) || r.height || 1;
     const sx = (e.clientX - r.left) * (cw / (r.width || cw));
     const sy = (e.clientY - r.top) * (ch / (r.height || ch));
     return { x: sx + Game.cam.x, y: sy + Game.cam.y, sx, sy, t: e.timeStamp, id: e.pointerId, type: e.pointerType };

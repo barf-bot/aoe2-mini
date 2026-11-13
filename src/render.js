@@ -2,11 +2,17 @@
 /* render -- canvas drawing: terrain, buildings, units, projectiles, minimap, the frame. */
 
 function beginCanvas(canvas, w, h) {
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
   let ctx = null;
   try { if (canvas && canvas.getContext) ctx = canvas.getContext('2d'); } catch (e) { ctx = null; }
-  if (!ctx) return { ok: false, ctx: null, w: w, h: h, canvas: canvas };
-  canvas.width = w; canvas.height = h;
-  return { ok: true, ctx, w, h, canvas };
+  if (!ctx) return { ok: false, ctx: null, w: w, h: h, canvas: canvas, dpr: dpr };
+  /* P2-19: the backing store is device pixels, the CSS box stays logical -- a canvas sized
+     in CSS pixels on a 2x screen is sampled up and everything draws blurry. setTransform and
+     not scale(): beginCanvas runs again on every resize, and scale() would compound. */
+  canvas.width = Math.max(1, Math.round(w * dpr)); canvas.height = Math.max(1, Math.round(h * dpr));
+  if (canvas.style) { canvas.style.width = w + 'px'; canvas.style.height = h + 'px'; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ok: true, ctx, w, h, canvas, dpr };
 }
 
 function drawWorld(Game, view) {
