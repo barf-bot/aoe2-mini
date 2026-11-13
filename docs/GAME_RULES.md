@@ -143,7 +143,7 @@ a bug.
   `age: 1` in `data/buildings.json`): `build` (`src/commands.js:114`) refuses them before
   picking a builder whenever `Game.age < 1` (`Blacksmith requires Feudal Age`,
   `Market requires Feudal Age`, `Watch Tower requires Feudal Age`,
-  `Barricade requires Feudal Age`), and their buttons — hotkeys `k`, `e`, `c`, `w` —
+  `Barricade requires Feudal Age`), and their buttons — hotkeys `k`, `e`, `c`, `q` —
   only appear once the player reaches Feudal Age.
 - The Barricade adds no placement or combat code of its own: `build` (`src/commands.js:114`)
   drafts its crew (`pickBuilders`, `src/commands.js:93`) through the same `canPlaceAt`
@@ -391,11 +391,11 @@ finger cannot move the anchored box) · drag to box-select (mixed selections col
 villagers) · right click, or a hold of `LONG_PRESS_MS` 600 ms that stays within 8 px of its
 press (`src/config.js:278`), issues move / attack / gather / build (context decided by
 what is under the cursor) · panning is
-`WASD / arrows` at 620 px/s (`ArrowUp` is the pan-up key, `W` doubles as the Barricade
-placement hotkey) · 14 px edge-scroll band, active only while the pointer is over the
+`WASD / arrows` at 620 px/s (`W` pans — the Barricade hotkey moved to `Q`) · 14 px
+edge-scroll band, active only while the pointer is over the
 canvas (not over header/footer chrome) · `Ctrl+1..9` store group, `1..9` recall · `H`
 house, `F` farm, `B` barracks, `L` lumber camp, `G` mining camp, `M` mill, `R` archery
-range, `K` blacksmith, `E` market, `C` watch tower, `W` barricade, `T` upgrade age,
+range, `K` blacksmith, `E` market, `C` watch tower, `Q` barricade, `T` upgrade age,
 `Esc` cancels placement then clears selection · `N` new game (`src/input.js:163`) · minimap
 click/drag moves the camera ·
 "New map" reseeds and resets.

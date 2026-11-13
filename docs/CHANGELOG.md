@@ -5,6 +5,20 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P2-12: `W` placed a barricade instead of panning
+
+- The keydown handler (`src/input.js:145`) armed Barricade placement on `w` and returned
+  before `setKey` (`src/input.js:164`) ran, so the `WASD / arrows to pan` the `index.html`
+  banner and the footer help line (`src/hud.js:103`) advertise had no up key: `ArrowUp`
+  panned, `W` did not. The hotkey moves to `q` — the only letter next to the WASD cluster
+  no handler used — and `w` reaches `setKey` again, so `keys.up` is set on press and
+  cleared on release.
+- checks: 323 → 324. `tools/checks/08-input.js` pins `['q', 'barricade', 'Barricade']` in
+  the hotkey table and adds the regression itself: `w` keydown sets `Game.keys.up`, keyup
+  clears it. The pinned banner and footer strings needed no change — the wording is now
+  true — and the Barricade's command-bar button carries no hotkey in its label.
+- `preview.png` regenerates byte-identical (no render path changed).
+
 ### Fixed — `docs/TODO.md` P1-11: the player's age and Blacksmith upgrades also strengthen the enemy
 
 - `Game.age`, `Game.ageBonus` and `Game.techs` were single global values that `unitAttack`

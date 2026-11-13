@@ -158,7 +158,7 @@ function attachInput(Game, d) {
     if (k === 'k') { Game.placing = Game.placing === 'blacksmith' ? null : 'blacksmith'; return; }
     if (k === 'e') { Game.placing = Game.placing === 'market' ? null : 'market'; return; }
     if (k === 'c') { Game.placing = Game.placing === 'watch_tower' ? null : 'watch_tower'; return; }
-    if (k === 'w') { Game.placing = Game.placing === 'barricade' ? null : 'barricade'; return; }
+    if (k === 'q') { Game.placing = Game.placing === 'barricade' ? null : 'barricade'; return; }
     if (k === 't') { upgradeAge(Game); return; }
     if (k === 'n') { storageSet(SAVE_PATH, null); resetGame(Game); return; }
     setKey(k, true);

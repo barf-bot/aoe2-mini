@@ -224,7 +224,7 @@ the pointer is over the canvas or mid-drag — coords measured on the header/foo
 to `null` instead, so hovering HUD chrome no longer reads as "cursor on a screen edge"
 and pans the camera. Click-vs-drag is decided by a 4px threshold; mixed drag selections
 collapse to villagers (AoE2 behaviour). Commands: left select, right click issue order,
-WASD/arrows pan, `Ctrl+1..9` set group, `1..9` recall, and `H`/`F`/`B`/`L`/`G`/`M`/`R`/`K`/`E`/`C`/`W`
+WASD/arrows pan, `Ctrl+1..9` set group, `1..9` recall, and `H`/`F`/`B`/`L`/`G`/`M`/`R`/`K`/`E`/`C`/`Q`
 arm every placeable building, `T` upgrade age, `Esc` clears placement then selection. The command bar is
 rebuilt every frame, so its clicks are **delegated to its parent** — `Game.dom.commands ||
 Game.dom.hud`, the footer in a browser — and `buttonAt` (`src/input.js:66`) is the single

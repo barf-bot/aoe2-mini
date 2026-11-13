@@ -29,14 +29,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P2 — smaller defects
 
-### 12. `W` places a barricade instead of panning
-
-**Verified.** Pressing `W` arms barricade placement and the camera does not move, while the
-footer help and the comment in `index.html` say "WASD / arrows … pan".
-
-- **Fix:** move the barricade to a free key and let `W` pan, or change both help texts.
-  `tools/checks/08-input.js` pins the current wording — update it together.
-
 ### 13. The minimap cannot be dragged
 
 **Verified.** A press on the minimap jumps the camera; dragging does nothing. The README

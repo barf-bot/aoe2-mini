@@ -115,7 +115,7 @@ const kPlacing = Game.placing;
 doc.fire('keydown', { key: 'Escape', target: view });
 check(kPlacing === 'blacksmith' && Game.placing === null,
   'input: k arms Blacksmith placement', 'k=' + String(kPlacing) + ' esc=' + String(Game.placing));
-[['e', 'market', 'Market'], ['c', 'watch_tower', 'Watch Tower'], ['w', 'barricade', 'Barricade']].forEach(([k, kind, label]) => {
+[['e', 'market', 'Market'], ['c', 'watch_tower', 'Watch Tower'], ['q', 'barricade', 'Barricade']].forEach(([k, kind, label]) => {
   doc.fire('keydown', { key: k, target: view });
   const armed = Game.placing;
   doc.fire('keydown', { key: 'Escape', target: view });
@@ -124,12 +124,19 @@ check(kPlacing === 'blacksmith' && Game.placing === null,
     k + '=' + String(armed) + ' esc=' + String(Game.placing));
 });
 
+doc.fire('keydown', { key: 'w', target: view });
+const wDown = Game.keys.up;
+doc.fire('keyup', { key: 'w', target: view });
+check(wDown === true && Game.keys.up === false,
+  'input: w pans up while held and releases on keyup',
+  'keydown=' + String(wDown) + ' keyup=' + String(Game.keys.up));
+
 /* The keys the handler implements and the controls the game advertises are one
-   contract: setKey pans up on `w`/`ArrowUp`, but every build hotkey — the
-   barricade's `w` included (the plan's "w is not free" ruling) — returns before
-   setKey runs, so keyboard pan-up is ArrowUp and `w` belongs to the Barricade.
-   The index.html banner and the footer's help line are the two surfaces that state it,
-   so both have to carry the post-barricade wording, not `WASD to pan.` */
+   contract: setKey pans on `w`/`a`/`s`/`d` and the arrows, and every build hotkey
+   returns before setKey runs — the reason the Barricade moved from `w` to `q`
+   (TODO P2-12): while `w` armed placement, the WASD pan both strings below promise
+   was impossible. The index.html banner and the footer's help line are the two
+   surfaces that state it, so both have to keep naming WASD. */
 const bannerCtl = (html.match(/^ +Controls: (.+)$/m) || [])[1] || '';
 const footerCtl = (AoE2.infoHtml(AoE2.createState()).match(/>([^<]*screen edges pan)/) || [])[1] || '';
 check(bannerCtl === 'left click / tap / drag to select, right click / press-and-hold to command, WASD / arrows to pan.' &&
