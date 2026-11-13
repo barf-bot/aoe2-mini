@@ -53,11 +53,27 @@ function stubCtx(canvas) {
   });
 }
 
+/* What an element hands back after you write markup into it. A real browser parses the
+   string and serialises it on the way out, so the read value is never the string you
+   wrote: tag names come back upper-cased and a boolean attribute expands to
+   `disabled=""`. The stub used to round-trip exactly what it was given, which hid that
+   from every innerHTML comparison here (docs/TODO.md P0-1: `renderHud` compared its
+   generated footer against `el.innerHTML` — a match in node, never in a browser, so the
+   bar was rebuilt 60 times a second). `stubEl` stores the serialised form and counts the
+   writes in `_htmlSets`, the same trick as fakeStorage's `sets`, so a check can tell
+   "wrote once" from "rewrote the frame". */
+const domHtml = (markup) => String(markup)
+  .replace(/<(\/?)([A-Za-z][A-Za-z0-9_-]*)/g, (_m, close, tag) => '<' + close + tag.toUpperCase())
+  .replace(/(^|[^\S\n])disabled(?![\w-]*=)/g, '$1disabled=""');
+
 function stubEl(tag, id, w, h) {
-  const e = { tagName: tag.toUpperCase(), id, _text: '', _html: '', attrs: {}, listeners: {} };
+  const e = { tagName: tag.toUpperCase(), id, _text: '', _html: '', _htmlSets: 0, attrs: {}, listeners: {} };
   e.clientWidth = w; e.clientHeight = h; e.width = w; e.height = h;
   Object.defineProperty(e, 'textContent', { get() { return e._text; }, set(v) { e._text = String(v); } });
-  Object.defineProperty(e, 'innerHTML', { get() { return e._html; }, set(v) { e._html = String(v); } });
+  Object.defineProperty(e, 'innerHTML', {
+    get() { return e._html; },
+    set(v) { e._html = domHtml(v); e._htmlSets++; },
+  });
   e._q = {};
   e.querySelector = (sel) => (e._q[sel] || (e._q[sel] = stubEl('b', id + '>' + sel, 10, 10)));
   e.addEventListener = (t, fn) => { (e.listeners[t] = e.listeners[t] || []).push(fn); };
@@ -318,7 +334,7 @@ const bootFixture = (raw, fn, extra) => {
 module.exports = {
   AoE2, DIMS, DIRS8H, DT, Game, HTML, HTML_DIR, SCRIPT_FILES,
   TOOLS_DIR, bad, blueVill, bootFixture, builtAt, check, cp, dataBuildings,
-  dataUnits, doc, fakeStorage, finishedHouse, flatState, freeSpotAround, fs, fundedGame, gameLoader,
+  dataUnits, doc, domHtml, fakeStorage, finishedHouse, flatState, freeSpotAround, fs, fundedGame, gameLoader,
   html, makeAudioStub, makeDoc, napiImage, ok, pad, path, rafQueue,
   report, results, scriptSrc, setTile, siteAt, solidTile, stepRender, stubCtx,
   stubEl, stubVoices, styleCss, tIdx, tOf, tc, tileCentre, uiCheck,

@@ -4,12 +4,17 @@
 function renderHud(Game) {
   const d = Game.dom || {};
   const setText = (el, val) => { if (el && el.textContent !== val) el.textContent = val; };
-  /* d.hud / d.result hold markup: write innerHTML when the element has one,
-     otherwise fall back to textContent (keeps the node stub working) */
-  const setHTML = (el, val) => {
-    if (!el) return;
-    if (typeof el.innerHTML === 'string') { if (el.innerHTML !== val) el.innerHTML = val; return; }
-    setText(el, val);
+  /* d.hud / d.result hold markup: write innerHTML when the element has one, otherwise
+     fall back to textContent (keeps the node stub working). The test is against the
+     string last written (d.hudLast / d.resultLast), NEVER against el.innerHTML: a browser
+     serialises `<button disabled>` back as `disabled=""`, so the two never match while any
+     button is disabled and the footer is rebuilt 60 times a second — the button under the
+     pointer is replaced between mouse-down and mouse-up, so the click lands on the footer
+     and buttonAt finds no button (docs/TODO.md P0-1). */
+  const setHTML = (key, el, val) => {
+    if (!el || d[key] === val) return;
+    d[key] = val;
+    if (typeof el.innerHTML === 'string') el.innerHTML = val; else el.textContent = val;
   };
   setText(d.set_food, String(Math.floor(Game.res[0].food)));
   setText(d.set_wood, String(Math.floor(Game.res[0].wood)));
@@ -19,9 +24,9 @@ function renderHud(Game) {
   setText(d.set_age, AGES[Game.age]);
   if (d.hud) {                                            /* one write for the whole frame */
     if (d.hud.setAttribute) d.hud.setAttribute('data-state', hudState(Game));
-    setHTML(d.hud, hudHtml(Game));
+    setHTML('hudLast', d.hud, hudHtml(Game));
   }
-  setHTML(d.result, resultHtml(Game));          /* '' while the game is still running */
+  setHTML('resultLast', d.result, resultHtml(Game));   /* '' while the game is still running */
   if (d.result && d.result.classList) {         /* CSS hides it while the class is off */
     if (Game.result) d.result.classList.add('show'); else d.result.classList.remove('show');
   }

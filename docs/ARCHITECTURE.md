@@ -189,14 +189,17 @@ the carry dot tinted by `CARRY_COLOR`.
 
 Canvases go through `beginCanvas(canvas, w, h)`; sizes come from `sizeW/sizeH(dom)` with
 node-safe fallbacks (`view_W/view_H`, `src/boot.js:27-28`). The footer is one fixed-height
-element owned by `hudHtml` (`src/hud.js:45`): `renderHud` (`src/hud.js:4`) stamps it
+element owned by `hudHtml` (`src/hud.js:50`): `renderHud` (`src/hud.js:4`) stamps it
 with the `data-state` answered by `hudState` (`group` / `units` / `building` / `none`) and
 writes the same three panels — `infoHtml`, `commandsHtml`, `queueHtml` — in the same order
-for every selection, so the frame never resizes the map and the CSS can pin it to
+for every selection, caching the string in `Game.dom.hudLast` so a frame that changed
+nothing writes no `innerHTML` at all (comparing against `el.innerHTML` instead never
+matches: the browser serialises `disabled` as `disabled=""`), so the frame never resizes
+the map and the CSS can pin it to
 `height:74px` with every panel a fixed `overflow:hidden` box (the command panel is a
-row-based button grid). The game-over overlay is `resultHtml` (`src/hud.js:54`) written
-into `#result` and hidden again by its `show` class the moment `Game.result` goes back to
-null.
+row-based button grid). The game-over overlay is `resultHtml` (`src/hud.js:59`) written
+into `#result`, cached the same way as `Game.dom.resultLast`, and hidden again by its
+`show` class the moment `Game.result` goes back to null.
 
 ## Input model
 
@@ -227,11 +230,13 @@ generators read the tables without a DOM.
   in its own node process, in parallel, and adds up the results (a file that crashes
   before reporting counts as a failure, never as zero checks). Each check file requires
   `tools/lib/harness.js`, which installs a stub `document`/`window` (elements with
-  `textContent`/`innerHTML` accessors, cached per id, `fire()` to dispatch events, a Proxy
+  `textContent` accessor and an `innerHTML` accessor that stores `domHtml(value)` — what a
+  browser hands back, with upper-cased tag names and `disabled=""` — and counts the writes
+  in `_htmlSets`, so a check can tell one write from a per-frame rebuild; cached per id,
   2D context that swallows every draw call), boots the game and exports the booted `Game`,
   the `AoE2` surface, `check`/`report` and the fixtures more than one file needs. So every
   file gets a fresh game, the files are **independent** — order does not matter and
-  `node tools/checks/07-combat.js` runs one alone — and together they assert 282
+  `node tools/checks/07-combat.js` runs one alone — and together they assert 283
   invariants. It never opens a browser. Node has no `Image`, so the harness defines one
   (§2b) whose `src` setter
   decodes the real sheet — caveat measured on `@napi-rs/canvas` 1.1.0: an `Image` built

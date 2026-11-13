@@ -5,6 +5,18 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P0-1: footer buttons ignore real mouse clicks
+
+- `renderHud` now compares the footer and result markup against the string it last wrote
+  (`Game.dom.hudLast` / `Game.dom.resultLast`) instead of `el.innerHTML`, which a browser
+  serialises back differently (`<button disabled>` comes back as `disabled=""`). The
+  footer used to be rebuilt 60 times a second, so the button under the pointer was
+  replaced between mouse-down and mouse-up and every footer click — build, train,
+  research, trade, cancel, demolish, age up, new map — armed nothing (hotkeys worked).
+  The harness stub element now serialises the way the DOM does and counts its writes in
+  `_htmlSets`, and `tools/checks/09-hud.js` proves a changed frame writes each panel once
+  while an unchanged frame writes neither again (282 → 283 checks).
+
 ### Split the single file into `src/` — no behaviour change
 
 `index.html` was 3116 lines and `tools/headless-check.js` 3799; both had outgrown what a

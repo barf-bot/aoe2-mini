@@ -21,23 +21,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P0 — the game cannot be played with the mouse
 
-### 1. Footer buttons ignore real mouse clicks
-
-**Verified.** In Chromium a click on `House` with the button held 30 ms or 120 ms armed
-placement 0 times out of 10; a 0 ms synthetic click worked 10 out of 10. Hotkeys work.
-This affects every footer button: build, train, research, trade, cancel, demolish, age
-up, new map.
-
-- **Cause:** `renderHud` in `src/hud.js` rewrites `#hud` whenever
-  `el.innerHTML !== hudHtml(Game)`. The browser serialises `disabled` as `disabled=""`,
-  so the two strings never match while any button is disabled and the footer is rebuilt
-  60 times a second. The button under the pointer is replaced between mouse-down and
-  mouse-up, so the `click` lands on the footer and `buttonAt` finds no button.
-- **Fix:** remember the last string written (for example `Game.dom.hudLast`) and compare
-  against that, never against `innerHTML`. Same for `#result`.
-- **Done when:** a check renders two frames with an unchanged state and proves the second
-  frame does not assign `innerHTML` again (count the assignments on the stub element).
-
 ### 2. The placement preview is invisible
 
 **Verified.** With `Game.placing = 'house'` and the camera at (338, 900) no ghost is drawn

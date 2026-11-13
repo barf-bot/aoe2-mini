@@ -4,7 +4,7 @@
 
 const {
   finishedHouse,
-  AoE2, Game, blueVill, check, html, stubEl, styleCss, tileCentre, report,
+  AoE2, Game, blueVill, bootFixture, check, domHtml, html, stubEl, styleCss, tileCentre, report,
 } = require('../lib/harness');
 
 /* ---- 11. command bar buttons ---------------------------------------- */
@@ -236,7 +236,7 @@ const paintedHud = (sel, bld) => {
     AoE2.renderFrame(Game);
     const hud = Game.dom.hud || {};
     return (hud.attrs ? String(hud.attrs['data-state']) : '<no #hud>') + '|' +
-      (typeof hud.innerHTML === 'string' && hud.innerHTML === AoE2.hudHtml(Game)
+      (typeof hud.innerHTML === 'string' && hud.innerHTML === domHtml(AoE2.hudHtml(Game))
         ? 'html=hudHtml' : 'html=MISMATCH');
   } catch (e) { return 'ERR ' + e.message; }
   finally { Game.selection = had[0]; Game.selectedBuilding = had[1]; }
@@ -249,6 +249,7 @@ const painted = [
 ];
 check(painted.join(' ') === 'units|html=hudHtml group|html=hudHtml building|html=hudHtml none|html=hudHtml',
   'hud: renderHud stamps #hud and writes exactly hudHtml for every state', painted.join(' '));
+
 /* ---- 11c. responsive layout (this plan, T3) ---- */
 /* The phone layout is one media block written last so it wins the cascade, and the
    checks read it as text naming the desktop rules it overrides: drift on either
@@ -280,4 +281,27 @@ check(propOf(mHeader, 'padding') === '2px 6px' && propOf(bHeader, 'padding') ===
   'ui: the responsive block trims the header padding the desktop rule declares',
   'media header{' + String(mHeader) + '} vs base header{' + String(bHeader) + '}');
 
+/* ---- 11d. one write per change (docs/TODO.md P0-1) ------------------- */
+/* renderHud compares the markup against the string it last wrote (Game.dom.hudLast /
+   .resultLast) instead of against el.innerHTML. A browser hands innerHTML back serialised
+   (`<button disabled>` comes back as `disabled=""`), so that comparison never matched while
+   any button was disabled and the footer was rebuilt 60 times a second: the button under
+   the pointer was replaced between mouse-down and mouse-up, so a real click landed on the
+   footer and armed nothing (verified in Chromium: 0 of 10 clicks on `House` armed
+   placement, while the 0 ms synthetic clicks the checks used to make all passed). The
+   harness stub serialises the same way and counts its writes, so the old code fails here
+   on both panels — §11b's read-back keeps proving the content itself. */
+bootFixture(undefined, (doc, st) => {
+  const sets = (k) => st.dom[k]._htmlSets;
+  const hud0 = sets('hud'), res0 = sets('result');              // boot's own first frame
+  st.selection = st.units.filter((u) => u.team === 0).map((u) => u.id);
+  st.result = 'victory';                                        // both panels gain new content
+  AoE2.renderFrame(st);
+  const hud1 = sets('hud'), res1 = sets('result');
+  AoE2.renderFrame(st);                                         // same state: nothing to write
+  check(hud1 === hud0 + 1 && res1 === res0 + 1 && sets('hud') === hud1 && sets('result') === res1,
+    'hud: a changed frame writes each panel once, an unchanged frame writes neither',
+    '#hud ' + hud0 + '->' + hud1 + '->' + sets('hud') + ' #result ' + res0 + '->' + res1 +
+    '->' + sets('result'));
+});
 report();

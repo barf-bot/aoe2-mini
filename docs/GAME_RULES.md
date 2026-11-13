@@ -214,7 +214,7 @@ side to lose one decides the game — a raze in combat, a cancelled site and a d
 `Game.result` set to `'victory'` (enemy keep gone) or `'defeat'` (yours gone), `stepSim`
 (`src/sim.js:5`) stops after the clock tick: units, build sites, training queues, arrows
 in flight and the enemy AI freeze while the camera and rendering keep working. The `#result`
-overlay — markup from `resultHtml` (`src/hud.js:54`), styled in the head — names the result
+overlay — markup from `resultHtml` (`src/hud.js:59`), styled in the head — names the result
 and offers a `New game` button wired to `resetGame` (`src/boot.js:54`), which rebuilds the
 same seeded start and clears `result` back to `null`. No auto-restart, no countdown.
 
@@ -307,12 +307,16 @@ the table is the contract, the audio path and the checks are its two readers, th
 
 ## Interface
 
-`hudState` (`src/hud.js:33`) answers the one selection word the footer is in — `group`
+`hudState` (`src/hud.js:38`) answers the one selection word the footer is in — `group`
 (several units), `units` (exactly one), `building` (a building and nothing else), `none` —
-and `hudHtml` (`src/hud.js:45`) is the single owner of the footer's markup: the same
+and `hudHtml` (`src/hud.js:50`) is the single owner of the footer's markup: the same
 three panels (`info` | `commands` | `queue`) in the same order for every state, stamped
 `renderHud` (`src/hud.js:4`) writes it in one
-`innerHTML` write, so the frame the CSS pins (`footer{flex:0 0 74px;height:74px}`, every
+`innerHTML` write, compared against `Game.dom.hudLast` — the string it last wrote, never
+against `el.innerHTML`, which a browser hands back serialised with `disabled=""`, so the
+read never matches while a button is disabled and re-writing it every frame replaces the
+button under the pointer and the click is lost (docs/TODO.md P0-1) — so the frame the CSS
+pins (`footer{flex:0 0 74px;height:74px}`, every
 panel a fixed-height `overflow:hidden` box) never changes size when the selection does —
 the info panel is a fixed title/body/bar grid, the command panel a row-based button grid.
 Choosing a placement (`Game.placing`) changes the info panel's content, never the state. A

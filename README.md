@@ -54,7 +54,7 @@ Start with `AGENTS.md` if you're an agent picking the repo up cold.
 | `assets/sprites.png` | the sprite atlas (1522×684): unit cells — villager idle/walk/farm_a/farm_b/chop_a/chop_b/mine_a/mine_b, militia and archer idle/walk/attack_a/attack_b, blue above red — above the building cells drawn at their footprints |
 | `data/units.json`, `data/buildings.json`, `data/techs.json` | the vendored AoE2 stat tables (sources in [`data/README.md`](data/README.md)) — the only place unit/building/tech/world numbers are authored |
 | `data/sprites.json`, `data/sprites/` | the vendored sprite frames (ripped AoE2 art, recoloured per team) and the atlas manifest `tools/gen-atlas.js` composes the sheet from |
-| `tools/headless-check.js` | runs every file in `tools/checks/` (each in its own process, against a stub DOM) and adds up the results — 282 invariants; pass a name fragment to run a subset, `-q` for failures only |
+| `tools/headless-check.js` | runs every file in `tools/checks/` (each in its own process, against a stub DOM) and adds up the results — 283 invariants; pass a name fragment to run a subset, `-q` for failures only |
 | `tools/checks/` | the checks themselves, one independent file per topic (`node tools/checks/07-combat.js` runs one alone) |
 | `tools/lib/` | `load-game.js`, the loader every tool uses (runs the scripts `index.html` lists, in the same order the browser does), and `harness.js`, the stub DOM and fixtures every check file starts from |
 | `tools/check-stats.mjs` | renders `CFG`/`KINDS`/`BLD`/`TECHS` in `src/config.js` from `data/` and fails with one line per field when they drift (`--write` regenerates the blocks) |
@@ -64,7 +64,7 @@ Start with `AGENTS.md` if you're an agent picking the repo up cold.
 | `preview.png` | a real frame of the game rendered headlessly |
 
 ```bash
-node tools/headless-check.js        # 282/282 checks passed
+node tools/headless-check.js        # 283/283 checks passed
 node tools/check-stats.mjs          # verifies src/config.js against the vendored stat tables
 node tools/audit-line-refs.js       # verifies the docs against the code
 npm install --prefix tools          # once: the canvas backend the next two need
