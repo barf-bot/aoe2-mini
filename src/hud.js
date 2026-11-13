@@ -95,8 +95,11 @@ function infoHtml(Game) {
   if (b) {
     const ups = Object.keys(TECHS).filter(id => TECHS[id].building === b.kind && Game.techs[b.team].has(id))
       .map(id => TECHS[id].label);
+    const gc = BLD[b.kind].garrisonCapacity;          // the row's capacity: 0 on a House, Farm, Camp
+    const gn = b.built >= 1 && gc ? Game.units.filter((u) => u.garrisonedIn === b.id).length : 0;
+    const gar = gn ? '<br>Garrisoned ' + gn + '/' + gc : '';   // the line exists only while someone is inside
     return shell(BLD[b.kind].label, 'HP ' + Math.ceil(b.hp) + '/' + b.maxHp +
-      (b.field ? '<br>Field: ' + Math.ceil(b.field) : '') +
+      (b.field ? '<br>Field: ' + Math.ceil(b.field) : '') + gar +
       (ups.length ? '<br>Upgrades: ' + ups.join(', ') : ''), pctOf(b.hp, b.maxHp));
   }
   return shell('', 'Left click or drag to select<br>Right click to move / attack / gather<br>' +
@@ -140,6 +143,14 @@ function commandsHtml(Game) {
         (canAfford(Game, b.team, BLD[up].cost) ? '' : ' disabled') + '>Upgrade to ' +
         BLD[up].label + '<span class="c">' + fmtCost(BLD[up].cost) + '</span></button>');
     }
+    /* the garrison buttons: one Leave per kind inside (input.js's `leave` branch hands
+       exactly those ids to leaveBuilding) plus Leave all, which a single occupant skips. */
+    const inside = Game.units.filter((u) => u.garrisonedIn === b.id);
+    const byKind = {};
+    for (const u of inside) byKind[u.kind] = (byKind[u.kind] || 0) + 1;
+    for (const k in byKind) out.push('<button data-act="leave" data-arg="' + k + '">Leave' +
+      '<span class="c">' + byKind[k] + ' ' + KINDS[k].label + '</span></button>');
+    if (inside.length > 1) out.push('<button data-act="leave" data-arg="all">Leave all<span class="c">' + inside.length + '</span></button>');
   }
   if (b && b.built < 1) {
     out.push('<button data-act="cancel">Cancel<span class="c">80% back</span></button>');

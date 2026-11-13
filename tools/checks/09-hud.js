@@ -1,9 +1,9 @@
 'use strict';
-/* checks/09-hud.js -- command bar (train / research / trade / upgrade), the uniform
+/* checks/09-hud.js -- command bar (train / research / trade / upgrade / garrison), the uniform
    HUD frame, the responsive layout: `node tools/checks/09-hud.js` on a fresh game. */
 
 const {
-  AoE2, DT, Game, blueVill, bootFixture, check, domHtml, finishedHouse, fundedGame, html, stubEl, styleCss, tileCentre, report,
+  AoE2, DT, Game, blueVill, bootFixture, builtAt, check, domHtml, finishedHouse, fundedGame, html, siteAt, stubEl, styleCss, tileCentre, report,
 } = require('../lib/harness');
 
 /* ---- 11. command bar buttons ---------------------------------------- */
@@ -525,4 +525,133 @@ bootFixture(undefined, (doc, st) => {
     '#hud ' + hud0 + '->' + hud1 + '->' + sets('hud') + ' #result ' + res0 + '->' + res1 +
     '->' + sets('result'));
 });
+
+/* ---- 11e. garrison (this plan, T3) ------------------------------------ */
+/* The panel half of docs/plans/2026-11-13-garrison.md: the count is an `infoHtml` body
+   line and the buttons are `commandsHtml` entries in the fixed grid the uniform frame
+   already owns (§11b proves no new panel or wrapper appears), and the click reaches them
+   through input.js's delegated `data-act` ladder — the §11 idiom of dispatching a stubEl
+   button at Game.dom.commands.listeners.click. The population header must not move when
+   a villager goes inside: he keeps the slot he always used. */
+const gCount = (() => {
+  const st = fundedGame();
+  const b = builtAt(st, 'barracks', 30);
+  const ring = AoE2.standingSpots(st, b, 3);
+  let err = null, r = {};
+  try {
+    st.selection = []; st.selectedBuilding = b;
+    const empty = AoE2.infoHtml(st);                           // the same building, nobody inside
+    const ms = [AoE2.makeUnit(st, 'militia', 0, ring[1].x, ring[1].y),
+                AoE2.makeUnit(st, 'militia', 0, ring[2].x, ring[2].y)];
+    const took = AoE2.garrisonUnits(st, ms.map((u) => u.id), b);
+    r = { empty, full: AoE2.infoHtml(st), took: took.length, cap: AoE2.BLD.barracks.garrisonCapacity };
+  } catch (e) { err = e.message; }
+  return Object.assign({ err }, r);
+})();
+check(gCount.err === null && gCount.took === 2 && gCount.cap === 10 &&
+      !gCount.empty.includes('Garrisoned') && gCount.full.includes('Garrisoned 2/10'),
+  'ui: a barracks with two militia inside shows Garrisoned 2/10 and the same building empty shows no garrison line',
+  JSON.stringify(gCount).slice(0, 300));
+const gNever = (() => {
+  const st = fundedGame();
+  let err = null, r = {};
+  try {
+    const house = finishedHouse(st);                           // capacity 0
+    st.selection = []; st.selectedBuilding = house;
+    const houseMark = AoE2.infoHtml(st);
+    const site = siteAt(st, 'barracks', 34);                   // built < 1 with someone linked
+    const v = AoE2.makeUnit(st, 'villager', 0, site.x, site.y);
+    v.garrisonedIn = site.id;
+    st.selectedBuilding = site;
+    r = { houseMark, siteMark: AoE2.infoHtml(st), linked: v.garrisonedIn === site.id };
+  } catch (e) { err = e.message; }
+  return Object.assign({ err }, r);
+})();
+check(gNever.err === null && gNever.linked && !/Garrisoned/.test(gNever.houseMark) &&
+      !/Garrisoned/.test(gNever.siteMark),
+  'ui: a house and an unfinished barracks never show a garrison line', JSON.stringify(gNever).slice(0, 300));
+const gButtons = (() => {
+  const st = fundedGame();
+  const b = builtAt(st, 'barracks', 31);
+  st.selectedBuilding = b;                                     // the command grid's building branch
+  let err = null, r = {};
+  try {
+    const ring = AoE2.standingSpots(st, b, 2);
+    const m = AoE2.makeUnit(st, 'militia', 0, ring[0].x, ring[0].y);
+    const one = (AoE2.garrisonUnits(st, [m.id], b), AoE2.commandsHtml(st));
+    const v = AoE2.makeUnit(st, 'villager', 0, ring[1].x, ring[1].y);
+    const two = (AoE2.garrisonUnits(st, [v.id], b), AoE2.commandsHtml(st));
+    const acts = (mark) => (mark.match(/data-act="[a-z]+" data-arg="[a-z_]+"/g) || []).join(' ');
+    r = { one: acts(one), two: acts(two) };
+  } catch (e) { err = e.message; }
+  return Object.assign({ err }, r);
+})();
+check(gButtons.err === null && gButtons.one.includes('data-act="leave" data-arg="militia"') &&
+      !gButtons.one.includes('data-arg="all"') &&
+      gButtons.two.includes('data-act="leave" data-arg="militia"') &&
+      gButtons.two.includes('data-act="leave" data-arg="villager"') &&
+      gButtons.two.includes('data-act="leave" data-arg="all"'),
+  'ui: the command grid offers one Leave per kind inside plus Leave all', JSON.stringify(gButtons));
+const clickButton = (Game, act, arg) => {
+  const btn = stubEl('button', 'btn', 60, 24);
+  btn.setAttribute('data-act', act);
+  btn.setAttribute('data-arg', arg);
+  Game.dom.commands.listeners.click.forEach((fn) => fn({ target: btn }));
+};
+const gLeaveAll = (() => {
+  const b = builtAt(Game, 'barracks', 32);
+  let err = null, r = {};
+  try {
+    const ms = [AoE2.makeUnit(Game, 'militia', 0, b.x - 30, b.y), AoE2.makeUnit(Game, 'militia', 0, b.x + 30, b.y)];
+    Game.selection = [];
+    AoE2.garrisonUnits(Game, ms.map((u) => u.id), b);
+    Game.selectedBuilding = b;
+    const before = AoE2.infoHtml(Game);
+    clickButton(Game, 'leave', 'all');
+    r = { before, after: AoE2.infoHtml(Game), emptied: ms.every((u) => u.garrisonedIn === null), bId: b.id };
+  } catch (e) { err = e.message; }
+  return Object.assign({ err }, r);
+})();
+check(gLeaveAll.err === null && gLeaveAll.before.includes('Garrisoned 2/10') &&
+      !gLeaveAll.after.includes('Garrisoned') && gLeaveAll.emptied,
+  'ui: clicking Leave all empties the building and the panel stops naming the count',
+  JSON.stringify(gLeaveAll).slice(0, 300));
+const gLeaveVill = (() => {
+  const b = builtAt(Game, 'barracks', 33);
+  let err = null, r = {};
+  try {
+    const v = AoE2.makeUnit(Game, 'villager', 0, b.x - 30, b.y);
+    const m = AoE2.makeUnit(Game, 'militia', 0, b.x + 30, b.y);
+    Game.selection = [];
+    AoE2.garrisonUnits(Game, [v.id, m.id], b);
+    Game.selectedBuilding = b;
+    const before = AoE2.infoHtml(Game);
+    clickButton(Game, 'leave', 'villager');                     // the villager button only
+    r = { before, after: AoE2.infoHtml(Game), vLinked: v.garrisonedIn, mLinked: m.garrisonedIn, bId: b.id };
+  } catch (e) { err = e.message; }
+  return Object.assign({ err }, r);
+})();
+check(gLeaveVill.err === null && gLeaveVill.before.includes('Garrisoned 2/10') &&
+      gLeaveVill.after.includes('Garrisoned 1/10') && gLeaveVill.vLinked === null &&
+      gLeaveVill.mLinked === gLeaveVill.bId,
+  'ui: clicking the villager Leave button releases only the villagers',
+  JSON.stringify(gLeaveVill).slice(0, 300));
+const gPop = (() => {
+  let err = null, r = {};
+  try {
+    r = bootFixture(undefined, (d, st) => {
+      const tc = st.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+      const vs = st.units.filter((u) => u.team === 0 && u.kind === 'villager').slice(0, 2);
+      AoE2.renderFrame(st);
+      const before = st.dom.set_pop.textContent;
+      const took = AoE2.garrisonUnits(st, vs.map((u) => u.id), tc);
+      AoE2.renderFrame(st);
+      return { before, after: st.dom.set_pop.textContent, took: took.length,
+               linked: vs.every((u) => u.garrisonedIn === tc.id) };
+    });
+  } catch (e) { err = e.message; }
+  return Object.assign({ err }, r);
+})();
+check(gPop.err === null && gPop.took === 2 && gPop.linked && gPop.before === gPop.after,
+  'ui: the header population line counts a garrisoned villager once', JSON.stringify(gPop));
 report();

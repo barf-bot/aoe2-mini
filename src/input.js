@@ -124,6 +124,17 @@ function buttonAt(e) {
   return t && t.tagName === 'BUTTON' ? t : null;
 }
 
+/** The `Leave` / `Leave all` buttons' half: `arg` is a unit kind (the per-kind
+ *  button's `data-arg`) or `all`, and it becomes the list of ids inside the selected
+ *  building the click releases (docs/plans/2026-11-13-garrison.md T3), so one button
+ *  can never release another kind. */
+function leaveSelected(Game, arg) {
+  const b = Game.selectedBuilding;
+  if (!b) return 0;                                   // the grid only draws these for a selected one
+  return leaveBuilding(Game, b, arg === 'all' ? undefined
+    : Game.units.filter((u) => u.garrisonedIn === b.id && u.kind === arg).map((u) => u.id));
+}
+
 function attachInput(Game, d) {
   const view = Game.dom.view;
   const rect = () => {
@@ -249,6 +260,7 @@ function attachInput(Game, d) {
         trade(Game, Game.selectedBuilding, res, dir);
       }
       else if (act === 'upgrade' && Game.selectedBuilding) upgradeBuilding(Game, Game.selectedBuilding);
+      else if (act === 'leave' && Game.selectedBuilding) leaveSelected(Game, arg);
       else if (act === 'cancel' && Game.selectedBuilding) cancelConstruction(Game, Game.selectedBuilding);
       else if (act === 'demolish' && Game.selectedBuilding) demolish(Game, Game.selectedBuilding);
       else if (act === 'age') upgradeAge(Game);
