@@ -20,10 +20,17 @@ in `src/`.
 
 **No build step.** What is committed is what is served: opening `index.html` from disk
 must work. That means plain classic scripts sharing one global scope — no ES modules, no
-transpiling, no bundling — and no image assets (terrain is drawn procedurally from the
-palettes in `src/config.js:282-291`): the only image the game may carry is
-`assets/sprites.png`, the sprite atlas composed by `tools/gen-atlas.js` from the vendored
-frames in `data/sprites/`.
+transpiling, no bundling.
+
+## Art pipeline
+
+Terrain is drawn procedurally from the palettes in `src/config.js:282-291`, and the only
+runtime image is `assets/sprites.png`, composed by `tools/gen-atlas.js` from
+`data/sprites.json` plus the vendored frames in `data/sprites/` — never hand-edit that file.
+One atlas means one loader (`loadAtlas` in `src/boot.js`) and one deterministic generator, so
+`data/` stays the single source of art. A new runtime image goes through the atlas and the
+generator as a deliberate change, never as a loose PNG. This rule does not follow from the
+no-build-step rule above (a PNG needs no build), so it is stated separately and stays.
 
 ## Where code goes
 

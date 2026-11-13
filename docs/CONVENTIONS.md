@@ -75,9 +75,9 @@ repo-level workflow rules (verification, deploy) see `../AGENTS.md`.
 ## Anti-rules
 
 - No frameworks, no bundlers, no build step, no runtime dependencies: the repo root must
-  stay servable as-is. (`tools/package.json` holds the tools' dev dependency only.) The only
-  image allowed is the generated `assets/sprites.png` (regenerate with `tools/gen-atlas.js`,
-  never hand-edit it).
+  stay servable as-is. (`tools/package.json` holds the tools' dev dependency only.)
+- The only image allowed is the generated `assets/sprites.png` (regenerate with
+  `tools/gen-atlas.js`, never hand-edit it).
 - No ES modules in `src/` — `import` would break opening `index.html` from disk and the
   shared-scope loader the tools rely on. Revisit that as one deliberate change, not piecemeal.
 - No module-level mutable state: everything that changes lives on `Game`.
