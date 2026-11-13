@@ -1,7 +1,7 @@
 'use strict';
-/* checks/13-render.js -- canvas draw calls: where the placement ghost is painted and
-   where unit sprites are blitted. Runs on its own (`node tools/checks/13-render.js`)
-   against a freshly booted game. */
+/* checks/13-render.js -- canvas draw calls: where the placement ghost is painted, where
+   unit sprites are blitted and which unit is skipped as garrisoned (the minimap too).
+   Runs on its own (`node tools/checks/13-render.js`) against a freshly booted game. */
 
 const {
   AoE2, bootFixture, check, freeSpotAround, report,
@@ -182,6 +182,39 @@ bootFixture(undefined, (doc, st) => {
     'render: a half-built site draws the building itself at the fade alpha, ghost rectangle gone',
     (bad.length ? bad.join(' | ') : 'house + blacksmith both at ' + want) +
     (ops.some((o) => o[2] === OLD_GHOST) ? ', ghost rect still painted' : ', no ghost rect'));
+});
+
+/* ---- 16e. render: a garrisoned unit is drawn nowhere (this plan, T2) -- */
+/* drawUnits skips him (src/render.js:161) — the plan's stated render change — but the
+   minimap loop at src/render.js:283 still painted his dot, so an invisible unit kept a
+   blue pixel on the map. One check, both halves: the field blits one fewer sprite and the
+   minimap loses exactly his dot (the camera is parked on him so his sprite is never
+   culled off-screen, and the dot is matched by its own tile, so the Town Center's rect
+   and the other villagers' dots still count). */
+bootFixture(undefined, (doc, st) => {
+  AoE2.setAtlas(st, { tag: 'probe-atlas' });        // the sheet to blit, no canvas backend needed
+  const tc = st.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  if (!tc || !v || !st.mm || !st.mm.ok) {
+    check(false, 'render: a booted page with a town center, a villager and a minimap exists',
+      'tc=' + !!tc + ' villager=' + !!v + ' mm=' + String(!!(st.mm && st.mm.ok)));
+    return;
+  }
+  const S = st.mm.w / st.world.w;
+  const blits = () => st.view.ctx.ops.filter((o) => o[0] === 'drawImage').length;   // o[1] is the arg list
+  const dots = () => st.mm.ctx.ops.filter((o) => o[0] === 'fillRect' &&
+    o[1][0] === v.x / TS * S - .5 && o[1][1] === v.y / TS * S - .5).length;
+  st.cam = { x: v.x, y: v.y };                       // him, not the view corner: never culled
+  st.view.ctx.clearOps(); st.mm.ctx.clearOps();
+  AoE2.renderFrame(st);
+  const on = { blits: blits(), dots: dots() };
+  v.garrisonedIn = tc.id;                            // inside the Town Center
+  st.view.ctx.clearOps(); st.mm.ctx.clearOps();
+  AoE2.renderFrame(st);
+  const inb = { blits: blits(), dots: dots() };
+  check(on.dots === 1 && on.blits > 0 && inb.dots === 0 && inb.blits === on.blits - 1,
+    'render: a garrisoned unit is drawn neither on the field nor on the minimap',
+    'on the field ' + JSON.stringify(on) + ' / inside ' + JSON.stringify(inb));
 });
 
 report();

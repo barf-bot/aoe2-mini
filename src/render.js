@@ -279,7 +279,7 @@ function drawMinimap(Game, mm) {
     c.fillStyle = TEAM[b.team].main;
     c.fillRect(b.tx * S, b.ty * S, Math.max(1, b.w * S), Math.max(1, b.h * S));
   }
-  for (const u of Game.units) {
+  for (const u of Game.units) { if (u.garrisonedIn) continue;   // inside a building: no dot either
     c.fillStyle = Game.selection.indexOf(u.id) >= 0 ? '#8ff0ff' : TEAM[u.team].light;
     c.fillRect(u.x / CFG.TILE * S - .5, u.y / CFG.TILE * S - .5, Math.max(1, S), Math.max(1, S));
   }
