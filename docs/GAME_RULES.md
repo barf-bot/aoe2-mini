@@ -322,7 +322,7 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   driving the simulation from a test touches no storage. `resetGame` sets `Game.autosaveAt =
   Game.time` (`src/boot.js:61`): a new settlement is written by the very next frame, which is
   what makes `N` (`storageSet` + `resetGame`, `src/input.js:230`) overwrite the slot instead of waiting out the debounce.
-- **The page surface** — the header's `Save` button (`index.html:19`) writes the slot through
+- **The page surface** — the header's `Save` button (`index.html:20`) writes the slot through
   `saveGame` (`src/boot.js:185`) and toasts `Saved`; `boot` (`src/boot.js:138`) calls
   `storageGet` / `loadGame` (`src/boot.js:143-144`) right after `createState` (`src/boot.js:38`),
   so reopening the page lands on the saved game; the three new-game paths — `N`
@@ -356,7 +356,7 @@ the table is the contract, the audio path and the checks are its two readers, th
   `AudioContext` (node, `tools/render-preview.js`, a browser that blocked audio) and a muted
   game each answer `false` before a node is built; the caller never has to care (the logic files
   stay DOM-free: the `typeof AudioContext` read is guarded inside the function).
-- **Mute is presentation, not state** — the header `Sound on/off` button (`index.html:20`)
+- **Mute is presentation, not state** — the header `Sound on/off` button (`index.html:21`)
   toggles through `setMuted` (`src/sound.js:28`), which stamps the button
   (`applyMuteButton`, `src/sound.js:22`) and writes `MUTE_PATH` = `aoe2mini:muted`
   (`src/config.js:274`) through the same `storageSet` the save slot uses; `isMuted`

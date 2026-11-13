@@ -20,7 +20,7 @@ simulation.
 
 | File | DOM | Contents |
 |---|---|---|
-| `index.html` | — | the markup (header, `#view` + `#minimap` canvases, `#hud` footer) and the script list |
+| `index.html` | — | the markup (the `<head>` with its inline SVG favicon, header, `#view` + `#minimap` canvases, `#hud` footer) and the script list |
 | `src/style.css` | — | all styles; the `max-width:720px` phone block is last so it wins the cascade |
 | `src/config.js` | no | `CFG`, `KINDS`, `SPRITE_SHEET`/`SPRITES`/`WORK_ANIM`/`spriteFor`, `BLD_SPRITES`/`bldSpriteFor`, `BLD`, `TECHS`, `AGES`, `SAVE_PATH`, `MUTE_PATH`, `LONG_PRESS_MS`/`LONG_PRESS_SLOP`, `T`, `PAL`, `TEAM`, `RES_OF_TILE`, `CARRY_COLOR`, `SFX` — every tunable number; `CFG`/`KINDS`/`BLD`/`TECHS` and the sprite tables are generated from `data/` |
 | `src/world.js` | no | seeded generation (`mulberry32`, `hash2`, `makeWorld`), site search (`findSite`), `berryCluster`, resource tiles (`tileRes`) |
