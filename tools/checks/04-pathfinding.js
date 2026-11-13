@@ -25,10 +25,23 @@ const pathState = (rows) => {
   return { world: { w, h, type, amount }, occupied, units: [], buildings: [], pathQueries: 0 };
 };
 const N8 = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
-/** The reference route: uniform-cost Dijkstra over the harness's own solidTile
- *  rule with the two rules findPath documents (the start tile may be solid, a
- *  diagonal needs both its orthogonal neighbours walkable). Step count, or null. */
-const refSteps = (st, from, to) => {
+/** What a step costs on this board: 1 along an axis, √2 across a corner — the
+ *  length of the move it prices. Written here, not imported from the game, so the
+ *  search cannot grade itself: the cost model is part of what §6c tests. */
+const stepCost = (dx, dy) => (dx && dy ? Math.SQRT2 : 1);
+/** The octile distance: what the cheapest 8-connected route between two tiles can
+ *  possibly cost when nothing is in the way. */
+const idealCost = (dx, dy) => Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+/** A route the game returned, scored with the same stepCost the search charges. */
+const routeCost = (p) => p.slice(1).reduce((c, t, i) =>
+  c + stepCost(Math.abs(t.tx - p[i].tx), Math.abs(t.ty - p[i].ty)), 0);
+/** The reference route: Dijkstra over the harness's own solidTile rule with the
+ *  two rules findPath documents (the start tile may be solid, a diagonal needs
+ *  both its orthogonal neighbours walkable), charging a diagonal √2 and a
+ *  straight step 1 — it used to charge every direction 1, which priced a diagonal
+ *  as free and let findPath's Chebyshev heuristic tie thousands of routes.
+ *  Optimal cost, or null. */
+const refCost = (st, from, to) => {
   const W = st.world.w, N = W * st.world.h;
   const openAt = (x, y) => (x === from.tx && y === from.ty) || solidTile(st, x, y) === null;
   const dist = new Array(N).fill(Infinity), done = new Array(N).fill(false);
@@ -45,10 +58,15 @@ const refSteps = (st, from, to) => {
       if (x < 0 || y < 0 || x >= W || y >= st.world.h) continue;
       if (d[0] && d[1] && !(openAt(cx, y) && openAt(x, cy))) continue;   // no corner-cutting
       if (!openAt(x, y)) continue;
-      if (best + 1 < dist[y * W + x]) dist[y * W + x] = best + 1;
+      const nd = best + stepCost(d[0], d[1]);
+      if (nd < dist[y * W + x]) dist[y * W + x] = nd;
     }
   }
 };
+/** Dijkstra's cost against the game's route cost: same rule, so the only slack is
+ *  the order the additions happen in — 1e-9 is that slack, anything else is a bug. */
+const costMatch = (a, b) => a !== null && Math.abs(a - b) < 1e-9;
+const costStr = (c) => (typeof c === 'number' && isFinite(c) ? c.toFixed(4) : String(c));
 /** What is wrong with a route, as a list: gaps, tiles that are not walkable
  *  (the route's own start tile excepted), diagonals cutting a corner, and
  *  anything off the board. Empty list means the route obeys the board rule. */
@@ -92,14 +110,14 @@ check(!!openRoute && openRoute.length === idealSteps + 1 &&
 const INLET = pathState(['.....W.....', '.....W.....', '.....W.....', '.....W.....', '.....W.....',
   '...........', '...........', '...........', '...........', '...........', '...........']);
 const inFrom = { tx: 0, ty: 4 }, inTo = { tx: 10, ty: 4 };
-const inIdeal = Math.max(10, 0);
-const inBest = refSteps(INLET, inFrom, inTo);
+const inIdeal = idealCost(10, 0);
+const inBest = refCost(INLET, inFrom, inTo);
 const inRoute = fp(INLET, inFrom, inTo);
 check(inBest !== null && inBest <= 1.15 * inIdeal && !!inRoute &&
-      (inRoute.length - 1) <= 1.15 * inBest && routeProblems(INLET, inRoute).length === 0,
+      routeCost(inRoute) <= 1.15 * inBest && routeProblems(INLET, inRoute).length === 0,
   'path: a route around a water inlet stays within 15% of optimal',
-  'straight line ' + inIdeal + ' steps, Dijkstra around the inlet ' + inBest +
-    ' steps, A* ' + (fpNote(inRoute) || (inRoute.length - 1) + ' steps'));
+  'straight line ' + costStr(inIdeal) + ', Dijkstra around the inlet ' + costStr(inBest) +
+    ', A* ' + (fpNote(inRoute) || `${costStr(routeCost(inRoute))} (${inRoute.length - 1} steps)`));
 
 // 3. the only shortcut here is the illegal one: (1,2)->(2,1) has water at
 // (1,1) and a building at (2,2) as its two orthogonal neighbours, so a
@@ -133,12 +151,12 @@ const foundRoute = fp(FOUNDATION, foundFrom, foundTo);
 check(!!foundRoute && foundRoute[0].tx === 0 && foundRoute[0].ty === 0 &&
       foundRoute[foundRoute.length - 1].tx === foundTo.tx &&
       foundRoute[foundRoute.length - 1].ty === foundTo.ty &&
-      refSteps(FOUNDATION, foundFrom, foundTo) === foundRoute.length - 1 &&
+      costMatch(refCost(FOUNDATION, foundFrom, foundTo), routeCost(foundRoute)) &&
       routeProblems(FOUNDATION, foundRoute).length === 0,
   "path: a route starts on the unit's own tile even when that tile is solid",
   fpNote(foundRoute) || ('route ' + foundRoute.map((t) => t.tx + ',' + t.ty).join(' ') +
-    ' starts on the occupied tile and matches the Dijkstra length ' +
-    refSteps(FOUNDATION, foundFrom, foundTo) + '; ' +
+    ' starts on the occupied tile at the Dijkstra cost ' +
+    costStr(refCost(FOUNDATION, foundFrom, foundTo)) + '; ' +
     (routeProblems(FOUNDATION, foundRoute).join(' ') || 'all later tiles walkable')));
 
 /* -- T2: the move order carries a route (moveUnit, mapEpoch) ------------ */
@@ -499,8 +517,8 @@ check(!!sq4w && sq4w.length === 4 &&
     `(71,60 and 70,61 are water, so the 2x2 there cannot hold 4)`);
 
 /* ---- 6d. barricade routing (this plan, T3) -------------------------- */
-// Routing around, through and after a wooden segment. Every expected length
-// comes from refSteps, the harness's own Dijkstra -- the §6c rule that findPath
+// Routing around, through and after a wooden segment. Every expected route cost
+// comes from refCost, the harness's own Dijkstra -- the §6c rule that findPath
 // may not grade itself; fp is only asked for the route *tiles*, exactly as §6c's
 // own repath fixture asks routeOf -- on the §6c fixtures rebuilt with barricades.
 
@@ -514,7 +532,7 @@ const barRoute = (() => {
   const { st, v, V, goal, at } = f;
   orderTo(f);
   const preRoute = fp(st, { tx: V.x, ty: V.y }, goal);  // the route on the clean board
-  const refPre = refSteps(st, { tx: V.x, ty: V.y }, goal);   // the clean board's optimum
+  const refPre = refCost(st, { tx: V.x, ty: V.y }, goal);   // the clean board's optimum
   if (preRoute === null || preRoute.length < 3) return null;
   const pad = preRoute[1];                              // a route tile, never own tile or goal
   const b = AoE2.makeBuilding(st, 'barricade', 0, pad.tx, pad.ty);
@@ -522,16 +540,16 @@ const barRoute = (() => {
   const centre = tileCentre(st, pad.tx, pad.ty);
   const walkAt = AoE2.walkable(st, centre.x, centre.y);
   const blocksLen = (st.blocks.get(b.id) || []).length;
-  const refWith = refSteps(st, { tx: V.x, ty: V.y }, goal);  // the same search, segment up
+  const refWith = refCost(st, { tx: V.x, ty: V.y }, goal);  // the same search, segment up
   AoE2.stepGame(st, DT);                                // the very next step
-  const during = routeOf(v);
+  const duringPath = v.path, during = routeOf(v);
   const proDuring = v.path === null ? ['no cached route'] : routeProblems(st, v.path);
   const dOk = AoE2.demolish(st, b);
   AoE2.stepGame(st, DT);                                // the first step on the cleared board
-  const refGone = refSteps(st, { tx: tOf(v.x), ty: tOf(v.y) }, goal);
-  const after = routeOf(v);
+  const refGone = refCost(st, { tx: tOf(v.x), ty: tOf(v.y) }, goal);
+  const afterPath = v.path, after = routeOf(v);
   const w = walkOrder(st, v, 400);
-  return { f, V, goal, at, preRoute, refPre, pad, b, walkAt, blocksLen, refWith, during, proDuring, dOk, refGone, after, w };
+  return { f, V, goal, at, preRoute, refPre, pad, b, walkAt, blocksLen, refWith, duringPath, during, proDuring, dOk, refGone, afterPath, after, w };
 })();
 const barTiles = (p) => p.map((t) => t.tx + ',' + t.ty).join(' ');
 check(!!barRoute && barRoute.walkAt === false && barRoute.blocksLen === 1,
@@ -540,21 +558,21 @@ check(!!barRoute && barRoute.walkAt === false && barRoute.blocksLen === 1,
     : `barricade at ${barRoute.pad.tx},${barRoute.pad.ty}: walkable=${barRoute.walkAt} ` +
       `blocks=${barRoute.blocksLen} tile(s)`);
 check(!!barRoute && barRoute.refPre !== null &&
-      barRoute.preRoute.length === barRoute.refPre + 1 &&
+      costMatch(routeCost(barRoute.preRoute), barRoute.refPre) &&
       barRoute.during.join(' ') !== barTiles(barRoute.preRoute) &&
-      barRoute.during.length === barRoute.refWith + 1 && barRoute.proDuring.length === 0,
+      costMatch(routeCost(barRoute.duringPath), barRoute.refWith) && barRoute.proDuring.length === 0,
   'path: a barricade dropped on a cached route reroutes the walker on the next step',
   !barRoute ? 'no flatWithOrder(4) fixture'
     : `before ${barTiles(barRoute.preRoute)} -> during ${barRoute.during.join(' ')} ` +
-      `(before ${barRoute.refPre} + 1, with the segment ${barRoute.refWith} + 1)` +
+      `(before ${costStr(barRoute.refPre)}, with the segment ${costStr(barRoute.refWith)})` +
       (barRoute.proDuring.length ? '; ' + barRoute.proDuring.join('; ') : ''));
 check(!!barRoute && barRoute.dOk === true &&
       barRoute.after.join(' ') === barTiles(barRoute.preRoute) &&
-      barRoute.refGone !== null && barRoute.after.length === barRoute.refGone + 1,
+      costMatch(routeCost(barRoute.afterPath), barRoute.refGone),
   'path: demolishing that segment restores a route of the pre-build length',
   !barRoute ? 'no flatWithOrder(4) fixture'
     : `demolish ${barRoute.dOk}; route ${barRoute.after.join(' ')} vs pre-build ` +
-      `${barTiles(barRoute.preRoute)} (refSteps ${String(barRoute.refGone)} + 1), walk finished in ${barRoute.w.n} steps`);
+      `${barTiles(barRoute.preRoute)} (route cost ${costStr(barRoute.refGone)}), walk finished in ${barRoute.w.n} steps`);
 
 // 20. §6c's check-10 unreachable-order fixture rebuilt with wood: the same
 // flatState villager, his eight neighbour tiles ringed with 1x1 barricades
@@ -614,16 +632,85 @@ const barPocket = (() => {
   const pop = ring.find((b) => b.tx === Vp.x + d[0] && b.ty === Vp.y + d[1]);
   const pOk = pop && AoE2.demolish(st, pop);
   const r2 = fp(st, { tx: Vp.x, ty: Vp.y }, goalP);
-  const ref = refSteps(st, { tx: Vp.x, ty: Vp.y }, goalP);
+  const ref = refCost(st, { tx: Vp.x, ty: Vp.y }, goalP);
   return { Vp, v, atP, d, ring, r1, w1, pOk, r2, ref };
 })();
 check(!!barPocket && barPocket.r1 === null && barPocket.v.order.kind === 'idle' &&
       barPocket.pOk === true && barPocket.r2 !== null && barPocket.ref !== null &&
-      barPocket.r2.length === barPocket.ref + 1,
+      costMatch(routeCost(barPocket.r2), barPocket.ref),
   'path: a villager ringed by eight barricades has no route, and demolishing one ring segment gives him one back',
   !barPocket ? 'no grass tile with eight free neighbours'
     : `ringed: route ${String(barPocket.r1)}, order ${barPocket.v.order.kind} after ${barPocket.w1.n} steps; ` +
       `popped ${barPocket.Vp.x + barPocket.d[0]},${barPocket.Vp.y + barPocket.d[1]}: ` +
-      `route ${String(barPocket.r2 && barPocket.r2.length)}, refSteps ${String(barPocket.ref)} + 1`);
+      `route ${String(barPocket.r2 && barPocket.r2.length)} costs ${costStr(barPocket.ref)} (Dijkstra)`);
+
+/* ---- 6e. the walked line (TODO P1-5: units walk in zigzags) -------- *
+ * What a route COSTS decides the line a unit walks. The bug: findPath charged 1
+ * for a diagonal step and 1 for a straight one under a Chebyshev heuristic, so
+ * thousands of 10-step routes tied and the one returned wandered — measured on
+ * flatState, 290 px of walking for the 220 px order east (44 px of sideways
+ * swing) and 309 px for the same order south (66 px of swing). The fix is the
+ * octile cost model (√2 per diagonal, 1 per straight step); these four checks
+ * grade the polyline the walk actually draws, one per axis direction, so a
+ * regression names the direction it came back in.
+ *
+ * `scene('villager', 0, 60, 60)` rather than the flatWithOrder villager: his own
+ * row is crowded with three villagers and a militia, and the separation pushes he
+ * trades with them crawl him along at a tenth of a pixel a step — that is the
+ * subject of the unit-collision items, and folding it in here would make a route
+ * check fail for the wrong reason. One unit on a flat board grades the route and
+ * nothing else, and the 1200-step budget is more than the ~365 the walk needs. */
+/** The walk `dist` tiles from tile (60, 60) in `dir`: the polyline length he
+ *  walked, the straight-line length his order asked for, and the widest sideways
+ *  departure from that line. Null when there is nowhere to stand or the order
+ *  never completed. */
+const perpOff = (p, a, b) =>                                       // distance p→line(a,b)
+  Math.abs((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / distTo(a, b);
+const walkLine = (dir, dist) => {
+  const gtx = 60 + dir[0] * dist, gty = 60 + dir[1] * dist;
+  const f = scene('villager', 0, 60, 60);
+  if (!AoE2.siteFree(f.st, gtx, gty, 1, 1)) return null;
+  const at = tileCentre(f.st, gtx, gty);
+  f.u.order = { kind: 'move', x: at.x, y: at.y };
+  const w = walkOrder(f.st, f.u, 1200);
+  if (f.u.order.kind !== 'idle') return null;                      // walked out the step budget
+  let len = 0, prev = w.from;
+  for (const p of w.seen) { len += distTo(prev, p); prev = p; }
+  return { f, w, straight: distTo(w.from, at), len,
+           swing: w.seen.reduce((m, p) => Math.max(m, perpOff(p, w.from, at)), 0) };
+};
+[['east', [1, 0]], ['west', [-1, 0]], ['south', [0, 1]], ['north', [0, -1]]].forEach(([name, dir]) => {
+  const r = walkLine(dir, 10);
+  check(!!r && Math.abs(r.len - r.straight) <= 0.05 * r.straight,
+    `path: a straight 10-tile move ${name} walks the straight line`,
+    !r ? 'no free tile 10 steps that way from (60,60), or the order never completed'
+      : `${r.w.n} steps, ${r.len.toFixed(1)}px walked for a ${r.straight.toFixed(1)}px order ` +
+        `(${(100 * (r.len / r.straight - 1)).toFixed(1)}% over), swung ${r.swing.toFixed(1)}px off the line`);
+});
+
+/** The second half of the item: the staircase. The off-axis order (60,60) ->
+ *  (70,63) has a route of 7 straight steps and 3 diagonals, so walking
+ *  its tile centres costs 7·22 + 3·22√2 px for a √(10²+3²)·22 px order — 7.7 %
+ *  of pure staircase. moveUnit now aims at the furthest waypoint a clear
+ *  straight line reaches (routeAhead), which walks the line itself; the cached
+ *  route keeps all 11 tiles, because the fix moves the index, never the route
+ *  (checks 6 and 19 read u.path and would notice a rewritten one). */
+const diagF = (() => {
+  const f = scene('villager', 0, 60, 60);
+  const at = tileCentre(f.st, 70, 63);
+  f.u.order = { kind: 'move', x: at.x, y: at.y };
+  const w = walkOrder(f.st, f.u, 1200);
+  if (f.u.order.kind !== 'idle') return null;
+  let len = 0, prev = w.from;
+  for (const p of w.seen) { len += distTo(prev, p); prev = p; }
+  const T = AoE2.CFG.TILE;
+  return { w, straight: distTo(w.from, at), len, tiles: (f.u.path || []).length, stairs: 7 * T + 3 * T * Math.SQRT2 };
+})();
+check(!!diagF && diagF.tiles === 11 && Math.abs(diagF.len - diagF.straight) <= 0.02 * diagF.straight,
+  'path: an off-axis move walks the line, not the route staircase',
+  !diagF ? 'the move order never completed'
+    : `${diagF.w.n} steps, ${diagF.len.toFixed(1)}px walked for a ${diagF.straight.toFixed(1)}px order ` +
+      `(${(100 * (diagF.len / diagF.straight - 1)).toFixed(1)}% over); route kept ${diagF.tiles} tiles, ` +
+      `whose staircases cost ${diagF.stairs.toFixed(1)}px and whose line costs ${diagF.straight.toFixed(1)}px`);
 
 report();

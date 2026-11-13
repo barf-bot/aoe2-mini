@@ -5,6 +5,30 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P1-5: units walk in zigzags
+
+- `findPath` (`src/movement.js:63`) priced a diagonal step and a straight one both at 1
+  under a Chebyshev heuristic, so every route of the same step count tied and the one
+  returned wandered: on a flat map a 10-tile move east measured 289.5 px of walking for
+  its 220 px order (43.6 px of sideways swing) and the same order south 309.1 px
+  (65.6 px of swing). Steps now cost the ground they walk — `stepCost`
+  (`src/movement.js:19`), 1 straight / √2 diagonal, with the matching
+  `max(dx,dy) + (√2−1)·min(dx,dy)` octile heuristic — which leaves the straight line as
+  the only optimum: the same four axis moves now walk 219.5 px each, 0.0 px of swing.
+- `moveUnit` (`src/movement.js:212`) no longer walks the route's staircase. `routeAhead`
+  (`src/movement.js:171`) picks the furthest waypoint a `lineClear`
+  (`src/movement.js:137`) straight line reaches from where the unit stands — the route's
+  next tile is always the floor, so a large `stop` (a work spot's `CFG.TILE`, a
+  building's `reachOf`) cannot stall a leg short of its tile — and `u.path` stays exactly
+  what A* returned, only the index moves. The off-axis order (60,60)→(70,63) walked
+  245.7 px for a 229.7 px order before, 229.2 px now.
+- `tools/checks/04-pathfinding.js`: the reference Dijkstra `refSteps` scored routes by
+  step count, which is what the uniform-cost rule made meaningless, so it becomes
+  `refCost` — the same √2 rule, written in the harness — and `routeCost` scores the route
+  the game returned; the four checks that compared a route's tile count to the reference
+  now compare its cost, and the new section 6e pins the walked line itself
+  (23 → 28 checks, 297 → 302 in the suite).
+
 ### Fixed — `docs/TODO.md` P0-4: villagers cannot be sent to a construction site
 
 - `orderForUnit` in `src/commands.js` had no case for an own building with `built < 1`, so

@@ -25,23 +25,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P1 — wrong behaviour you notice within a minute
 
-### 5. Units walk in zigzags
-
-**Verified.** On an empty flat map a 10-tile move east walks 290 px instead of 220 and
-swings 44 px sideways; 10 tiles south walks 309 px and swings 66 px. A pure diagonal is
-straight.
-
-- **Cause:** `findPath` in `src/movement.js` charges 1 for a diagonal step and 1 for a
-  straight one, with a Chebyshev heuristic. Thousands of routes tie, and the one returned
-  wanders.
-- **Fix:** cost √2 for diagonals and the octile heuristic
-  (`max(dx,dy) + (√2 − 1) · min(dx,dy)`). Then smooth: in `moveUnit`, skip ahead to the
-  furthest waypoint that has a clear straight line of walkable tiles from the unit.
-- **Done when:** on `flatState()` the walked length of a straight 10-tile move is within
-  5 % of the straight-line distance, in all four axis directions. The existing reference
-  Dijkstra in `tools/checks/04-pathfinding.js` uses uniform cost and must be updated with
-  it.
-
 ### 6. Every unit uses the same corner of a building
 
 **Verified.** `workPos` returns one fixed tile — the first free tile around the footprint,

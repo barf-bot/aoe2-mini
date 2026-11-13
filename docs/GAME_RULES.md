@@ -39,28 +39,32 @@ a bug.
 
 ## Movement
 
-- Everything solid blocks (`walkable`, `src/movement.js:248`): water, resource tiles with
+- Everything solid blocks (`walkable`, `src/movement.js:314`): water, resource tiles with
   stock (`amount > 0`) and building tiles — foundations included, via `Game.occupied`
   (`rebuildBlocks`, `src/entities.js:102`). Units work from the neighbour tile instead of
   standing on the thing: `workSpot` (`src/entities.js:42`) offers only free walkable
   neighbours, `workPos` (`src/entities.js:150`) is the standing spot beside a building, and a
   unit caught under a new footprint is moved there (`makeBuilding`, `src/entities.js:76`).
 - Orders route over the tile grid instead of sliding at the target (`findPath`,
-  `src/movement.js:54`): A\*, 8-connected, uniform cost per tile, and a diagonal never cuts
+  `src/movement.js:63`): A\*, 8-connected, every step priced by the octile rule
+  (`stepCost`, `src/movement.js:19` — 1 for a straight step, √2 for a diagonal) with the
+  matching octile heuristic, and a diagonal never cuts
   between two solid tiles — so a unit walks *around* a water inlet, a forest or a house
   instead of nose-pressing the shoreline. The route is cached on the unit (`u.path`,
   `u.pathFor`, `u.pathAt`) and dropped when the order's goal tile changes or the walkable
   set changes under it (`Game.mapEpoch`: a building went up, a tile ran dry); that is the
-  re-path rule. `moveUnit` (`src/movement.js:144`) then walks the cached waypoints at
-  `u.speed` px/s (`stepToward`, `src/movement.js:103`), the exact ordered point being the
+  re-path rule. `moveUnit` (`src/movement.js:212`) then walks the route's *lines* and not
+  its staircase — `routeAhead` (`src/movement.js:171`) takes the furthest waypoint a
+  `lineClear` (`src/movement.js:137`) straight line reaches — at `u.speed` px/s
+  (`stepToward`, `src/movement.js:116`), the exact ordered point being the
   route's last waypoint — so arrival is the point itself, not a radius around it.
-- A solid target is never walked into (`standTarget`, `src/movement.js:193`): harvest, build,
+- A solid target is never walked into (`standTarget`, `src/movement.js:259`): harvest, build,
   deposit and attack orders first ask it for a tile to stand on — the ordered point itself
   when it is walkable or already within the order's arrival radius, else the spot the game
   assigns for what was ordered to (`workPos` for a building, `workSpot` for a tile) — and
   route to that, so a builder works from the edge of the footprint instead of stalling on
   it. A target with no reachable spot leaves the order unroutable instead of queued.
-- A group move gets ranks instead of a scatter (`formationSlots`, `src/movement.js:214`): a
+- A group move gets ranks instead of a scatter (`formationSlots`, `src/movement.js:280`): a
   centred `cols = ceil(sqrt(n))` grid, one tile per unit (the `max(CFG.UNIT_SEP, CFG.TILE)`
   pitch expressed on the tile grid), solid or already-held cells skipped and the grid
   grown until every unit has a distinct walkable tile, the nearest free slot paired to the
@@ -68,7 +72,7 @@ a bug.
   `u.slot`, and a retiring move order releases it — so a finished formation holds no tiles
   and a slot taken by another order forces a re-ask instead of a stack. `attack` and
   `harvest` orders keep their targets: no slots for a fight.
-- Units push apart to `CFG.UNIT_SEP` (11 px) every tick (`separate`, `src/movement.js:268`) —
+- Units push apart to `CFG.UNIT_SEP` (11 px) every tick (`separate`, `src/movement.js:334`) —
   and because the slot pitch is that same number on the tile grid, a parked group needs
   zero pushes: the two mechanisms agree by construction.
 

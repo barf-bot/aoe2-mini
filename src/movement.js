@@ -11,6 +11,13 @@ function tileOf(px, py) { return { tx: Math.floor(px / CFG.TILE), ty: Math.floor
  *  corner between two walls — the AoE2 movement rule. */
 const DIRS8 = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
 
+/** What one step costs: 1 along an axis, √2 across a corner — the length of the
+ *  move it prices. Charging every direction 1 (the old rule) made a diagonal free,
+ *  so every route with the same step count tied and the one returned was the
+ *  wandering one; the tools/checks/04-pathfinding.js reference Dijkstra costs
+ *  steps the same way, so a route is graded in the currency the search spends. */
+function stepCost(dx, dy) { return dx && dy ? Math.SQRT2 : 1; }
+
 /** The binary min-heap findPath's open set needs (entries are [fScore, tile]);
  *  ~20 lines of percolate, because scanning an array open set per pop is O(n)
  *  on a board with 9216 tiles and the frame loop cannot afford it. */
@@ -42,11 +49,13 @@ function heapPop(hp) {
 }
 
 /** A* over the tile grid — the roadmap P0.2 route finder. `from`/`to` are tiles
- *  as tileOf() returns them. 8-connected with uniform cost (any open tile costs
- *  1, whatever the direction) and the admissible Chebyshev heuristic, so a route
- *  comes out within a hair of optimal. The start tile is accepted even when it
- *  is solid (a unit may stand on a farm tile or a fresh foundation) while every
- *  later tile must satisfy walkable(). Returns the route start→goal inclusive,
+ *  as tileOf() returns them. 8-connected, costing every step what it walks
+ *  (stepCost: 1 straight, √2 diagonal) with the matching octile heuristic, so the
+ *  route comes out optimal and — on open ground — straight: with uniform cost any
+ *  diagonal-free route tied with the direct one and the search returned a wanderer.
+ *  The start tile is accepted even when it is solid (a unit may stand on a farm
+ *  tile or a fresh foundation) while every later tile must satisfy walkable().
+ *  Returns the route start→goal inclusive,
  *  or null when the goal is unreachable or the search burns
  *  CFG.ASTAR_MAX_NODES expansions — a hopeless query must not stall the frame
  *  loop. Every call counts itself in Game.pathQueries, so a caller that routes
@@ -59,7 +68,10 @@ function findPath(Game, from, to) {
   if (fx < 0 || fy < 0 || fx >= w || fy >= h || gx < 0 || gy < 0 || gx >= w || gy >= h) return null;
   const centre = (t) => t * CFG.TILE + CFG.TILE / 2;
   const openAt = (tx, ty) => (tx === fx && ty === fy) || walkable(Game, centre(tx), centre(ty));
-  const hCost = (tx, ty) => Math.max(Math.abs(tx - gx), Math.abs(ty - gy));
+  const hCost = (tx, ty) => {                                 // octile admissible for stepCost
+    const dx = Math.abs(tx - gx), dy = Math.abs(ty - gy);
+    return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+  };
   const idx = (tx, ty) => ty * w + tx;
   const goal = idx(gx, gy), start = idx(fx, fy);
   const gScore = new Map([[start, 0]]);
@@ -84,10 +96,11 @@ function findPath(Game, from, to) {
       if (dx && dy && !(openAt(cx, ny) && openAt(nx, cy))) continue;   // no corner-cutting
       const ni = idx(nx, ny);
       if (closed.has(ni) || !openAt(nx, ny)) continue;
-      if (cg + 1 < (gScore.has(ni) ? gScore.get(ni) : Infinity)) {
-        gScore.set(ni, cg + 1);
+      const ng = cg + stepCost(dx, dy);
+      if (ng < (gScore.has(ni) ? gScore.get(ni) : Infinity)) {
+        gScore.set(ni, ng);
         cameFrom.set(ni, cur);
-        heapPush(open, [cg + 1 + hCost(nx, ny), ni]);
+        heapPush(open, [ng + hCost(nx, ny), ni]);
       }
     }
   }
@@ -114,11 +127,66 @@ function stepToward(Game, u, ax, ay, s, dt) {
   return false;
 }
 
+/** True when the straight walk from (ax,ay) to (bx,by) never steps on a tile
+ *  findPath would refuse. The segment is probed every half tile — the granularity
+ *  stepToward moves in — and every probed tile must be walkable, with the one
+ *  exception findPath carries too: the tile the walk starts on, because a unit may
+ *  stand on a farm cell or a fresh foundation and still has to leave it. This is
+ *  what keeps routeAhead honest: a waypoint on the far side of a wall is not a
+ *  straight walk just because A* routed to it. */
+function lineClear(Game, ax, ay, bx, by) {
+  const own = tileOf(ax, ay);
+  const probes = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / (CFG.TILE / 2)));
+  for (let k = 0; k <= probes; k++) {
+    const t = k / probes, px = ax + (bx - ax) * t, py = ay + (by - ay) * t;
+    const tile = tileOf(px, py);
+    if (tile.tx === own.tx && tile.ty === own.ty) continue;     // his own tile, exempt as T1's is
+    if (!walkable(Game, px, py)) return false;
+  }
+  return true;
+}
+
+/** The point that counts as standing on route waypoint `i`: the exact ordered
+ *  point (x,y) for the route's last tile — that tile IS the tile holding it — and
+ *  the tile centre for every other one. moveUnit aims at this and routeAhead tests
+ *  the line to it, so the two can never disagree about where a leg ends. */
+function aimPoint(u, i, x, y) {
+  return i >= u.path.length - 1 ? { x, y }
+    : { x: u.path[i].tx * CFG.TILE + CFG.TILE / 2, y: u.path[i].ty * CFG.TILE + CFG.TILE / 2 };
+}
+
+/** The smoothing half of TODO P1-5: which waypoint `u` is walking to next. A*
+ *  answers with a tile per step, so an off-axis order (7 straight steps and 3
+ *  diagonals to (70,63)) was walked as a staircase costing 7 % more ground than
+ *  the order itself. The answer is the FURTHEST waypoint a clear straight line
+ *  from where he stands reaches — probed from the end backwards, so open ground
+ *  costs one probe and a wall costs only the blocked steps it walks back over —
+ *  under one floor: the route's next tile, always, once the leg to the current aim
+ *  is walked (the same `d <= s` test stepToward uses). Without the floor a big
+ *  `stop` — a work spot's CFG.TILE, a building's reachOf — reports arrival at a
+ *  waypoint he is still short of, the line to the next tile clips a corner he has
+ *  not reached, and the order stalls a tile shy of its own goal. The route is
+ *  never rewritten: `u.path` stays what findPath returned (the checks read it),
+ *  only the index jumps ahead. */
+function routeAhead(Game, u, x, y, s) {
+  const last = u.path.length - 1;
+  const cur = aimPoint(u, u.pathAt, x, y);
+  const floor = u.pathAt < last && Math.hypot(cur.x - u.x, cur.y - u.y) <= s
+    ? u.pathAt + 1 : u.pathAt;                        // the leg is walked, so the next tile is the floor
+  for (let i = last; i > floor; i--) {
+    const p = aimPoint(u, i, x, y);
+    if (lineClear(Game, u.x, u.y, p.x, p.y)) return i;
+  }
+  return floor;
+}
+
 /** Move `u` toward (x,y) ALONG his A* route (findPath) instead of in a straight
  *  line: the route's own tiles are the walkability answer, so a unit walks
  *  *around* the inlet, the forest and the house instead of nose-pressing them,
  *  and the waypoint list (the route's tile centres, then the exact ordered
- *  point) is what T4's formation slots will be judged by.
+ *  point) is what T4's formation slots will be judged by. Which waypoint he
+ *  actually walks to is routeAhead's call — the furthest one a clear straight line
+ *  reaches, so the route is walked as lines and not as a staircase.
  *
  *  One rule says when the cached route is thrown away, and it is the design's
  *  re-path rule: the order's goal tile changed (`u.pathFor`), the walkable set
@@ -168,13 +236,11 @@ function moveUnit(Game, u, x, y, dt, stop) {
     u.pathAt = u.path && u.path.length > 1 ? 1 : 0;                // path[0] is the tile he stands on
   }
   if (u.path === null) return false;                // routed and found nothing: nothing to walk
+  u.pathAt = routeAhead(Game, u, x, y, s);           // the leg's end, then the furthest clear waypoint
   const endLeg = u.pathAt >= u.path.length - 1;     // the last tile IS the ordered tile
-  const ax = endLeg ? x : u.path[u.pathAt].tx * CFG.TILE + CFG.TILE / 2;
-  const ay = endLeg ? y : u.path[u.pathAt].ty * CFG.TILE + CFG.TILE / 2;
-  const done = stepToward(Game, u, ax, ay, s, dt);
-  if (endLeg || !done) return done;
-  u.pathAt++;                                       // that leg is walked: aim at the next tile
-  return false;
+  const aim = aimPoint(u, u.pathAt, x, y);
+  const done = stepToward(Game, u, aim.x, aim.y, s, dt);
+  return endLeg ? done : false;                     // only the last leg can report an arrival
 }
 
 /** The tile a route to (x, y) must end on, or `null` — and `null` REFUSES the order

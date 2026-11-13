@@ -98,23 +98,28 @@ the right stockpile — that field being unset was a real bug (deposits silently
 Every unit also carries its rendering state: `u.face` (`+1`/`-1`) and `u.anim`, the
 activity clock behind every animation (walk, work, swing). `unitAnim(u)`
 (`src/render.js:134`) maps it to the sprite cell to show; `moveUnit`
-(`src/movement.js:144`) is the only writer of `u.face`, so units never flip for no reason.
+(`src/movement.js:212`) is the only writer of `u.face`, so units never flip for no reason.
 
-### Pathfinding (`findPath`, `src/movement.js:54`)
+### Pathfinding (`findPath`, `src/movement.js:63`)
 
-A\* over the tiles `walkable` answers for: uniform cost, 8-connected, and a diagonal never
+A\* over the tiles `walkable` answers for: 8-connected, every step costing the ground it
+walks (`stepCost`, `src/movement.js:19` — 1 straight, √2 diagonal) under the matching
+octile heuristic, and a diagonal never
 cuts between two solid tiles — so routes bend around water, forest and footprints instead
-of sliding into them. `moveUnit` (`src/movement.js:144`) walks the route's tile centres plus
-the exact ordered point at `u.speed` px/s (`stepToward`, `src/movement.js:103`) and keeps the
-answer on the unit (`u.path` / `u.pathFor` / `u.pathAt`): a route is valid for one goal
+of sliding into them. `moveUnit` (`src/movement.js:212`) picks the waypoint to walk to
+with `routeAhead` (`src/movement.js:171`) — the furthest one a `lineClear`
+(`src/movement.js:137`) straight line reaches, so a route is walked as lines and not as
+its staircase — and steps at `u.speed` px/s (`stepToward`, `src/movement.js:116`), the
+exact ordered point being the route's last waypoint. The
+answer is cached on the unit (`u.path` / `u.pathFor` / `u.pathAt`): a route is valid for one goal
 tile and one version of the world, so a changed goal or a bumped `Game.mapEpoch` (a
 building went up, a tile ran dry) drops it and the next step re-paths.
 `CFG.ASTAR_MAX_NODES` caps a single query, and an unreachable goal costs one capped query
-answer instead of one per tile. `standTarget` (`src/movement.js:193`) turns a solid order target into
+answer instead of one per tile. `standTarget` (`src/movement.js:259`) turns a solid order target into
 a standable tile — the ordered point itself when it is walkable or already within the
 order's arrival radius, else `workPos` for a building / `workSpot` for a tile — so every
 order kind runs one pipeline, order → standTarget → findPath → step, and
-`formationSlots` (`src/movement.js:214`) hands a group's move orders one distinct tile each,
+`formationSlots` (`src/movement.js:280`) hands a group's move orders one distinct tile each,
 the ranks that replaced the golden-angle `spread`.
 
 ### Combat
