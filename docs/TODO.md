@@ -21,23 +21,6 @@ Functions are named instead of line numbers so this file does not go stale as co
 
 ## P0 — the game cannot be played with the mouse
 
-### 3. A building placed on an invalid spot silently appears somewhere else
-
-**Verified.** 50 of 176 placements (11 kinds × 8 offsets × 1 or 4 villagers) ended on a
-different tile than the one clicked, with the toast still saying "started". Two triggers:
-the footprint is not free, or the click is more than 7 tiles from the builder.
-
-- **Cause:** `build` in `src/commands.js` falls back to `findSite(...)` next to the
-  villager when `siteFree(...) && near(..., 7)` is false.
-- **Fix:** refuse instead: toast "Can't build there", spend nothing, keep `Game.placing`
-  armed. Drop the 7-tile limit — the builder can walk. Keep the `findSite` fallback only
-  for the no-click call (`atX === undefined`).
-- **Also:** `drawGhost` only checks `siteFree`, so make the ghost colour use the same rule
-  `build` uses.
-- **Done when:** a click on water / on another building / 20 tiles away leaves resources
-  and `Game.buildings.length` unchanged, or (for the far click) builds exactly at the
-  clicked tile.
-
 ### 4. Villagers cannot be sent to a construction site
 
 **Verified.** Right-clicking an own foundation gives the villager a plain `move` order;

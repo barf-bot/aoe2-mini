@@ -243,7 +243,7 @@ function drawGhost(Game, view) {
   const def = BLD[Game.placing];
   const TS = CFG.TILE, cam = Game.cam;                 // view space, like drawBuildings
   const tx = Math.floor(Game.cursor.x / TS), ty = Math.floor(Game.cursor.y / TS);
-  const ok = siteFree(Game, tx, ty, def.w, def.h);
+  const ok = canPlaceAt(Game, Game.placing, tx, ty);  // the one rule build applies (TODO P0-3)
   const x = tx * TS - cam.x, y = ty * TS - cam.y;
   c.globalAlpha = .6;
   c.fillStyle = ok ? 'rgba(111,191,115,.6)' : 'rgba(209,88,79,.6)';

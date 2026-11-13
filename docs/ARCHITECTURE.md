@@ -28,7 +28,7 @@ simulation.
 | `src/sim.js` | no | `stepSim`/`updateUnit` (the order state machine), combat math (`unitAttack`/`unitArmor`/`hitUnit`/`hitBuilding`/`autoAcquire`), projectiles (`spawnArrow`/`updateProjectiles`/`stepBuildingAttacks`) |
 | `src/movement.js` | no | `tileOf`, A\* (`findPath`), `stepToward`/`moveUnit`/`standTarget`, `formationSlots`, `walkable`, `reachOf`, `separate` |
 | `src/economy.js` | no | gathering (`workersOnTile`, `findDropoff`, `deposit`, `depleteTile`, `nextSource`, `resumeGather`), `popCap`/`popUsed`, `selectedUnits`, `canAfford`/`spend`/`refund` |
-| `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, plus `toast` |
+| `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`, `canPlaceAt`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, plus `toast` |
 | `src/ai.js` | no | `aiStep` — the enemy village, acting through the same commands |
 | `src/save.js` | guarded | `storageGet`/`storageSet` (the one door to `localStorage`, node-safe), `encodeState`/`decodeState`, `markDirty`, `saveGame`/`loadGame`, `migrate`/`validState` |
 | `src/sound.js` | guarded | `playSfx` (WebAudio synth of the `SFX` rows), `isMuted`/`setMuted`/`applyMuteButton` |
@@ -239,7 +239,7 @@ generators read the tables without a DOM.
   boots the game and exports the booted `Game`,
   the `AoE2` surface, `check`/`report` and the fixtures more than one file needs. So every
   file gets a fresh game, the files are **independent** — order does not matter and
-  `node tools/checks/07-combat.js` runs one alone — and together they assert 286
+  `node tools/checks/07-combat.js` runs one alone — and together they assert 294
   invariants. It never opens a browser. Node has no `Image`, so the harness defines one
   (§2b) whose `src` setter
   decodes the real sheet — caveat measured on `@napi-rs/canvas` 1.1.0: an `Image` built

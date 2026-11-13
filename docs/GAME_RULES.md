@@ -131,13 +131,13 @@ a bug.
   `Barricade requires Feudal Age`), and their buttons — hotkeys `k`, `e`, `c`, `w` —
   only appear once the player reaches Feudal Age.
 - The Barricade adds no placement or combat code of its own: `build` (`src/commands.js:100`)
-  drafts a builder through the same rules, `siteFree` (`src/commands.js:165`) and `near`
-  (`src/commands.js:160`) pick its pad via `findSite` (`src/world.js:144`), cancelling refunds
+  drafts a builder (`pickBuilder`, `src/commands.js:80`) through the same `canPlaceAt`
+  (`src/commands.js:137`) rule, cancelling refunds
   `floor(3 × CFG.CANCEL_REFUND)` = **2** wood and demolishing costs nothing — and a
   built or half-built segment registers its one tile in `Game.occupied` like any other
   footprint, so routes reroute around it and a raze reopens the gap
   (`docs/plans/2026-11-12-wooden-barricade.md`).
-- Market trade (`trade`, `src/commands.js:215`): the market row is the only one carrying
+- Market trade (`trade`, `src/commands.js:231`): the market row is the only one carrying
   `trade` rates — selling 100 of food, wood or stone pays `trade.sell` **33** gold, buying
   100 back costs `trade.buy` **67** gold — and the six buttons on a finished Market move
   exactly 100 units at that rate in one click. Every refusal routes through `toast`:
@@ -154,18 +154,25 @@ a bug.
   Center (and food also to farms) when the dedicated building doesn't exist. A farm
   never receives its own harvest. Farms feed 170 food (`BLD.farm.field`) before going
   idle; the mill tracks `field` the same way.
-- Placement needs a free, walkable footprint (`siteFree`, `src/commands.js:165`) and enough
-  resources. The builder (`pickBuilder` via `build`, `src/commands.js:100`) is the nearest
-  idle villager in the current selection, else the nearest idle team-0 villager: a
+- One rule judges a tile — `canPlaceAt` (`src/commands.js:137`): the row's `age` gate plus a
+  free, walkable footprint (`siteFree`, `src/commands.js:181`). A click that fails it is
+  refused (`Can't build there`) with nothing spent and `Game.placing` still armed; the old
+  answer was to move the site to `findSite` (`src/world.js:144`) next to the villager, and a
+  tile more than 7 tiles off the builder failed too (docs/TODO.md P0-3). Distance is no
+  longer part of the rule — the builder walks — so `findSite` only answers the button call
+  without a tile, and `drawGhost` (`src/render.js:240`) paints with the same `canPlaceAt`.
+  Placement also needs enough resources. The builder (`pickBuilder` via
+  `build`, `src/commands.js:100`) is the nearest idle villager in the current
+  selection, else the nearest idle team-0 villager: a
   villager already building a finished-or-missing building or on a harvest/move order is
   free (the order is abandoned), while one assigned to a building with `built < 1` is
   never yanked off — so each placement gets its own builder and parallel construction
   works. With no idle villager the placement is refused (`All villagers are building`).
   The building's HP scales with progress until complete.
-- Cancelling and demolishing (phase 2, T3/T4): `cancelConstruction` (`src/commands.js:127`)
+- Cancelling and demolishing (phase 2, T3/T4): `cancelConstruction` (`src/commands.js:147`)
   ends an in-progress site, refunding `floor(cost × CFG.CANCEL_REFUND)` — **80%** of the
   defined cost whatever the progress — and frees its builders; `demolish`
-  (`src/commands.js:147`) removes a finished own-team building with no refund, refuses Town
+  (`src/commands.js:167`) removes a finished own-team building with no refund, refuses Town
   Centers (`Cannot demolish a Town Center`), buildings with a training queue
   (`Still training`) and buildings with a tech in flight (`Still researching`). The
   footer offers `Cancel` for a foundation and, once the
@@ -183,7 +190,7 @@ a bug.
 | Fletching | Blacksmith | 100 food + 50 gold | 30 s | +1 pierce attack |
 | Bracer | Blacksmith | 300 food + 200 gold | 40 s | +1 pierce armour |
 
-- Only a finished Blacksmith researches (`researchTech`, `src/commands.js:196`): the tech's age
+- Only a finished Blacksmith researches (`researchTech`, `src/commands.js:212`): the tech's age
   must be reached (`Forge requires Feudal Age`), one tech at a time per building
   (`Blacksmith is busy`), never a duplicate (`Forge already researched`), cost checked
   (`Not enough food`), and other buildings refuse its techs (`Barracks cannot research
@@ -284,7 +291,7 @@ the table is the contract, the audio path and the checks are its two readers, th
 | `hit` | triangle | 170 → 60 | 0.14 | 0.35 | `hitUnit` (`src/sim.js:81`) |
 | `arrow` | sawtooth | 880 → 320 | 0.10 | 0.18 | `spawnArrow` (`src/sim.js:97`) |
 | `build` | square | 220 → 140 | 0.20 | 0.25 | `updateUnit`'s `b.built >= 1` branch (`src/sim.js:252`) |
-| `age` | triangle | 392 → 523 → 659 | 0.60 | 0.30 | `upgradeAge` (`src/commands.js:238`) |
+| `age` | triangle | 392 → 523 → 659 | 0.60 | 0.30 | `upgradeAge` (`src/commands.js:247`) |
 | `victory` | sawtooth | 523 → 659 → 784 | 0.90 | 0.30 | `setResult` (`src/entities.js:141`) |
 | `defeat` | sawtooth | 392 → 311 → 262 | 1.10 | 0.28 | `setResult` (`src/entities.js:141`) |
 

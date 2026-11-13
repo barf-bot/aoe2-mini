@@ -5,6 +5,26 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Fixed — `docs/TODO.md` P0-3: a building placed on an invalid spot appeared elsewhere
+
+- `build` in `src/commands.js` answered a click it could not build on — an occupied or
+  off-map footprint, or any tile more than 7 tiles from the builder — by putting the
+  building on `findSite`'s pad next to the villager and still toasting `started` (verified:
+  50 of 176 placements landed on a different tile than the one clicked). A click is now the
+  site or a refusal: `Can't build there`, nothing spent, no building, and `Game.placing`
+  stays armed. The 7-tile limit is gone — the builder walks — so a click 20 tiles away
+  builds exactly on that tile, and `findSite` only answers the button call that carries no
+  tile. That rule is now one exported function, `canPlaceAt` (`src/commands.js:137`), which
+  `drawGhost` (`src/render.js:240`) uses too: the ghost used to judge the tile with
+  `siteFree` alone, so an age-gated kind hovered green where the click would only answer
+  `requires Feudal Age`. `near` (`src/commands.js`) is gone with the range limit.
+- `tools/checks/05-construction.js` pinned the old rule (a far click "still builds at
+  findSite's pad", an occupied click "falls back to findSite"); both assertions are replaced
+  by five that pin the new one — water, one of your own buildings, off the map, 20 tiles
+  away, and the surviving no-tile button call (40 → 43 checks), and `tools/checks/13-render.js`
+  now also compares the ghost's recorded fill style against that rule (3 → 8 checks;
+  286 → 294 in the suite).
+
 ### Fixed — `docs/TODO.md` P0-2: the placement preview is invisible
 
 - `drawGhost` in `src/render.js` painted the ghost at `tx * CFG.TILE` — world coordinates —

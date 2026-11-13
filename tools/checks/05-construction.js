@@ -3,8 +3,8 @@
    Runs on its own (`node tools/checks/05-construction.js`) against a freshly booted game. */
 
 const {
-  AoE2, DT, Game, blueVill, check, dataBuildings, freeSpotAround, pad, stepRender, tOf, tc,
-  report,
+  AoE2, DT, Game, blueVill, check, dataBuildings, flatState, freeSpotAround, pad, setTile, stepRender,
+  tOf, tc, report,
 } = require('../lib/harness');
 
 /* ---- 7. construction ------------------------------------------------ */
@@ -309,27 +309,85 @@ check(!!bb && bb.w === bdDef.w && bb.h === bdDef.h &&
   bb ? bb.w + 'x' + bb.h + ' tiles=' + (bd.blocks.get(bb.id) || []).length +
      ' popCap=' + popCapBd + '->' + AoE2.popCap(bd, 0) : 'placement failed');
 
-// the two placement refusals, one throwaway state funded for exactly two sites:
-// the far click first (while the selected villager is still free), then the
-// Town Center's own tile -- both must fall back to findSite, never refuse.
-const bpl = AoE2.createState();
-bpl.age = 1;
-const bplv = bpl.units.find((u) => u.team === 0 && u.kind === 'villager');
-bpl.selection = [bplv.id];
-bpl.res[0].wood = bdCost * 2;
-const tc2 = bpl.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
-const bFar = AoE2.build(bpl, 'barricade', (tOf(bplv.x) + 12) * AoE2.CFG.TILE + 4, tOf(bplv.y) * AoE2.CFG.TILE + 4);
-check(!!bFar && (bFar.tx !== tOf(bplv.x) + 12 || bFar.ty !== tOf(bplv.y)) && bpl.res[0].wood === bdCost,
-  "build: a click 12 tiles off the selected villagers still builds at findSite's pad",
-  bFar ? 'site=' + bFar.tx + ',' + bFar.ty + ' clicked=' + (tOf(bplv.x) + 12) + ',' + tOf(bplv.y) +
-     ' wood=' + bpl.res[0].wood : 'no building');
-const bOcc = AoE2.build(bpl, 'barricade', tc2.tx * AoE2.CFG.TILE + 4, tc2.ty * AoE2.CFG.TILE + 4);
-check(!!bOcc && (bOcc.tx !== tc2.tx || bOcc.ty !== tc2.ty) &&
-      AoE2.siteFree(bpl, tc2.tx, tc2.ty, bdDef.w, bdDef.h) === false && bpl.res[0].wood === 0,
-  'build: a barricade is never placed on an occupied tile - the click falls back to findSite',
-  bOcc ? 'site=' + bOcc.tx + ',' + bOcc.ty + ' tc=' + tc2.tx + ',' + tc2.ty +
-     ' siteFree(tc)=' + AoE2.siteFree(bpl, tc2.tx, tc2.ty, bdDef.w, bdDef.h) +
-     ' wood=' + bpl.res[0].wood : 'no building');
+/* The invalid clicks (docs/TODO.md P0-3): the old code answered a click it could
+   not honour -- a footprint that is not free, or a tile more than 7 tiles off the
+   builder -- by moving the site to findSite's pad next to the villager while the
+   toast still said "started". A click is now the site or a refusal ('Can't build
+   there', nothing spent, no new building, Game.placing still armed); the 7-tile
+   limit is gone, so a far click builds exactly on the tile clicked. The findSite
+   fallback survives only for the button call without a tile, which the last case
+   below still pins.
+   Every case runs on flatState(): grass everywhere, so the only reason a pad can
+   fail is the one the case is about -- the generator's ponds and forest would let
+   a refusal pass for a reason nobody checked. */
+const ZERO = JSON.stringify({ food: 0, wood: 0, gold: 0, stone: 0 });
+
+/** Build `kind` at tile `where(st, v)` -- or with no tile at all, the button
+ *  call -- in a flat settlement priced at exactly one site (so 'Not enough
+ *  wood' can never be the reason for the answer) with the builder selected and
+ *  the placement armed, and report everything the item's Done-when names. The
+ *  builder's tile is read before the attempt because a new footprint moves
+ *  whoever was standing on it to the work spot beside the building. */
+const place = (kind, age, where) => {
+  const st = flatState();
+  st.age = age;
+  const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
+  st.selection = [v.id];                              // pin the builder, as §7 does
+  const bank = { food: 0, wood: 0, gold: 0, stone: 0 };
+  for (const k in AoE2.BLD[kind].cost) bank[k] = AoE2.BLD[kind].cost[k];
+  st.res[0] = bank;
+  const at = where(st, v);
+  st.placing = at === null ? null : kind;             // arming is what a map click implies
+  const banked = JSON.stringify(st.res[0]);
+  const n0 = st.buildings.length;
+  const vx = tOf(v.x), vy = tOf(v.y);
+  let b, threw = null;
+  try {
+    b = at === null ? AoE2.build(st, kind)
+      : AoE2.build(st, kind, at.tx * AoE2.CFG.TILE + 4, at.ty * AoE2.CFG.TILE + 4);
+  } catch (e) { threw = e; }
+  return { at, vx, vy, b, threw, toast: st.toastMsg, banked,
+           res: JSON.stringify(st.res[0]), n0, n: st.buildings.length, placing: st.placing };
+};
+const refused = (r) => !r.threw && r.b === undefined && r.toast === "Can't build there" &&
+  r.res === r.banked && r.n === r.n0 && r.placing !== null;
+const detail = (r) => r.threw ? 'threw: ' + r.threw.message
+  : 'b=' + (r.b ? r.b.kind + '@' + r.b.tx + ',' + r.b.ty : 'none') +
+    ' clicked=' + (r.at ? r.at.tx + ',' + r.at.ty : 'none') + ' toast=' + JSON.stringify(r.toast) +
+    ' res=' + r.banked + '->' + r.res + ' buildings=' + r.n0 + '->' + r.n +
+    ' placing=' + String(r.placing);
+
+// a footprint that is not free: water, and one of your own buildings' tiles
+const water = place('barricade', 1, (st, v) => {
+  const t = { tx: tOf(v.x) + 6, ty: tOf(v.y) + 6 };
+  setTile(st, t.tx, t.ty, AoE2.T.WATER, 0);
+  return t;
+});
+check(refused(water), "build: a click on water refuses with 'Can't build there' and spends nothing",
+  detail(water));
+const onOwn = place('barricade', 1, (st) => {
+  const own = st.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+  return { tx: own.tx, ty: own.ty };
+});
+check(refused(onOwn),
+  "build: a click on your own Town Center refuses with 'Can't build there' and spends nothing",
+  detail(onOwn));
+// off the map: refused, not thrown (siteFree bounds rule out the whole footprint)
+const edge = place('barricade', 1, () => ({ tx: 200, ty: 200 }));
+check(refused(edge), "build: a click off the map refuses with 'Can't build there' instead of throwing",
+  detail(edge));
+// the range limit is gone: 20 tiles away builds ON the clicked tile, not at findSite's pad
+const far = place('barricade', 1, (st, v) => ({ tx: tOf(v.x) + 20, ty: tOf(v.y) }));
+check(!far.threw && !!far.b && far.b.tx === far.at.tx && far.b.ty === far.at.ty &&
+      far.res === ZERO && far.n === far.n0 + 1 && far.placing === null,
+  'build: a click 20 tiles off the builder builds exactly on the tile clicked (no range limit)',
+  detail(far));
+// the one call that keeps the fallback: the button, with no tile to honour
+const button = place('barricade', 1, (st, v) => null);
+check(!button.threw && !!button.b && button.b.tx === button.vx && button.b.ty === button.vy &&
+      button.res === ZERO && button.placing === null,
+  "build: the button call (no tile) still takes findSite's pad next to the builder",
+  detail(button));
 
 // back to the walk: a stockpile of 2 wood cannot pay the row's 3.
 const bdWoodA = bd.res[0].wood;

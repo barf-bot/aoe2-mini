@@ -108,9 +108,17 @@ function build(Game, kind, atX, atY) {
   if (!v) return toast(Game, Game.units.some(u => u.team === 0 && u.kind === 'villager')
     ? 'All villagers are building' : 'No villager available');
   if (!canAfford(Game, 0, def.cost)) return toast(Game, 'Not enough ' + missing(Game, 0, def.cost));
-  let site = null;
-  if (clicked && siteFree(Game, clicked.tx, clicked.ty, def.w, def.h) && near(Game, v, clicked.tx, clicked.ty, 7)) site = clicked;
-  if (!site) site = findSite(Game.world, Math.floor(v.x / CFG.TILE), Math.floor(v.y / CFG.TILE), def.w);
+  /* A click is the site or nothing (docs/TODO.md P0-3): the old answer for a
+     tile it could not build on — an occupied footprint, or anything more than
+     7 tiles off the builder — was to move the site to findSite's pad next to
+     the villager while the toast still said 'started'. Distance stopped being
+     part of the rule (the builder walks), so the clicked tile is used as given
+     or the placement is refused; findSite still answers the button call, which
+     has no tile to honour and has always meant "put it up near a villager". */
+  const site = clicked
+    ? (canPlaceAt(Game, kind, clicked.tx, clicked.ty) ? clicked : null)
+    : findSite(Game.world, Math.floor(v.x / CFG.TILE), Math.floor(v.y / CFG.TILE), def.w);
+  if (!site) return toast(Game, "Can't build there");
   spend(Game, 0, def.cost);
   const b = makeBuilding(Game, kind, 0, site.tx, site.ty);
   v.order = { kind: 'build', b: b.id };
@@ -118,6 +126,18 @@ function build(Game, kind, atX, atY) {
   markDirty(Game);                         // the spend and the new site are a change
   toast(Game, def.label + ' started');
   return b;
+}
+
+/** The single rule that judges a tile a player wants to put `kind` on: the row's
+ *  age gate plus a buildable footprint (`siteFree`). `build` and the placement
+ *  ghost in render.js both ask it, so the ghost is never green over a tile the
+ *  click would refuse (docs/TODO.md P0-3). Cost is not part of it — the ghost
+ *  colours the land, not the wallet — and neither is distance: the builder
+ *  walks to whatever tile was clicked. */
+function canPlaceAt(Game, kind, tx, ty) {
+  const def = BLD[kind];
+  if (!def || (def.age ?? 0) > Game.age) return false;
+  return siteFree(Game, tx, ty, def.w, def.h);
 }
 
 /** Cancel an in-progress site: refund the floored CANCEL_REFUND share of the
@@ -155,10 +175,6 @@ function demolish(Game, b) {
   removeBuilding(Game, b);
   toast(Game, def.label + ' demolished');
   return true;
-}
-
-function near(Game, u, tx, ty, dist) {
-  return Math.abs(tx - Math.floor(u.x / CFG.TILE)) <= dist && Math.abs(ty - Math.floor(u.y / CFG.TILE)) <= dist;
 }
 
 /** Is a wxh footprint buildable? grass only, no overlap, in bounds. */

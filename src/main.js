@@ -11,7 +11,7 @@ const AoE2 = {
   tileOf, findPath, formationSlots, separate,
   setAtlas, createState, boot, loadAtlas, stepGame, stepSim, renderFrame, playSfx, isMuted,
   unitAnim,
-  build, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
+  build, canPlaceAt, cancelConstruction, demolish, train, researchTech, trade, issueOrder, upgradeAge, orderForUnit, siteFree, toast,
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, spawnArrow, updateProjectiles, stepBuildingAttacks,
   popCap, popUsed, selectedUnits, canAfford, spend, refund, resetGame,
   SAVE_PATH, saveGame, loadGame, markDirty, storageGet, storageSet, applyMuteButton, setMuted,

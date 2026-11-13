@@ -3,7 +3,7 @@
    Runs on its own (`node tools/checks/13-render.js`) against a freshly booted game. */
 
 const {
-  AoE2, bootFixture, check, report,
+  AoE2, bootFixture, check, freeSpotAround, report,
 } = require('../lib/harness');
 
 /* ---- 16. render: the placement ghost (docs/TODO.md P0-2) ------------- */
@@ -51,6 +51,46 @@ bootFixture(undefined, (doc, st) => {
       'want fill=' + g.want.fill + ' stroke=' + g.want.stroke +
       ' -> fill=' + g.fill + ' stroke=' + g.stroke);
   }
+});
+
+/* ---- 16b. render: the ghost colour is build's rule (docs/TODO.md P0-3) - */
+/* drawGhost graded the tile with siteFree alone while build refuses more than an
+   unbuildable footprint (a kind whose `age` gate is shut answers 'requires
+   Feudal Age'), so `e` in a Dark Age village showed a green ghost over land the
+   click would never take. The colour now comes from the one rule build uses
+   (canPlaceAt in src/commands.js), and the recorded fill style proves it: the
+   ghost is green exactly where a click would build. */
+const GREEN = 'rgba(111,191,115,.6)', RED = 'rgba(209,88,79,.6)';
+
+/** The fillStyle the ghost paints the footprint of `kind` at tile (tx, ty) with the
+ *  camera at the world origin ('none' / '2x' when the frame painted it zero / many times). */
+const ghostFill = (st, kind, tx, ty) => {
+  const def = AoE2.BLD[kind];
+  st.cam = { x: 0, y: 0 };
+  st.placing = kind;
+  st.cursor = { x: tx * TS + 4, y: ty * TS + 4 };
+  st.view.ctx.clearOps();
+  AoE2.renderFrame(st);
+  const rect = [tx * TS, ty * TS, def.w * TS, def.h * TS].join();
+  const hits = st.view.ctx.ops.filter((o) => o[0] === 'fillRect' && o[1].join() === rect);
+  return hits.length === 1 ? hits[0][2] : hits.length + 'x';
+};
+const ghostCase = (st, name, kind, tx, ty, want) => {
+  const painted = ghostFill(st, kind, tx, ty);
+  check(painted === want, name, 'painted ' + painted + ' want ' + want);
+};
+
+bootFixture(undefined, (doc, st) => {
+  const own = st.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
+  const free = freeSpotAround(st.world, st, own.tx, own.ty, 2, 2, 8);
+  check(!!free, 'site: a free 2x2 pad beside the Town Center exists to hover',
+    free ? 'tile ' + free.tx + ',' + free.ty : 'none');
+  if (!free) return;
+  ghostCase(st, 'render: a house ghost over free grass is green', 'house', free.tx, free.ty, GREEN);
+  ghostCase(st, 'render: a house ghost over the Town Center footprint is red', 'house', own.tx, own.ty, RED);
+  ghostCase(st, 'render: an age-gated kind is red while its age is locked', 'market', free.tx, free.ty, RED);
+  st.age = 1;
+  ghostCase(st, 'render: the same kind is green once its age is reached', 'market', free.tx, free.ty, GREEN);
 });
 
 report();
