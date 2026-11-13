@@ -1,6 +1,7 @@
 'use strict';
-/* checks/05-construction.js -- construction, camps + drop-offs, cancel / demolish, the barricade.
-   Runs on its own (`node tools/checks/05-construction.js`) against a freshly booted game. */
+/* checks/05-construction.js -- construction, camps + drop-offs, cancel / demolish, the
+   barricade, every row's age gate. Runs on its own (`node tools/checks/05-construction.js`)
+   against a freshly booted game. */
 
 const {
   AoE2, DT, Game, blueVill, check, dataBuildings, flatState, freeSpotAround, pad, setTile, stepRender,
@@ -137,7 +138,7 @@ check(!bsGate.threw && bsGate.built === undefined &&
       ' wood=' + bsGate.wood + ' (was ' + bsGate.wood0 + ')');
 const bsF = (() => {
   const st = AoE2.createState();
-  st.age = 1;
+  st.age[0] = 1;                                // the row's own age (data/buildings.json age: 1)
   st.res[0].wood = 200;                               // START holds 100; the row costs 150
   const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
   const spot = freeSpotAround(st.world, st, tOf(v.x), tOf(v.y), 1, 1, 8);
@@ -207,7 +208,7 @@ check(!barGate.threw && barGate.built === undefined &&
    footprint within 8 tiles, and the walk is capped the way §7b's is. */
 const feudalSite = (kind) => {
   const st = AoE2.createState();
-  st.age = 1;
+  st.age[0] = 1;
   const row = dataBuildings.buildings[kind];
   const def = AoE2.BLD[kind];
   const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
@@ -255,6 +256,7 @@ check(!!barF.row && !!barF.def && !!barF.spot && !barF.threw && !!barF.b && exac
 // a carrying villager must walk to the DEDICATED building for what they carry
 // instead of always trudging to the Town Center.
 const cg = AoE2.createState();
+cg.age[0] = 1;      // §7b raises a mill too, and the MILL (68) row is Feudal (data/buildings.json age: 1)
 const cv = cg.units.find((u) => u.team === 0 && u.kind === 'villager');
 const vt = cg.buildings.find((b) => b.team === 0 && b.kind === 'town_center');
 const dropId = (res, src) => {
@@ -371,7 +373,7 @@ check(cHouse3 && AoE2.demolish(cs, cHouse3) === undefined &&
 // every number read off AoE2.BLD.barricade and CFG.CANCEL_REFUND rather
 // than literals, so the fixture re-proves the T1 row on every run.
 const bd = AoE2.createState();
-bd.age = 1;
+bd.age[0] = 1;
 const bdv = bd.units.find((u) => u.team === 0 && u.kind === 'villager');
 const bdDef = AoE2.BLD.barricade;
 const bdCost = bdDef.cost.wood;
@@ -408,7 +410,7 @@ const ZERO = JSON.stringify({ food: 0, wood: 0, gold: 0, stone: 0 });
  *  whoever was standing on it to the work spot beside the building. */
 const place = (kind, age, where) => {
   const st = flatState();
-  st.age = age;
+  st.age[0] = age;
   const v = st.units.find((u) => u.team === 0 && u.kind === 'villager');
   st.selection = [v.id];                              // pin the builder, as §7 does
   const bank = { food: 0, wood: 0, gold: 0, stone: 0 };
@@ -491,5 +493,31 @@ check(bdDemo === true && !bd.buildings.includes(bdB) &&
       JSON.stringify(bd.res[0]) === resBd0 && bd.blocks.get(bdB.id) === undefined,
   'demolish: a finished barricade is removed with zero change to the stockpile',
   bdB ? JSON.stringify(bd.res[0]) + ' (was ' + resBd0 + ')' : 'rebuild failed');
+
+/* ---- 7e. every row's age gate (docs/ROADMAP.md P1-4, age-gate half) --- */
+/* The sections above gate the four rows that carried an `age` with a fixture of
+   their own; data/buildings.json now names one on all twelve, so this
+   table-driven pass proves `build`'s rule once per row instead of once per age
+   class. Any age below a row's own refuses -- the AGES toast, the bank
+   untouched, no building, the placement left armed -- and the row's own age
+   raises it for exactly the cost banked before the call, so a BLD row cheaper
+   than the data row leaves wood behind and fails the check. */
+for (const kind of Object.keys(dataBuildings.buildings)) {
+  const def = AoE2.BLD[kind];
+  const where = (st, v) => freeSpotAround(st.world, st, tOf(v.x), tOf(v.y), def.w, def.h, 8);
+  for (const age of def.age > 0 ? [0, def.age] : [0]) {
+    const r = place(kind, age, where);
+    const open = age >= def.age;
+    const got = r.threw ? 'threw: ' + r.threw.message
+      : r.b ? r.b.kind + '@' + r.b.tx + ',' + r.b.ty + ' res=' + r.banked + '->' + r.res
+        : 'refused=' + JSON.stringify(r.toast) + ' res=' + r.banked + '->' + r.res;
+    const good = open
+      ? !!r.b && r.b.kind === kind && r.res === ZERO && r.n === r.n0 + 1 && r.placing === null
+      : r.b === undefined && r.toast === def.label + ' requires ' + AoE2.AGES[def.age] &&
+        r.res === r.banked && r.n === r.n0 && r.placing !== null;
+    check(good, 'age: the ' + AoE2.AGES[age] + ' ' + (open ? 'raises' : 'refuses') + ' the ' +
+      def.label + ' (row age ' + def.age + ')', got);
+  }
+}
 
 report();

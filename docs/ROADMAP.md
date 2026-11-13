@@ -34,8 +34,11 @@ that before starting anything below.
    and the effects apply through `unitAttack`/`unitArmor` to that team's unit damage paths
    (since 2026-11-13 the age and tech bonuses are stored per team — the player's Forge no
    longer arms an enemy, docs/TODO.md P1-11).
-   Left over: Fletching's and Bracer's +1 range is not modelled, and the other
-   buildings' real ages are still ungated (the blacksmith's `age` is the first gated row).
+   Age gating closed 2026-11-13: every row in `data/buildings.json` now carries its real
+   AoE2 age (five Dark, seven Feudal) and `build` gates on it, so the blacksmith's `age` is
+   no longer the only gated row — `tools/checks/05-construction.js` §7e proves both halves
+   per row. Left over: Fletching's and Bracer's +1 range is not modelled (the engine has one
+   attack number per unit, `data/techs.json` `design{}`).
 5. **More buildings**: lumber camp, mining camp and mill shipped 2026-11-04 (`BLD`,
    hotkeys `L`/`G`/`M`, resource-based drop-off routing); market (`e`) and watch tower
    (`c`) shipped 2026-11-12 by the market + watch tower plan

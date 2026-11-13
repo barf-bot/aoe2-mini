@@ -3,8 +3,7 @@
    Runs on its own (`node tools/checks/09-hud.js`) against a freshly booted game. */
 
 const {
-  finishedHouse,
-  AoE2, Game, blueVill, bootFixture, check, domHtml, html, stubEl, styleCss, tileCentre, report,
+  AoE2, Game, blueVill, bootFixture, check, domHtml, finishedHouse, fundedGame, html, stubEl, styleCss, tileCentre, report,
 } = require('../lib/harness');
 
 /* ---- 11. command bar buttons ---------------------------------------- */
@@ -18,7 +17,13 @@ check(Game.placing === 'farm', 'ui: clicking the Farm button arms placement', St
 // The archer line's building (T4): offered to a villager selection, and its
 // button arms placement through the same delegated listener as every other.
 Game.selection = blueVill().map(u => u.id);
-const cmdRng = AoE2.commandsHtml(Game);
+// The range is a Feudal row (data/buildings.json `age: 1`), so its markup comes from
+// the fixture that is unlocked, not from the still-Dark-Age Game the age section below
+// takes from 0 to 2; the button click still dispatches through the shared Game's bar.
+const rngSt = fundedGame();
+rngSt.selection = rngSt.units
+  .filter((u) => u.team === 0 && u.kind === 'villager').map((u) => u.id);
+const cmdRng = AoE2.commandsHtml(rngSt);
 const rngBtn = stubEl('button', 'btnRng', 60, 24);
 rngBtn.setAttribute('data-act', 'build');
 rngBtn.setAttribute('data-arg', 'archery_range');

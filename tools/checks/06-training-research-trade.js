@@ -80,6 +80,7 @@ check(!!capBar && capBarTry === undefined && capBar.queue.length === 0 &&
  * range, 25 wood + 45 gold to train the archer - so no cost can pass by
  * accident, and the trained unit is checked against KINDS.archer, not literals. */
 const ar = AoE2.createState();
+ar.age[0] = 1;                         // data/buildings.json ages the range at 1: Feudal only
 finishedHouse(ar);                     // room to train: 5 living at a cap of 5 would refuse (P1-10)
 const arVill = ar.units.find((u) => u.team === 0 && u.kind === 'villager');
 ar.selection = [arVill.id];

@@ -5,6 +5,33 @@ commits on `main`.
 
 ## [Unreleased] — 2026-11-13
 
+### Added — `docs/ROADMAP.md` P1-4 (age-gate half): every building row now carries its real age
+
+- `data/buildings.json` gated four rows — `blacksmith`, `market`, `watch_tower`, `barricade`, all
+  `age: 1` — while the other eight carried no `age` at all, so the `def.age ?? 0` in `build`
+  (`src/commands.js:114`) made the Barracks, the Mill and the Archery Range Dark Age buildings.
+  Every row now names the age AoE2 does: `age: 0` for `town_center`, `house`, `farm`,
+  `lumber_camp`, `mining_camp`, `age: 1` for `barracks` (the vendored row's own `internal_name`
+  is `Barracks Age1`), `mill`, `archery_range` plus the four that already had it. The ages are
+  recorded as authored in `source.rule` — `age` is no column of the upstream table — and
+  `src/config.js` is regenerated from the data (`tools/check-stats.mjs --write`, not hand-edited).
+  Fletching's and Bracer's +1 range stays out: the engine has one attack number per unit
+  (`data/techs.json` `design{}`), which is the other half of P1-4.
+- checks: 345 → 364. `tools/checks/05-construction.js` gains §7e, a table-driven pass over all
+  twelve rows: any age below a row's own refuses with the `AGES` toast, spends nothing and raises
+  nothing, and the village at the row's own age builds it for exactly its cost (the bank the
+  fixture lays down drains to zero, so a cheaper `BLD` row fails). The rest is fixture fallout —
+  the pre-P1-11 scalar `st.age = 1` assignments, which `Game.age[0]` reads as `undefined` and so
+  never gated anything, become `st.age[0] = 1`; §7b's village ages up because it raises a Mill;
+  `tools/checks/06-training-research-trade.js` ages its Archery Range state up; and the
+  Archery Range button in `tools/checks/09-hud.js` is asked of `fundedGame()` (Feudal, every cost
+  payable) instead of the still-Dark-Age shared `Game`, which the file's own age-up section later
+  takes from 0 to 2. All of them failed before the fix, for the right reason: §7b crashed with an
+  unbuilt mill and the range's button simply stopped being offered.
+- `aiStep` (`src/ai.js:4`) needs no age-correct build order — the enemy never builds, it only
+  trains from its own Town Center, and `Game.age[1]` stays 0 — so no AI behaviour got gated away.
+- the `BLD` table in `docs/GAME_RULES.md` gained the Age column the data now carries.
+
 ### Fixed — `docs/TODO.md` P2-19: blurry canvas on high-DPI screens
 
 - `beginCanvas` (`src/render.js:4`) set `canvas.width/height` to the CSS pixel size and never

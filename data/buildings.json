@@ -6,7 +6,7 @@
       "https://raw.githubusercontent.com/HSZemi/aoe2dat/master/data/units_buildings_techs.json"
     ],
     "fetched": "2026-11-11",
-    "rule": "Table numbers are copied, never retuned. label/w/h/pop/field/trains are authored here (listed in authored[]) because the table carries no footprint or population-provided column. blacksmith is the building that shared id 103 / internal_name BLAC row actually names; lumber_camp keeps the same numbers it used while borrowing the row. The id 72 / internal_name WALL row is published as barricade: 'Barricade' is the authored label for the wooden wall segment, and its 1x1 footprint and age: 1 gate are authored, not table columns.",
+    "rule": "Table numbers are copied, never retuned. label/w/h/pop/field/trains are authored here (listed in authored[]) because the table carries no footprint or population-provided column. blacksmith is the building that shared id 103 / internal_name BLAC row actually names; lumber_camp keeps the same numbers it used while borrowing the row. The id 72 / internal_name WALL row is published as barricade: 'Barricade' is the authored label for the wooden wall segment, and its 1x1 footprint and age: 1 gate are authored, not table columns. Every row now carries an explicit age, authored from AoE2 (age is no column of the table): the five Dark Age rows town_center, house, farm, lumber_camp, mining_camp are age 0, the seven Feudal rows barracks (the table's own internal_name is 'Barracks Age1'), mill, archery_range, blacksmith, market, watch_tower, barricade are age 1.",
     "authored": [
       "buildings.*.label", "buildings.*.w", "buildings.*.h", "buildings.*.pop",
       "buildings.*.field", "buildings.*.trains",
@@ -32,7 +32,8 @@
       "range": 6,
       "reload": 2,
       "accuracy": 100,
-      "garrisonCapacity": 15
+      "garrisonCapacity": 15,
+      "age": 0
     },
     "house": {
       "id": 70,
@@ -52,7 +53,8 @@
       "range": 0,
       "reload": 0,
       "accuracy": 0,
-      "garrisonCapacity": 0
+      "garrisonCapacity": 0,
+      "age": 0
     },
     "farm": {
       "id": 50,
@@ -73,7 +75,8 @@
       "range": 0,
       "reload": 0,
       "accuracy": 0,
-      "garrisonCapacity": 0
+      "garrisonCapacity": 0,
+      "age": 0
     },
     "barracks": {
       "id": 12,
@@ -93,7 +96,8 @@
       "range": 0,
       "reload": 0,
       "accuracy": 0,
-      "garrisonCapacity": 10
+      "garrisonCapacity": 10,
+      "age": 1
     },
     "lumber_camp": {
       "id": 103,
@@ -113,7 +117,8 @@
       "range": 0,
       "reload": 0,
       "accuracy": 0,
-      "garrisonCapacity": 0
+      "garrisonCapacity": 0,
+      "age": 0
     },
     "mining_camp": {
       "id": 584,
@@ -133,7 +138,8 @@
       "range": 0,
       "reload": 0,
       "accuracy": 0,
-      "garrisonCapacity": 0
+      "garrisonCapacity": 0,
+      "age": 0
     },
     "mill": {
       "id": 68,
@@ -154,7 +160,8 @@
       "range": 0,
       "reload": 0,
       "accuracy": 0,
-      "garrisonCapacity": 0
+      "garrisonCapacity": 0,
+      "age": 1
     },
     "archery_range": {
       "id": 87,
@@ -174,7 +181,8 @@
       "range": 0,
       "reload": 0,
       "accuracy": 0,
-      "garrisonCapacity": 10
+      "garrisonCapacity": 10,
+      "age": 1
     },
     "blacksmith": {
       "id": 103,

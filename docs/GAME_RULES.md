@@ -124,27 +124,34 @@ a bug.
 
 ## Buildings (`BLD`)
 
-| Building | HP | Size | Cost | Build time | Pop | Trains |
-|---|---|---|---|---|---|---|
-| Town Center | 2400 | 3×3 | 275 wood + 100 stone | 100 s | +5 | Villager |
-| House | 550 | 2×2 | 25 wood | 25 s | +5 | — |
-| Farm | 480 | 2×2 | 60 wood | 15 s | — | (food field 170) |
-| Barracks | 1200 | 2×2 | 175 wood | 50 s | — | Militia |
-| Lumber Camp | 1800 | 1×1 | 150 wood | 40 s | — | — |
-| Mining Camp | 600 | 1×1 | 100 wood | 35 s | — | — |
-| Mill | 600 | 2×2 | 100 wood | 35 s | — | (food field 170) |
-| Archery Range | 1500 | 2×2 | 175 wood | 50 s | — | Archer |
-| Blacksmith | 1800 | 1×1 | 150 wood | 40 s | — | — |
-| Market | 1800 | 2×2 | 175 wood | 60 s | — | — |
-| Watch Tower | 850 | 1×1 | 35 wood + 125 stone | 80 s | — | — |
-| Barricade | 150 | 1×1 | 3 wood | 7 s | — | — |
+| Building | Age | HP | Size | Cost | Build time | Pop | Trains |
+|---|---|---|---|---|---|---|---|
+| Town Center | Dark | 2400 | 3×3 | 275 wood + 100 stone | 100 s | +5 | Villager |
+| House | Dark | 550 | 2×2 | 25 wood | 25 s | +5 | — |
+| Farm | Dark | 480 | 2×2 | 60 wood | 15 s | — | (food field 170) |
+| Barracks | Feudal | 1200 | 2×2 | 175 wood | 50 s | — | Militia |
+| Lumber Camp | Dark | 1800 | 1×1 | 150 wood | 40 s | — | — |
+| Mining Camp | Dark | 600 | 1×1 | 100 wood | 35 s | — | — |
+| Mill | Feudal | 600 | 2×2 | 100 wood | 35 s | — | (food field 170) |
+| Archery Range | Feudal | 1500 | 2×2 | 175 wood | 50 s | — | Archer |
+| Blacksmith | Feudal | 1800 | 1×1 | 150 wood | 40 s | — | — |
+| Market | Feudal | 1800 | 2×2 | 175 wood | 60 s | — | — |
+| Watch Tower | Feudal | 850 | 1×1 | 35 wood + 125 stone | 80 s | — | — |
+| Barricade | Feudal | 150 | 1×1 | 3 wood | 7 s | — | — |
 
-- Four rows carry an `age` gate — Blacksmith, Market, Watch Tower and Barricade (each
-  `age: 1` in `data/buildings.json`): `build` (`src/commands.js:114`) refuses them before
-  picking a builder whenever `Game.age < 1` (`Blacksmith requires Feudal Age`,
-  `Market requires Feudal Age`, `Watch Tower requires Feudal Age`,
-  `Barricade requires Feudal Age`), and their buttons — hotkeys `k`, `e`, `c`, `q` —
-  only appear once the player reaches Feudal Age.
+- Every row carries an explicit `age` (`buildings.*.age` in `data/buildings.json`,
+  generated into `BLD`): the five Dark Age rows — Town Center, House, Farm, Lumber Camp,
+  Mining Camp — are `age: 0`, the seven Feudal rows — Barracks (the table's own
+  `internal_name` is `Barracks Age1`), Mill, Archery Range, Blacksmith, Market, Watch
+  Tower, Barricade — are `age: 1`. `build` (`src/commands.js:114`) refuses a row whose
+  age the village has not reached *before* picking a builder or spending
+  (`Barracks requires Feudal Age`), `canPlaceAt` (`src/commands.js:156`) answers the same
+  gate for the placement ghost, and `commandsHtml` (`src/hud.js:106`) never offers the
+  locked buttons — hotkeys `b`, `m`, `r`, `k`, `e`, `c`, `q`. The Blacksmith's `age: 1` was
+  the first gated row (P1-4); the other eleven rows are now gated by the same number, and
+  §7e of `tools/checks/05-construction.js` proves both halves per row: the Dark Age
+  refusal spends nothing and raises nothing, and the same village at the row's own age
+  builds it for exactly its cost.
 - The Barricade adds no placement or combat code of its own: `build` (`src/commands.js:114`)
   drafts its crew (`pickBuilders`, `src/commands.js:93`) through the same `canPlaceAt`
   (`src/commands.js:156`) rule, cancelling refunds
