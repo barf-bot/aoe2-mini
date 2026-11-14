@@ -181,7 +181,7 @@ A prompt you can paste per session is in §10.
     load, step 300 → identical `encodeState` to the run that never saved.
   - **Done when:** verify green. **Size:** M. This unblocks G8, Q2, S2.
 
-- [ ] **G7 — `tools/ai-arena.js`: a headless match runner**
+- [x] **G7 — `tools/ai-arena.js`: a headless match runner**
   - **Read:** `tools/lib/load-game.js`, `tools/checks/12-ai.js` (the `village` fixture).
   - **Change:** `node tools/ai-arena.js --seeds 1-10 --minutes 20 [--blue idle|ai] [--json]`
     boots a state per seed (needs TODO 22's `resetGame(Game, seed)`), sets `started`, steps

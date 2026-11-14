@@ -66,6 +66,7 @@ Start with `AGENTS.md` if you're an agent picking the repo up cold.
 | `tools/render-preview.js` | boots the same code against a real canvas (`@napi-rs/canvas`) and writes `preview.png`, so the renderer is verified, not just assumed |
 | `tools/audit-line-refs.js` | checks that every `file:NNN` reference in the docs still points at the code it names, that the documented file map matches what `index.html` loads, and that the logic files stay DOM-free |
 | `tools/browser-smoke.js` | opens the page in a real Chrome (Playwright) — the working copy and the live site — asserts the app booted, writes `tools/out/local.png` + `tools/out/live.png` and prints one JSON line per target; exits non-zero when a target fails |
+| `tools/ai-arena.js` | headless match runner: plays seeded games (`--seeds 1-10 --minutes 20`) by stepping the sim on the CPU — no browser, no dependencies — and prints one line per seed (winner, end time, pop and stockpile per team) plus a summary line; `--json` prints the same report as one object. Its output is fixed-format and reproducible, and every Phase-2 AI card pastes it as its before/after number |
 | `preview.png` | a real frame of the game rendered headlessly |
 
 ```bash
@@ -77,6 +78,7 @@ npm install --prefix tools          # once: the canvas backend and playwright th
 node tools/render-preview.js        # rewrites preview.png
 node tools/gen-atlas.js             # composes assets/sprites.png from data/sprites/ and rewrites the tables
 node tools/browser-smoke.js         # real-browser smoke test: screenshots index.html and the live site
+node tools/ai-arena.js              # headless match table: the AI measuring stick (docs-only tool, not part of verify)
 ```
 
 ## How to run locally

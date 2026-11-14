@@ -99,6 +99,23 @@ the browser does.
 seed and handed one script (a move order, a house, a train) must encode byte-for-byte
 identically after 3000 steps — and a third game built from another seed must not.
 
+`tools/ai-arena.js` (roadmap G7, `node tools/ai-arena.js --seeds 1-10 --minutes 20`) is a
+seventh tool, also outside those five and outside `npm run check`: a headless match runner —
+plain node, no dependencies — that plays seeded games by stepping `stepSim` (`src/sim.js`) and
+prints one line per seed (winner, end time, villagers/fighters/buildings and the f/w/g/s
+stockpile for each team) then one summary line (`red W / blue W / open`, mean end time, mean
+red pop at 12 min). Both are a fixed format, and the same arguments must print a byte-identical
+table on every run — that is what G8 proves about the sim, and
+`diff <(node tools/ai-arena.js) <(node tools/ai-arena.js)` is empty on an unchanged tree.
+`--blue ai` is accepted but stays idle while card A1 has not landed; `stepBlue`
+(`tools/ai-arena.js`) is the single place that changes when it does, and the header says
+`blue=ai pending-A1 (idle)` so a pasted table never implies a player that was not there.
+`--json` prints the same header line, rows and summary as one object, plus every minute sample.
+
+Every Phase-2 card (A1–A10, `docs/plans/2026-11-14-strix-local-roadmap.md` §5) pastes this
+tool's before/after output — the table and its summary line — into its commit message body:
+that table is the card's proof, not a paraphrase of the diff.
+
 `tools/render-preview.js` renders a real frame through `@napi-rs/canvas` so the *renderer*
 is proven too — commit the regenerated `preview.png` when visuals change, and look at it
 before committing (a blank sprite sheet once passed every assertion).
@@ -162,7 +179,7 @@ reports the right dimensions can still paint nothing (see `tools/lib/harness.js`
 | `docs/ROADMAP.md` | prioritized open work (features and process) |
 | `docs/CHANGELOG.md` | dated entries of what shipped |
 | `docs/plans/` | historical design plans; they predate the `src/` split and cite the old single-file line numbers |
-| `tools/` | `verify.js` (the one-command gate), `headless-check.js` (runner for `tools/checks/`), `check-stats.mjs`, `render-preview.js`, `gen-atlas.js`, `audit-line-refs.js`, `browser-smoke.js` (the Playwright smoke test, with `tools/out/` for its screenshots), and `tools/lib/` (`load-game.js`, the loader every tool uses, and `harness.js`, the stub DOM + fixtures the checks start from) |
+| `tools/` | `verify.js` (the one-command gate), `headless-check.js` (runner for `tools/checks/`), `check-stats.mjs`, `render-preview.js`, `gen-atlas.js`, `audit-line-refs.js`, `browser-smoke.js` (the Playwright smoke test, with `tools/out/` for its screenshots), `ai-arena.js` (the headless match runner that prints the Phase-2 before/after table), and `tools/lib/` (`load-game.js`, the loader every tool uses, and `harness.js`, the stub DOM + fixtures the checks start from) |
 
 The docs are not trusted by eye: `tools/audit-line-refs.js` is what proves the line
 references above and in `docs/` still match the code, and AGENTS/README must list every

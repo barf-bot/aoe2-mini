@@ -116,6 +116,18 @@ commits on `main`.
   `startLoop`'s frame time and the save envelope, neither of them encoded).
 - checks: suite 443 → 451; the file itself runs 8 checks in 64 ms.
 
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` G7: `tools/ai-arena.js`
+
+- `tools/ai-arena.js` (`--seeds 1-10 --minutes 20 [--blue idle|ai] [--json]`) plays seeded games
+  on the CPU in plain node — `createState()` + `resetGame(g, seed)` (`src/boot.js`) stepped
+  `stepSim` (`src/sim.js`) at `CFG.SIM_DT`, sampled every simulated minute — and prints one
+  fixed-format table: a row per seed (winner, end time, villagers/fighters/buildings and the
+  f/w/g/s stockpile per team) plus one summary line. Same arguments, same table, byte for byte.
+- `--blue ai` runs idle and prints `blue=ai pending-A1 (idle)` until card A1 gives team 0 a
+  brain (`stepBlue` is where it plugs in); the card's total-gathered column is the current
+  stockpile, since nothing counts hauls before S5. First table (seeds 1-10, 20 min): no winner on
+  any seed, red at 5 villagers, wood/gold/stone unmoved — R2 measured; checks stay 451.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep
