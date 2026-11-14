@@ -163,7 +163,7 @@ the same way from `stepBuildingAttacks` (`src/sim.js:136`).
 ### Save / load (`saveGame`, `src/save.js:123`)
 
 `src/save.js` owns the whole contract. `encodeState` (`src/save.js:77`) is the single owner of the
-schema — the field list the harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:22`) —
+schema — the field list the harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:53`) —
 `saveGame(path, Game, at = now())` (`src/save.js:123`) serialises `{ version, seed, writtenAt,
 state }` and hands the string to `storageSet` (`src/save.js:18`), and
 `loadGame(path, Game, raw = storageGet(path))` (`src/save.js:252`) reads the slot back. The

@@ -51,20 +51,6 @@ Center row trains only `villager`. Red therefore gets militia without a Barracks
   `toast` is made team-aware, see item 23). Red must own a finished Barracks to get militia.
 - **Done when:** `12-ai.js` asserts a red village with no Barracks never queues `militia`.
 
-### 22. `New map` never makes a new map
-
-**Verified** by reading: `resetGame` (`src/boot.js`) always calls `makeWorld(CFG.SEED)`,
-so the footer's `New map`, the victory overlay's `New game` and the `N` key all rebuild the
-same seed-1337 map. `docs/GAME_RULES.md` claims `New map` reseeds.
-
-- **Fix:** `resetGame(Game, seed)` takes a seed (default `CFG.SEED`, so every check keeps
-  its map); the `restart` action passes a fresh one (derived from `Date.now()` in `input.js`,
-  never `Math.random()` in logic). `makeWorld` already stores `world.seed` and
-  `encodeState` already saves it, so a load keeps the map; `Game.rnd` must be re-seeded from
-  the same seed.
-- **Done when:** `10-reset-save.js` asserts `resetGame(g, 7)` and `resetGame(g, 8)` produce
-  different `world.type` arrays and that a save/load round-trip keeps `world.seed`.
-
 ---
 
 ## P2 — smaller defects

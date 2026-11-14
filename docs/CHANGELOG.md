@@ -45,6 +45,20 @@ commits on `main`.
   the three new-game checks in `tools/checks/10-reset-save.js` and the result-overlay check in
   `tools/checks/07-combat.js` now drive the confirming second press.
 
+### Fixed — `docs/TODO.md` item 22: `New map` makes a real new map
+
+- `resetGame` (`src/boot.js`) takes a `seed` parameter (default `CFG.SEED`, so every existing
+  caller and check keeps the seed-1337 map) and drives both `makeWorld(seed)` (`src/world.js`)
+  and `Game.rnd` with it — both were hard-wired to `CFG.SEED`, so every restart rebuilt the same
+  map while `docs/GAME_RULES.md` claimed `New map` reseeds.
+- `requestReset` (`src/boot.js`) forwards the seed on the press that actually resets, and the
+  `n` key, the footer's `New map` (`src/input.js`) and the victory overlay's `New game` now pass
+  `Date.now() >>> 0`, so a real restart gets a real new map; `loadGame` already rebuilt
+  `Game.rnd` from the saved world's seed, so a load still keeps its own rng stream.
+- checks: `tools/checks/10-reset-save.js` gains the seed-7-vs-seed-8 and the seed-7 round-trip
+  cases (suite 413 → 416); the confirm-flow check in `tools/checks/08-input.js` also asserts the
+  wiped game's `world.seed` is no longer `CFG.SEED`.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep

@@ -320,8 +320,9 @@ side to lose one decides the game — a raze in combat, a cancelled site and a d
 (`src/sim.js:5`) stops after the clock tick: units, build sites, training queues, arrows
 in flight and the enemy AI freeze while the camera and rendering keep working. The `#result`
 overlay — markup from `resultHtml` (`src/hud.js:59`), styled in the head — names the result
-and offers a `New game` button wired to `resetGame` (`src/boot.js:54`), which rebuilds the
-same seeded start and clears `result` back to `null`. No auto-restart, no countdown.
+and offers a `New game` button wired to `requestReset` (`src/boot.js`), which on the
+confirming press reseeds from `Date.now()` and rebuilds the start on that new map,
+clearing `result` back to `null`. No auto-restart, no countdown.
 
 ## Save / load
 
@@ -335,7 +336,7 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   `2`; `seed` is `Game.world.seed` falling back to `CFG.SEED`, the only way the excluded `rnd`
   closure is rebuilt; `writtenAt` is the `at` argument, pinned so the same `Game` saved twice
   gives the same bytes; `state` is `encodeState(Game)` (`src/save.js:77`), the schema the
-  harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:22`).
+  harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:53`).
 - **Version rule** — `migrate(payload)` (`src/save.js:137`) takes `CFG.VERSION` (2) as written and
   converts a `version: 1` payload — one global `age`, `ageBonus` and `techs` set — into the
   per-team shape (the player's half filled, the enemy's empty) instead of throwing such a save

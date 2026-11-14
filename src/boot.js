@@ -52,13 +52,13 @@ function createState() {
   return Game;
 }
 
-function resetGame(Game) {
-  Game.world = makeWorld(CFG.SEED);
+function resetGame(Game, seed = CFG.SEED) {
+  Game.world = makeWorld(seed);
   Game.units = [];
   Game.projectiles = [];
   Game.buildings = [];
   Game.nextId = 1;
-  Game.time = 0; Game.wave = 0; Game.age = [0, 0]; Game.ageBonus = [0, 0]; Game.techs = [new Set(), new Set()]; Game.rnd = mulberry32(CFG.SEED);
+  Game.time = 0; Game.wave = 0; Game.age = [0, 0]; Game.ageBonus = [0, 0]; Game.techs = [new Set(), new Set()]; Game.rnd = mulberry32(seed);
   Game.autosaveAt = Game.time;             // due now: the next frame writes this settlement
   Game.mapEpoch = 0; Game.pathQueries = 0; // section-4 path state: fresh map, no cached routes
   Game.selection = []; Game.selectedBuilding = null; Game.placing = null; Game.result = null;
@@ -179,7 +179,7 @@ function boot(doc) {
   if (Game.dom.result && Game.dom.result.addEventListener) {
     Game.dom.result.addEventListener('click', (e) => {
       const b = buttonAt(e);
-      if (b && b.getAttribute('data-act') === 'restart') requestReset(Game);
+      if (b && b.getAttribute('data-act') === 'restart') requestReset(Game, Date.now() >>> 0);
     });
   }
   if (Game.dom.save && Game.dom.save.addEventListener) {
@@ -239,15 +239,16 @@ function stepGame(Game, dt) {
 
 /* N / New map / New game used to wipe the save on the first press (docs/TODO.md item 23,
    finding R6). requestReset now asks: the first call arms Game.confirmReset and toasts, a
-   second within CONFIRM_RESET_SECS runs the old wipe (forget the save, rebuild the seeded
-   start) and clears the arm, and a call after the window simply re-arms. One exported
-   function so the n key and both New buttons cannot disagree; confirmReset is transient and
-   never enters the save payload (src/save.js:30). */
-function requestReset(Game) {
+   second within CONFIRM_RESET_SECS runs the old wipe (forget the save, rebuild the start on
+   the seed it was given — item 22: the DOM call sites pass a fresh Date.now() seed, the
+   default keeps CFG.SEED) and clears the arm, and a call after the window simply re-arms.
+   One exported function so the n key and both New buttons cannot disagree; confirmReset is
+   transient and never enters the save payload (src/save.js:30). */
+function requestReset(Game, seed = CFG.SEED) {
   const armed = typeof Game.confirmReset === 'number' &&
                 Game.time - Game.confirmReset <= CONFIRM_RESET_SECS;
   if (!armed) { Game.confirmReset = Game.time; toast(Game, 'Press N again to start a new map'); return; }
   storageSet(SAVE_PATH, null);
-  resetGame(Game);
+  resetGame(Game, seed);
   Game.confirmReset = null;
 }

@@ -15,6 +15,37 @@ check(Game.units.length === 10 && Game.res[0].wood === 100, 'reset: fresh state 
 stepRender(60);
 check(true, 'reset: simulation runs on the reset state', '60 steps clean');
 
+/* ---- 12b. the seed parameter (docs/TODO.md item 22) ----------------- */
+/* resetGame hard-wired makeWorld(CFG.SEED) and Game.rnd = mulberry32(CFG.SEED), so
+   `New map` rebuilt the seed-1337 map whatever the caller asked for. It takes a seed
+   now and drives both with it — that is what lets the DOM pass a fresh one. */
+const typeOf = (g) => Array.from(g.world.type).join(',');
+const gSeed = AoE2.createState();
+AoE2.resetGame(gSeed, 7);
+const typeSeed7 = typeOf(gSeed);
+AoE2.resetGame(gSeed, 7);
+check(gSeed.world.seed === 7 && typeOf(gSeed) === typeSeed7,
+  'reset: the same seed rebuilds the identical map',
+  'seed=' + gSeed.world.seed + ' want=7 type7=' + typeSeed7.slice(0, 40) +
+  ' type7again=' + typeOf(gSeed).slice(0, 40));
+AoE2.resetGame(gSeed, 8);
+check(gSeed.world.seed === 8 && typeOf(gSeed) !== typeSeed7,
+  'reset: a different seed makes a different map',
+  'seed=' + gSeed.world.seed + ' want=8 type7=' + typeSeed7.slice(0, 40) +
+  ' type8=' + typeOf(gSeed).slice(0, 40));
+const seedRoundTrip = withStorage(() => {
+  const g = AoE2.createState();
+  AoE2.resetGame(g, 7);
+  const before = typeOf(g);
+  const env = JSON.parse(AoE2.saveGame(AoE2.SAVE_PATH, g, 1000));
+  const loaded = AoE2.loadGame(AoE2.SAVE_PATH, g);
+  return [loaded === true && g.world.seed === 7 && env.seed === 7 && typeOf(g) === before,
+    'load=' + loaded + ' world.seed=' + g.world.seed + ' envelope.seed=' + env.seed +
+    ' typeSame=' + (typeOf(g) === before)];
+});
+check(seedRoundTrip[0], 'save: a round trip on seed 7 keeps that seed and that map',
+  seedRoundTrip[1]);
+
 /* ---- 13. save/load (this plan, T1) -------------------------------- */
 /* The save contract. SAVE_FIELDS IS the schema: encodeState returns exactly these
    keys in this order, and every check below reads the JSON string saveGame hands
