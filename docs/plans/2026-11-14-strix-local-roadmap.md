@@ -138,7 +138,7 @@ A prompt you can paste per session is in §10.
   - **Done when:** the scratch experiment above is green and the real tree is unchanged.
     **Size:** M.
 
-- [ ] **G3 — Stop the line-ref tax from growing**
+- [x] **G3 — Stop the line-ref tax from growing**
   - **Change:** in `docs/CONVENTIONS.md` and `AGENTS.md`, add the rule: new prose cites
     `functionName` (`src/file.js`) — no line number — unless the line is not a function
     (a table row, a CSS rule). CHANGELOG entries: ≤ 12 lines, no line numbers. Add

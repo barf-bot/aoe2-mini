@@ -133,6 +133,12 @@ reports the right dimensions can still paint nothing (see `tools/lib/harness.js`
 - A check file must pass when run alone: it may only rely on `tools/lib/harness.js` and on
   what it set up itself. Fixtures needed by more than one file go in the harness; build a
   throwaway `AoE2.createState()` when a check needs a clean world.
+- **Docs cite names, not positions.** New prose says `functionName` and names the file
+  (`src/sim.js`) without a line number; the number earns its place only when the thing cited
+  is not a function — a table row, a CSS rule, a generated block — because there the line is
+  the meaning. `docs/CHANGELOG.md` entries: ≤ 12 lines, no numbers. Both rules are
+  forward-only. Rationale and full wording: `docs/CONVENTIONS.md` — a named citation cannot
+  rot, which beats renumbering it with `tools/audit-line-refs.js --fix` after every edit.
 - Commit style: imperative, one logical change per commit (`Add README with live-site link
   and tool docs`, `Fix villager carry bookkeeping so deposits land in the stockpile`).
 

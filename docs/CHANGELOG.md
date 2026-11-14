@@ -23,6 +23,17 @@ commits on `main`.
   `fixed N, left M` and exits 1 unless nothing needed fixing and nothing is broken. Without
   `--fix` the checks and their output are byte-identical to before.
 
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` G3: a citation rule and a plan template
+
+- New prose in `docs/CONVENTIONS.md` and `AGENTS.md` cites `functionName` (`src/file.js`) with
+  no line number unless the thing cited is not a function (a table row, a CSS rule, a
+  generated block) where the line is the meaning, and `docs/CHANGELOG.md` entries are ≤ 12
+  lines with no numbers — forward-only, because a named citation cannot rot the way a moved
+  number does, which is what `tools/audit-line-refs.js --fix` exists to repair.
+- `docs/plans/TEMPLATE.md`: the copy-in skeleton for future plans — the fenced `Status:`
+  header, the condensed working rules, one empty `Read`/`Change`/`Check`/`Done when`/`Size`/
+  `Needs` card and the hard-stop list, 58 lines so a new plan starts short.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep

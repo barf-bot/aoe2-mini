@@ -47,6 +47,18 @@ repo-level workflow rules (verification, deploy) see `../AGENTS.md`.
   carryRes, work, cd, dead}` even when fields are irrelevant to that unit type. Dropping a
   key from a shape is exactly the class of bug that broke attack range.
 
+## Citing code in docs
+
+- New prose cites the **name, not the position**: `functionName` (`src/file.js`), no line
+  number. A number is part of the meaning only when the thing cited is not a function — a
+  table row, a CSS rule, a generated `CFG`/`KINDS`/`BLD` block — so that is the one case new
+  prose adds one.
+- `docs/CHANGELOG.md` entries are ≤ 12 lines and carry no line numbers at all.
+- Why: `tools/audit-line-refs.js` and its `--fix` can repair a ref that moved, but a doc that
+  cites names cannot rot in the first place, and that is the cheaper of the two.
+- Forward-only: the existing numbered refs keep their numbers — converting them is not part of
+  any card, and rewriting prose for it burns the session's reading budget.
+
 ## Behaviour rules
 
 - Validate first, `return toast(Game, '<reason>')` early — every rejection path has a
