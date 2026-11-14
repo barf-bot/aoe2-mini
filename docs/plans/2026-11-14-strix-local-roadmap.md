@@ -71,15 +71,17 @@ session to a few thousand lines of reading and make failure cheap.
 7. Update `docs/GAME_RULES.md` if a rule/number changed, delete the TODO item if the card
    fixes one, add **at most 12 lines** to `docs/CHANGELOG.md`, tick the card's box here.
 8. Commit: imperative subject, one logical change (`Add the idle-villager counter and the
-   period hotkey`). Push only if the human told you which branch.
+   period hotkey`). Then `git push origin main`. **`main` is the live site** — never push
+   unless verify printed `VERIFY OK` in this session after your last edit.
 
 **Hard stops** — do not work around these, write them down and stop:
 
 - Three verify runs fail on the same error → `git checkout -- . && git clean -fd src tools docs`,
   append the card id, the error and your best guess to `docs/plans/BLOCKED.md`, end the session.
-- A card needs a number that is not in `data/` → stop. **Table numbers are vendored, never
-  invented or retuned** (`data/README.md`). Cards marked *needs vendoring* require the human
-  (or a session with network) to add the rows first.
+- **Table numbers are vendored, never invented or retuned** (`data/README.md`). The box has
+  internet: a card marked *needs vendoring* starts by fetching the row from the URLs in the
+  `source` block of the matching `data/*.json`, copying the numbers unchanged, and listing
+  any field you had to author in `source.authored`. If the row is not in the source → stop.
 - Never delete or weaken an existing check to get green. If you believe a check is wrong,
   that is a BLOCKED note, not an edit.
 - Never hand-edit the generated blocks of `src/config.js` or `assets/sprites.png`.
@@ -100,11 +102,13 @@ A prompt you can paste per session is in §10.
 
 ## 3. Phase 0 — groundwork (do these first; they make every later card cheaper)
 
-- [ ] **G0 — Deploy what exists** *(human)*
-  - Merge `ccr-521786a6-e0qp5x` into `main` (it is a fast-forward: `main` is an ancestor),
-    push, then check `gh api repos/barf-bot/aoe2-mini/pages --jq .status` → `built` and run
-    `npm run browser-smoke --prefix tools`. Decide which branch the Strix box works on from
-    now on and write it in `AGENTS.md` §Deploy.
+- [ ] **G0 — Deploy what exists, move to `main`**
+  - `git fetch origin && git checkout main && git merge --ff-only origin/ccr-521786a6-e0qp5x`
+    (a fast-forward: `main` is an ancestor), verify green, `git push origin main`. Wait ~60 s,
+    then byte checks: `curl -s <site>/index.html | diff - index.html` and the same for two `src/` files. Run
+    `npm run browser-smoke --prefix tools` (if Playwright has no browser:
+    `npx --prefix tools playwright install chromium`). Write in `AGENTS.md` §Deploy: all work
+    happens on `main`, one push per green card.
   - **Done when:** the live page has the garrison `Leave` button and the smoke test passes for
     both targets.
 
@@ -392,22 +396,21 @@ through `tools/gen-atlas.js`; check `preview.png` by eye before committing)
 
 ## 8. Decisions for the human (do not let the model guess these)
 
-1. Which branch does the Strix box commit to, and may it push? (G0)
+1. ~~Branch~~ — decided 2026-11-14: everything on `main`, push after each green card.
 2. Keep the invented `+25 % attack per age` scaling, or drop it for AoE2's rules (ages only
    unlock things)? Dropping it changes combat balance and several checks.
 3. Bracer: keep the armour version or port the real effect (+1 range, +1 pierce attack for
    archers, TC, towers)? (C5)
 4. AI fairness: may the AI see through fog once S1 exists?
 5. How far past Castle Age, if ever? (C4/C6 assume Castle stays the cap.)
-6. Can the Strix box reach `raw.githubusercontent.com` to vendor table rows, or do the
-   *needs vendoring* cards wait for a networked session?
+6. ~~Network~~ — decided 2026-11-14: the box has internet; it vendors rows itself.
 
 ---
 
 ## 9. Order of work
 
 ```
-G0 (human) → G1 → G2 → G3 → G4 → G5
+G0 → G1 → G2 → G3 → G4 → G5
 → TODO 23 → TODO 22 → TODO 26
 → G6 → G8 → G7
 → A1 → A2 → A3 → A4 → A5 → A6 → A7 → A8   (red can now win)
@@ -439,7 +442,7 @@ docs/plans/2026-11-14-strix-local-roadmap.md. Do only that card.
 5. Run `npm run verify --prefix tools` until VERIFY OK (audit ref drift:
    `node tools/audit-line-refs.js --fix`).
 6. Update GAME_RULES/TODO/CHANGELOG (≤12 lines) and tick the card's box in the plan.
-7. Commit with an imperative one-line subject. Do not push.
+7. Commit with an imperative one-line subject, then `git push origin main`.
 If the same verify error repeats three times, revert, write docs/plans/BLOCKED.md, stop.
 Never invent stat numbers, never weaken a check, never edit generated blocks.
 ```
