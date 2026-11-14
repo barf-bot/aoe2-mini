@@ -28,7 +28,7 @@ simulation.
 | `src/sim.js` | no | `stepSim`/`updateUnit` (the order state machine — its `build` branch ends a site by calling `promoteBuilding` when the site is an upgrade in progress, and its first guard parks a unit whose `garrisonedIn` is set instead of moving him), combat math (`unitAttack`/`unitArmor`/`hitUnit`/`hitBuilding`/`autoAcquire`/`attackableAsEnemy`/`targetableAsEnemy`), projectiles (`spawnArrow`/`updateProjectiles`/`stepBuildingAttacks`) |
 | `src/movement.js` | no | `tileOf`, A\* (`findPath`), `stepToward`/`moveUnit`/`standTarget`, `formationSlots`, `walkable`, `reachOf`, `separate` |
 | `src/economy.js` | no | gathering (`workersOnTile`, `findDropoff`, `deposit`, `depleteTile`, `nextSource`, `resumeGather`), `popCap`/`popUsed`, `selectedUnits`, `canAfford`/`spend`/`refund` |
-| `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`, `canPlaceAt`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, plus `toast` |
+| `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`/`pickBuilders`, `canPlaceAt`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, plus `toast` — `build`, `pickBuilders` and `upgradeAge` take a `team` (default `0`, the player) and `build` an optional `crew` of villager ids (roadmap A1), so the AI orders through the same commands without writing on the player's toast line |
 | `src/structures.js` | no | the building chain and its garrison helpers: `upgradeBuilding`/`promoteBuilding` (the two halves of a tower upgrade), `ringSpot`/`placeOnRing`, `garrisonUnits`/`leaveBuilding` |
 | `src/ai.js` | no | `aiStep` — the enemy village, acting through the same commands |
 | `src/save.js` | guarded | `storageGet`/`storageSet` (the one door to `localStorage`, node-safe), `encodeState`/`decodeState`, `markDirty`, `saveGame`/`loadGame`, `migrate`/`validState` |
@@ -66,10 +66,10 @@ there, so the renderer never has to wonder where the sheet came from.
 Persistence: the plain half of that object is the save payload — `encodeState`
 (`src/save.js:77`) picks exactly the fields `saveGame` writes, the per-runtime caches (`dom`,
 `view`, `mm`, `mmBase`, `toastMsg`, `toastAt`, `pingAt`, `frame`, `pathQueries`, `sprites`, `rnd`,
-`mapEpoch`, `autosaveAt`, `sound`) stay out of it and are rebuilt on load — so one object shape can be
+`mapEpoch`, `autosaveAt`, `sound`, `aiLog`) stay out of it and are rebuilt on load — so one object shape can be
 written to `localStorage` and read back into a fresh `createState` (`src/boot.js:38`). The
 ruleset itself is `docs/GAME_RULES.md` §Save / load; the parts are below in
-`### Save / load` (`saveGame`, `src/save.js:123`).
+`### Save / load` (`saveGame`, `src/save.js:128`).
 
 Coordinate systems: **tile** coords (`tx`,`ty`) for the world grid, **world pixels**
 (`x = tx * CFG.TILE`), **screen pixels** (`sx`) via `toWorld(e)` / camera offset. Terrain
@@ -161,7 +161,7 @@ arrow in `Game.projectiles` that flies at `CFG.PROJ_SPEED` px/s and resolves thr
 land, deleted either way. Built buildings with `attack > 0` (Town Center 5, LOS 8) shoot
 the same way from `stepBuildingAttacks` (`src/sim.js:136`).
 
-### Save / load (`saveGame`, `src/save.js:123`)
+### Save / load (`saveGame`, `src/save.js:128`)
 
 `src/save.js` owns the whole contract. `encodeState` (`src/save.js:77`) is the single owner of the
 schema — the field list the harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:53`) —

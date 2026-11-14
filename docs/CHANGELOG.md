@@ -128,6 +128,19 @@ commits on `main`.
   stockpile, since nothing counts hauls before S5. First table (seeds 1-10, 20 min): no winner on
   any seed, red at 5 villagers, wood/gold/stone unmoved — R2 measured; checks stay 451.
 
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` A1: commands take a team (fixes R4)
+
+- `build`, `pickBuilders` and `upgradeAge` (`src/commands.js`) take a `team` (default `0`, the
+  player); `build` also takes an optional `crew` of villager ids, so a red build pays from
+  `Game.res[1]`, owns the site as team 1, leaves the player's placement ghost armed and uses
+  exactly the named villagers instead of the selection or the nearest-villager search. The
+  player path is untouched, so every construction/training assertion still passes unchanged.
+- `toast` routes any other team's message to `Game.aiLog` (`createState`, `src/boot.js`; the
+  last 50 `{t, msg}`, never saved) and the `age` chime fires for team 0 alone — the AI's
+  feedback is its log. `src/ai.js` still calls the defaults; card A2 switches it to team 1.
+- checks: `12-ai.js` gains the eight A1 cases (suite 451 → 459); the `tools/ai-arena.js` table
+  is byte-identical before and after, as it must be when no AI behaviour changed.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep

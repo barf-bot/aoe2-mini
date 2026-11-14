@@ -46,6 +46,7 @@ function createState() {
     time: 0, wave: 0, age: [0, 0], ageBonus: [0, 0], techs: [new Set(), new Set()], nextId: 1, started: false, result: null, rngState: CFG.SEED, simAcc: 0,
     mapEpoch: 0, pathQueries: 0, // walkable-set epoch + findPath budget, both section-4 path state
     dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0, autosaveAt: 0, sound: null,
+    aiLog: [],   // the enemy toast history (src/commands.js `toast`): per-runtime feedback, never saved
   };
   Game.toast = (m) => toast(Game, m);
   resetGame(Game);

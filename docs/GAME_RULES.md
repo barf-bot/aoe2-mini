@@ -151,10 +151,12 @@ a bug.
   Mining Camp — are `age: 0`, the eight Feudal rows — Barracks (the table's own
   `internal_name` is `Barracks Age1`), Mill, Archery Range, Blacksmith, Market, Watch
   Tower, Guard Tower, Barricade — are `age: 1`, and the one Castle row — Keep — is `age: 2`.
-  `build` (`src/commands.js:117`) refuses a row whose
-  age the village has not reached *before* picking a builder or spending
-  (`Barracks requires Feudal Age`), `canPlaceAt` (`src/commands.js:159`) answers the same
-  gate for the placement ghost, and `commandsHtml` (`src/hud.js:109`) never offers the
+  `build` (`src/commands.js`) refuses a row whose
+  age the building's own team has not reached *before* picking a builder or spending
+  (`Barracks requires Feudal Age`): `build` takes the team it builds for, `team = 0` by
+  default (roadmap A1), so a red build is gated by `Game.age[1]` and paid from
+  `Game.res[1]`, while the placement ghost keeps asking the player's age through
+  `canPlaceAt` (`src/commands.js`). `commandsHtml` (`src/hud.js:109`) never offers the
   locked buttons — hotkeys `b`, `m`, `r`, `k`, `e`, `c`, `q`. The Blacksmith's `age: 1` was
   the first gated row (P1-4); the other thirteen rows are now gated by the same number, and
   §7e of `tools/checks/05-construction.js` proves both halves per row: the Dark Age
@@ -172,7 +174,7 @@ a bug.
   `Not your building`, `Already under construction`, `<label> has no upgrade`,
   `<label> requires <Age>`, `Not enough <res>`, `All villagers are building` /
   `No villager available` — every one answered before anything is spent. Cancelling an
-  upgrade in progress (`cancelConstruction`, `src/commands.js:169`) refunds
+  upgrade in progress (`cancelConstruction`, `src/commands.js:182`) refunds
   `floor(CFG.CANCEL_REFUND × BLD[b.upgrade].cost)` — the tier being paid for, not the one
   standing — and leaves the old tier built (`Guard Tower upgrade cancelled`) instead of
   removing the building. Population never moves: all three tower rows carry `pop: 0`. The
@@ -199,14 +201,14 @@ a bug.
   `tools/checks/08-input.js`, §9h of `07-combat.js`, §11e of `09-hud.js` and the two §13
   save cases in `10-reset-save.js`; no data, no `src/config.js` and no `assets/sprites.png`
   byte moved for it.
-- The Barricade adds no placement or combat code of its own: `build` (`src/commands.js:117`)
+- The Barricade adds no placement or combat code of its own: `build` (`src/commands.js:129`)
   drafts its crew (`pickBuilders`, `src/commands.js:96`) through the same `canPlaceAt`
-  (`src/commands.js:159`) rule, cancelling refunds
+  (`src/commands.js:172`) rule, cancelling refunds
   `floor(3 × CFG.CANCEL_REFUND)` = **2** wood and demolishing costs nothing — and a
   built or half-built segment registers its one tile in `Game.occupied` like any other
   footprint, so routes reroute around it and a raze reopens the gap
   (`docs/plans/2026-11-12-wooden-barricade.md`).
-- Market trade (`trade`, `src/commands.js:253`): the market row is the only one carrying
+- Market trade (`trade`, `src/commands.js:266`): the market row is the only one carrying
   `trade` rates — selling 100 of food, wood or stone pays `trade.sell` **33** gold, buying
   100 back costs `trade.buy` **67** gold — and the six buttons on a finished Market move
   exactly 100 units at that rate in one click. Every refusal routes through `toast`:
@@ -223,16 +225,19 @@ a bug.
   Center (and food also to farms) when the dedicated building doesn't exist. A farm
   never receives its own harvest. Farms feed 170 food (`BLD.farm.field`) before going
   idle; the mill tracks `field` the same way.
-- One rule judges a tile — `canPlaceAt` (`src/commands.js:159`): the row's `age` gate plus a
-  free, walkable footprint (`siteFree`, `src/commands.js:203`). A click that fails it is
+- One rule judges a tile — `canPlaceAt` (`src/commands.js:172`): the row's `age` gate plus a
+  free, walkable footprint (`siteFree`, `src/commands.js:216`). A click that fails it is
   refused (`Can't build there`) with nothing spent and `Game.placing` still armed; the old
   answer was to move the site to `findSite` (`src/world.js:162`) next to the villager, and a
   tile more than 7 tiles off the builder failed too (docs/TODO.md P0-3). Distance is no
   longer part of the rule — the builder walks — so `findSite` only answers the button call
   without a tile, and `drawGhost` (`src/render.js:246`) paints with the same `canPlaceAt`.
   Placement also needs enough resources. The crew (`pickBuilders` via
-  `build`, `src/commands.js:117`) is every free villager in the current selection, else
-  the nearest free team-0 villager: a villager on a harvest/move order, or one whose
+  `build`, `src/commands.js`) is, for `team = 0` — the default, the player — every free
+  villager in the current selection, else the nearest free villager of that team: the
+  selection is the player's own, so any other team goes straight to its own pool, and an
+  explicit `crew` of villager ids (roadmap A1, the AI's path) replaces both searches with
+  exactly the live villagers of that team it names. A villager on a harvest/move order, or one whose
   `build` order points at a finished or demolished building, is free (that order is
   abandoned), while one working a site with `built < 1` is never yanked off — so a
   placement gets the whole free crew, their work stacks in `updateUnit`, and four
@@ -260,7 +265,7 @@ a bug.
   must be affordable, and must have population room (`Need more houses`). Room is measured by
   one helper, `popCommitted` (`src/economy.js:118`): every living unit of the team
   (`popUsed`, `src/economy.js:108` — villagers, militia and archers alike, docs/TODO.md
-  P1-10) plus every unit still queued in its buildings. `train` (`src/commands.js:218`) and
+  P1-10) plus every unit still queued in its buildings. `train` (`src/commands.js:231`) and
   the footer's disabled buttons (`commandsHtml`, `src/hud.js:109`) both read it, so the
   opening village reads 5/5 and a button never offers a click the command would refuse.
 
@@ -282,7 +287,7 @@ a bug.
 | Fletching | Blacksmith | 100 food + 50 gold | 30 s | +1 pierce attack |
 | Bracer | Blacksmith | 300 food + 200 gold | 40 s | +1 pierce armour |
 
-- Only a finished Blacksmith researches (`researchTech`, `src/commands.js:234`): the tech's age
+- Only a finished Blacksmith researches (`researchTech`, `src/commands.js:247`): the tech's age
   must be reached (`Forge requires Feudal Age`), one tech at a time per building
   (`Blacksmith is busy`), never a duplicate (`Forge already researched`), cost checked
   (`Not enough food`), and other buildings refuse its techs (`Barracks cannot research
@@ -295,11 +300,14 @@ a bug.
 ## Ages (`AGES`)
 
 Dark Age → Feudal Age → Castle Age (`src/config.js:286`): Castle Age is the last age, as the
-README states, and `upgradeAge` (`src/commands.js:269`) answers `Castle Age reached` there.
+README states, and `upgradeAge` (`src/commands.js`) answers `Castle Age reached` there.
 Cost (`src/config.js:17`): Dark → Feudal **500 food** (`CFG.AGE_FOOD`); every later age
 costs `AGE_FOOD * 2` = **1000 food** (Feudal → Castle). Hotkey `T`.
-Each upgrade sets `Game.ageBonus[0] = Game.age[0]`, which scales the player's unit damage; the
-enemy's half stays 0 and its tech set empty until the AI can research (docs/TODO.md P1-11).
+`upgradeAge(Game, team = 0)` (roadmap A1) advances `Game.age[team]` and sets
+`Game.ageBonus[team] = Game.age[team]`, which scales that team's unit damage; the `age`
+chime and the on-screen message stay the player's (team 0) and another team's answer goes to
+`Game.aiLog`. The enemy's tech set stays empty until the AI can research
+(docs/TODO.md P1-11).
 
 ## Enemy AI (Red)
 
@@ -357,7 +365,8 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   (`src/save.js:217`) bumps `mapEpoch` instead of restoring it, so every cached route rebuilds on
   its first step. Excluded as per-runtime caches: `dom`, `view`, `mm`, `mmBase`, `toastMsg`,
   `toastAt`, `pingAt`, `frame`, `pathQueries`, `sprites`, `mapEpoch`, `autosaveAt`, `sound`,
-  and since G6 `simAcc` (`rngState` joined the payload instead of being rebuilt from the seed).
+  `aiLog` (the enemy toast history, transient since A1) and since G6 `simAcc` (`rngState`
+  joined the payload instead of being rebuilt from the seed).
 - **References become ids** — `Game.selectedBuilding` is stored as an id and relinked on load
   (`decodeState`, `src/save.js:203`); a projectile's target becomes `tk` (`'unit' | 'building'`)
   plus `tid` (`encodeProjectile`, `src/save.js:71`, and `decodeProjectile`, `src/save.js:204`

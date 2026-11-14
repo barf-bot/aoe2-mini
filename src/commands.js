@@ -82,27 +82,36 @@ function issueOrder(Game, wx, wy) {
   if (n) { Game.pingAt = Game.time; markDirty(Game); }
 }
 
-/** The villagers a placement drafts (T5 + docs/TODO.md P0-4): every free
- *  villager in the current selection, or — the selection holding none, the way
- *  the button call always worked — the nearest free villager of the player's
- *  own team. "Free" = not assigned to an unfinished building; a harvest or a
- *  go_deposit or move order is simply abandoned (as it always was), and a
- *  villager whose order is build on a building with built < 1 is never taken.
- *  The picker used to answer the single nearest of them, which yanked him off
- *  his first site on every new placement while the rest of a four-villager
- *  crew stood around watching one man build; the whole free crew is handed the
- *  order now — updateUnit stacks their work, so the site goes up faster and a
- *  half-built house never depends on one villager surviving. */
-function pickBuilders(Game, site) {
+/** The villagers a placement drafts (T5 + docs/TODO.md P0-4; the `team` and `crew`
+ *  arguments are roadmap A1). With no `crew`: team 0 — the player — takes every free
+ *  villager in the current selection, or, the selection holding none the way the button
+ *  call always worked, the nearest free villager of his own team; any other team owns no
+ *  selection and goes straight to its own nearest free villager. With a `crew` — an
+ *  explicit list of villager ids — exactly the live villagers of `team` it names are
+ *  used and neither search runs. "Free" = not assigned to an unfinished building (a
+ *  harvest, go_deposit or move order is abandoned as it always was, and a villager
+ *  working a site with built < 1 is never yanked off it); handing the whole free crew the
+ *  order, instead of the single nearest one the old picker answered with, is what lets
+ *  four villagers raise a house in under half the time one does, since updateUnit stacks
+ *  their work. */
+function pickBuilders(Game, site, team = 0, crew = null) {
+  if (crew) {                                  // named ids: resolve them, search nothing
+    const named = [];
+    for (const id of crew) {
+      const u = Game.units.find((v) => v.id === id);
+      if (u && u.team === team && !u.dead && u.kind === 'villager') named.push(u);
+    }
+    return named;
+  }
   const free = (u) => {
     if (u.kind !== 'villager' || u.dead) return false;
     if (u.order.kind !== 'build') return true;
     const b = Game.buildings.find((z) => z.id === u.order.b);
     return !b || b.built >= 1;
   };
-  const sel = selectedUnits(Game).filter(free);
+  const sel = team === 0 ? selectedUnits(Game).filter(free) : [];  // the selection is the player's
   if (sel.length) return sel;
-  const pool = Game.units.filter((u) => u.team === 0 && free(u));
+  const pool = Game.units.filter((u) => u.team === team && free(u));
   if (!pool.length) return [];
   if (!site) return [pool[0]];
   let best = pool[0], bd = Infinity;
@@ -113,18 +122,22 @@ function pickBuilders(Game, site) {
   return [best];
 }
 
-/** Build button / click-to-place. */
-function build(Game, kind, atX, atY) {
+/** Build button / click-to-place. `team` (default 0, the player) pays for and owns the
+ *  site; `crew` (A1) can name the builders instead of the selection being asked. The
+ *  player-only steps — the `placing` guard and clearing the ghost — run for team 0 alone,
+ *  so an AI build never wipes what the player is about to place. */
+function build(Game, kind, atX, atY, team = 0, crew = null) {
   const def = BLD[kind];
-  if (Game.placing && atX === undefined) return;
+  if (team === 0 && Game.placing && atX === undefined) return;
   const clicked = atX !== undefined && atY !== undefined
     ? { tx: Math.floor(atX / CFG.TILE), ty: Math.floor(atY / CFG.TILE) }
     : null;
-  if ((def.age ?? 0) > Game.age[0]) return toast(Game, def.label + ' requires ' + AGES[def.age]);
-  const crew = pickBuilders(Game, clicked);
-  if (!crew.length) return toast(Game, Game.units.some(u => u.team === 0 && u.kind === 'villager')
-    ? 'All villagers are building' : 'No villager available');
-  if (!canAfford(Game, 0, def.cost)) return toast(Game, 'Not enough ' + missing(Game, 0, def.cost));
+  if ((def.age ?? 0) > Game.age[team]) return toast(Game, def.label + ' requires ' + AGES[def.age], team);
+  const picked = pickBuilders(Game, clicked, team, crew);
+  if (!picked.length) return toast(Game, crew ? 'No villager in the crew'
+    : Game.units.some((u) => u.team === team && u.kind === 'villager')
+      ? 'All villagers are building' : 'No villager available', team);
+  if (!canAfford(Game, team, def.cost)) return toast(Game, 'Not enough ' + missing(Game, team, def.cost), team);
   /* A click is the site or nothing (docs/TODO.md P0-3): the old answer for a
      tile it could not build on — an occupied footprint, or anything more than
      7 tiles off the builder — was to move the site to findSite's pad next to
@@ -134,19 +147,19 @@ function build(Game, kind, atX, atY) {
      has no tile to honour and has always meant "put it up near a villager". */
   const site = clicked
     ? (canPlaceAt(Game, kind, clicked.tx, clicked.ty) ? clicked : null)
-    : findSite(Game.world, Math.floor(crew[0].x / CFG.TILE), Math.floor(crew[0].y / CFG.TILE), def.w);
-  if (!site) return toast(Game, "Can't build there");
-  spend(Game, 0, def.cost);
-  const b = makeBuilding(Game, kind, 0, site.tx, site.ty);
-  /* every free villager in the crew takes the order (docs/TODO.md P0-4), and none
+    : findSite(Game.world, Math.floor(picked[0].x / CFG.TILE), Math.floor(picked[0].y / CFG.TILE), def.w);
+  if (!site) return toast(Game, "Can't build there", team);
+  spend(Game, team, def.cost);
+  const b = makeBuilding(Game, kind, team, site.tx, site.ty);
+  /* every villager picked above takes the order (docs/TODO.md P0-4), and none
      of them keeps a formation tile: a site owns no tile, as issueOrder rules. */
-  for (const u of crew) {
+  for (const u of picked) {
     u.order = { kind: 'build', b: b.id };
     u.slot = null;
   }
-  Game.placing = null;
+  if (team === 0) Game.placing = null;
   markDirty(Game);                         // the spend and the new site are a change
-  toast(Game, def.label + ' started');
+  toast(Game, def.label + ' started', team);
   return b;
 }
 
@@ -266,21 +279,27 @@ function trade(Game, b, res, direction) {
   return b;
 }
 
-function upgradeAge(Game) {
-  if (Game.age[0] >= AGES.length - 1) return toast(Game, AGES[AGES.length - 1] + ' reached');
-  const cost = { food: Game.age[0] === 0 ? CFG.AGE_FOOD : CFG.AGE_FOOD * 2 };
-  if (!canAfford(Game, 0, cost)) return toast(Game, 'Need ' + cost.food + ' food');
-  spend(Game, 0, cost);
-  Game.age[0]++;                             // the player's own age (docs/TODO.md P1-11)
-  Game.ageBonus[0] = Game.age[0];            // and only the player's attack/armour scaling
-  playSfx(Game, 'age');
+function upgradeAge(Game, team = 0) {
+  if (Game.age[team] >= AGES.length - 1) return toast(Game, AGES[AGES.length - 1] + ' reached', team);
+  const cost = { food: Game.age[team] === 0 ? CFG.AGE_FOOD : CFG.AGE_FOOD * 2 };
+  if (!canAfford(Game, team, cost)) return toast(Game, 'Need ' + cost.food + ' food', team);
+  spend(Game, team, cost);
+  Game.age[team]++;                          // the side that paid (docs/TODO.md P1-11, A1)
+  Game.ageBonus[team] = Game.age[team];      // and only that side's attack/armour scaling
+  if (team === 0) playSfx(Game, 'age');      // the player hears it; the AI's feedback is its log
   markDirty(Game);                         // the age up is a change
-  toast(Game, AGES[Game.age[0]] + ' reached');
+  toast(Game, AGES[Game.age[team]] + ' reached', team);
 }
 
 /* ------------------------------- toast --------------------------------- */
 
-function toast(Game, msg) {
+function toast(Game, msg, team = 0) {
+  if (team !== 0) {                     // A1: an AI has no toast line — keep its last 50
+    const log = Game.aiLog || (Game.aiLog = []);
+    log.push({ t: Game.time, msg });
+    if (log.length > 50) log.shift();
+    return;
+  }
   Game.toastMsg = msg;
   Game.toastAt = Game.time;
   const el = Game.dom && Game.dom.toast;

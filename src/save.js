@@ -29,9 +29,11 @@ function storageSet(path, raw) {
    reads back. Everything else on Game is a per-runtime cache and stays out of the
    payload — the nine DOM-only fields (dom, view, mm, mmBase, toastMsg, toastAt,
    pingAt, frame, sound), pathQueries (a run counter), sprites (the live atlas Image),
-   mapEpoch (loadGame recomputes it), autosaveAt (the save schedule) and simAcc (the
+   mapEpoch (loadGame recomputes it), autosaveAt (the save schedule), simAcc (the
    fixed-timestep accumulator, transient since G6 — the saved rngState resumes the
-   stream; Game.rnd used to be the unpersisted closure, now replaced by rngState). */
+   stream; Game.rnd used to be the unpersisted closure, now replaced by rngState) and
+   aiLog (the enemy toast history, transient since A1 — the AI's feedback is its own log,
+   not something the save has to carry). */
 
 /* A source reference minus its live part: `amount` is a getter onto world.amount or
    a farm's field, so the payload keeps the tile / farm it names and loadGame hands

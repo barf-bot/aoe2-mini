@@ -215,7 +215,7 @@ Today's AI is ~30 lines of logic. The goal of this phase: **with an idle player,
 inside 20 minutes on every seed; against `--blue ai`, red wins 40–60 % of seeds.** Every card
 reports `tools/ai-arena.js` before/after.
 
-- [ ] **A1 — Commands take a team**
+- [x] **A1 — Commands take a team**
   - **Read:** `build`, `pickBuilders`, `upgradeAge`, `toast` (`src/commands.js`).
   - **Change:** `build(Game, kind, atX, atY, team = 0, crew = null)` — `crew` is an explicit
     list of villager ids (the AI passes it; the player path keeps using the selection).
