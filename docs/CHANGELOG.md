@@ -141,6 +141,19 @@ commits on `main`.
 - checks: `12-ai.js` gains the eight A1 cases (suite 451 → 459); the `tools/ai-arena.js` table
   is byte-identical before and after, as it must be when no AI behaviour changed.
 
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` A2: the AI state and tick (fixes R3, TODO 21)
+
+- `Game.ai = [null, { lastTick: -1 }]` (`src/boot.js`) is the per-team brain slot — the player
+  has none until A10 — saved by `encodeState`/`decodeState` and filled by `migrate` for every
+  older payload (`CFG.VERSION` 3 → 4); `CFG.AI_TICK: 1` is authored in `data/units.json`, the
+  table carrying no AI cadence.
+- `aiStep` (`src/ai.js`) is a dispatcher now: one decision per `CFG.AI_TICK` (`aiTickDue`, the
+  clock in `Game.ai[1]`), `Game.wave` keeping the separate `CFG.WAVE_EVERY` clock, and every
+  order going through `train` — `queueTrain` is gone, so a Town Center makes villagers and
+  red's militia wait for a Barracks (A6). `train` toasts with `bld.team` and `canPlaceAt`
+  takes a `team`, closing the two routing gaps A1 left.
+- checks: `12-ai.js` 13 → 26 (suite 459 → 472); the `tools/ai-arena.js` after-table is in the commit body.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep

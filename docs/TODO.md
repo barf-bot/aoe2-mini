@@ -41,16 +41,6 @@ Town Center's arrows within the first two minutes. The game cannot be lost.
 - **Done when:** a check in `tools/checks/12-ai.js` runs 15 simulated minutes with an idle
   player and asserts red built at least one house, gathered wood and fielded ≥ 5 fighters.
 
-### 21. The AI trains militia at its Town Center
-
-**Verified** by reading: `queueTrain` (`src/ai.js`) spends and pushes onto the Town Center
-queue directly, skipping `train`, whose `BLD[...].trains` check would refuse it — the Town
-Center row trains only `villager`. Red therefore gets militia without a Barracks.
-
-- **Fix:** delete `queueTrain`; the AI calls `train(Game, bld, kind)` like the player (after
-  `toast` is made team-aware, see item 23). Red must own a finished Barracks to get militia.
-- **Done when:** `12-ai.js` asserts a red village with no Barracks never queues `militia`.
-
 ---
 
 ## P2 — smaller defects

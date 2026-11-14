@@ -102,6 +102,7 @@ function encodeState(Game) {
     age: Game.age,                     // [player, enemy] — per team since docs/TODO.md P1-11
     ageBonus: Game.ageBonus,           // ditto: the age scaling each team's units read
     techs: [Array.from(Game.techs[0]), Array.from(Game.techs[1])],
+    ai: Game.ai,                       // [null, {lastTick}] — the per-team brain slot (src/ai.js, roadmap A2)
     nextId: Game.nextId,
     started: Game.started,
     result: Game.result,
@@ -136,29 +137,31 @@ function saveGame(path, Game, at = now()) {
   return raw;
 }
 
-/* The version hook: v3 (rngState joins the state, G6) is what this build writes;
-   a v2 payload — age / ageBonus / techs per team since docs/TODO.md P1-11 — gets
-   rngState filled from its own world seed, the stream restart without a saved
-   number. A v1 payload — one global age, ageBonus and techs set — folds into the
-   player's half first, the enemy's staying 0 and empty, and takes the same fill. */
+/* The version hook: v4 (`Game.ai` joins the state — roadmap A2 gives the enemy a brain to
+   save) is what this build writes. Older payloads are repaired by filling exactly the fields
+   they predate, newest shape first: a v3 payload (rngState in, G6) gains the brain slot; a
+   v2 payload (age / ageBonus / techs per team since docs/TODO.md P1-11) gains rngState from
+   its own world seed plus the slot; a v1 payload (one global age, ageBonus and techs set)
+   folds into the player's half first, the enemy's staying 0 and empty, and gains both. The
+   answer carries the current version, so a save never has to be repaired twice, and any
+   other number — newer included, or a state that is not an object with a world — is
+   refused, which is what makes loadGame's `version: 999` case a reset instead of a guess. */
 function migrate(payload) {
   if (!payload || typeof payload !== 'object') return null;
   if (payload.version === CFG.VERSION) return payload;
-  if (payload.version === 2) {
-    const s = payload.state;
-    if (!s || typeof s !== 'object' || Array.isArray(s) ||
-        !s.world || typeof s.world !== 'object') return null;
-    if (typeof s.rngState === 'number') return payload;
-    return Object.assign({}, payload,
-      { state: Object.assign({}, s, { rngState: s.world.seed }) });
-  }
-  if (payload.version !== 1) return null;   // v2 and v1 are the older shapes there are
+  if ([1, 2, 3].indexOf(payload.version) < 0) return null;    // the older shapes there are
   const s = payload.state;
-  if (!s || typeof s !== 'object' || Array.isArray(s) || typeof s.age !== 'number' ||
-      typeof s.ageBonus !== 'number' || !Array.isArray(s.techs)) return null;
-  return Object.assign({}, payload, { state: Object.assign({}, s,
-    { age: [s.age, 0], ageBonus: [s.ageBonus, 0], techs: [s.techs, []],
-      rngState: s.world ? s.world.seed : payload.seed }) });
+  if (!s || typeof s !== 'object' || Array.isArray(s) || !s.world || typeof s.world !== 'object') return null;
+  const state = Object.assign({}, s);
+  if (payload.version === 1) {                                // one global age / bonus / techs
+    if (typeof state.age !== 'number' || typeof state.ageBonus !== 'number' || !Array.isArray(state.techs)) return null;
+    state.age = [state.age, 0];
+    state.ageBonus = [state.ageBonus, 0];
+    state.techs = [state.techs, []];
+  }
+  if (typeof state.rngState !== 'number') state.rngState = state.world.seed;   // G6
+  if (!Array.isArray(state.ai)) state.ai = [null, { lastTick: -1 }];            // A2
+  return Object.assign({}, payload, { version: CFG.VERSION, state });
 }
 
 /* Everything decodeState needs, checked before a single field is assigned: the
@@ -176,7 +179,8 @@ function validState(payload) {
       !Array.isArray(s.projectiles) || !Array.isArray(s.age) || s.age.length !== 2 ||
       !Array.isArray(s.ageBonus) || s.ageBonus.length !== 2 ||
       !Array.isArray(s.techs) || s.techs.length !== 2 ||
-      !Array.isArray(s.techs[0]) || !Array.isArray(s.techs[1])) return false;
+      !Array.isArray(s.techs[0]) || !Array.isArray(s.techs[1]) ||
+      !Array.isArray(s.ai) || s.ai.length !== 2) return false;
   if (!Array.isArray(s.res) || s.res.length !== 2 ||
       s.res.some((r) => !r || typeof r !== 'object' || Array.isArray(r))) return false;
   if (!s.blocks || typeof s.blocks !== 'object' || Array.isArray(s.blocks)) return false;
@@ -257,6 +261,7 @@ function decodeState(Game, state, seed) {
   Game.started = state.started;
   Game.result = state.result;
   Game.techs = [new Set(state.techs[0]), new Set(state.techs[1])];
+  Game.ai = state.ai;                  // [null, {lastTick}] — the enemy brain resumes its tick clock (src/ai.js, A2)
   Game.rngState = typeof state.rngState === 'number' ? state.rngState : seed >>> 0;
 }
 

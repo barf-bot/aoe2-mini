@@ -208,7 +208,7 @@ a bug.
   built or half-built segment registers its one tile in `Game.occupied` like any other
   footprint, so routes reroute around it and a raze reopens the gap
   (`docs/plans/2026-11-12-wooden-barricade.md`).
-- Market trade (`trade`, `src/commands.js:266`): the market row is the only one carrying
+- Market trade (`trade`, `src/commands.js:274`): the market row is the only one carrying
   `trade` rates — selling 100 of food, wood or stone pays `trade.sell` **33** gold, buying
   100 back costs `trade.buy` **67** gold — and the six buttons on a finished Market move
   exactly 100 units at that rate in one click. Every refusal routes through `toast`:
@@ -273,7 +273,7 @@ a bug.
   a building counts for its population cap, receives a carried load and can be worked only
   once it is complete — `popCap` (`src/economy.js:102`), `findDropoff` (`src/economy.js:31`),
   `resumeGather` (`src/economy.js:88`), the farm case of `orderForUnit`
-  (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:187`) all test
+  (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:193`) all test
   `built >= 1`, as does the enemy's `aiStep` (`src/ai.js:4`). An *enemy* building follows the
   other half of the rule: attackable at any progress, a 0 % foundation included, the way
   AoE2 does it (`attackableAsEnemy`, `src/sim.js:317`).
@@ -287,7 +287,7 @@ a bug.
 | Fletching | Blacksmith | 100 food + 50 gold | 30 s | +1 pierce attack |
 | Bracer | Blacksmith | 300 food + 200 gold | 40 s | +1 pierce armour |
 
-- Only a finished Blacksmith researches (`researchTech`, `src/commands.js:247`): the tech's age
+- Only a finished Blacksmith researches (`researchTech`, `src/commands.js:255`): the tech's age
   must be reached (`Forge requires Feudal Age`), one tech at a time per building
   (`Blacksmith is busy`), never a duplicate (`Forge already researched`), cost checked
   (`Not enough food`), and other buildings refuse its techs (`Barracks cannot research
@@ -311,12 +311,23 @@ chime and the on-screen message stay the player's (team 0) and another team's an
 
 ## Enemy AI (Red)
 
-Every **45 s** (`CFG.WAVE_EVERY`): if Red is at population cap, every free militia is
-ordered to attack the nearest blue unit ("Red attack wave!"); otherwise a **finished** Town
-Center (`src/ai.js:4`) queues a villager while the village holds fewer than 5 units — every
-kind counts, since `popUsed` counts them all (docs/TODO.md P1-10) — else a militia, and never
-double-queues: a Red keep still at 50 % caps nobody, trains nobody and sends no wave
-(docs/TODO.md P1-9).
+Red has a brain slot of its own — `Game.ai` (`src/boot.js`), saved with the game as
+`[null, { lastTick: -1 }]`, the player's half empty until card A10 — and `aiStep`
+(`src/ai.js`) makes at most one decision per `CFG.AI_TICK` (1 s) of `Game.time`.
+`Game.wave` keeps the separate **45 s** (`CFG.WAVE_EVERY`) attack clock the rules below
+document: a wave is not a decision and a decision is not a wave (roadmap A2).
+
+- **Train** (`aiTrain`, `src/ai.js`) — one unit per tick, asked through `train`
+  (`src/commands.js`) like any other player's: the building's own `trains` row is the law, so
+  a Town Center queues `villager` and nothing else until a Barracks exists (card A6). The
+  removed `queueTrain` used to spend and push militia onto the Town Center queue behind that
+  row's back (docs/TODO.md P1-21). A building with a unit in its queue trains nothing more,
+  and a half-built enemy Town Center caps nobody, trains nobody and sends no wave
+  (docs/TODO.md P1-9).
+- **Fight** (`aiAttackWave`, `src/ai.js`) — at population cap, every militia holding no live
+  order is sent at the closest blue unit (`nearestEnemy`, `src/ai.js`) and the village
+  announces `Red attack wave!` through `toast` with team 1, so it lands in `Game.aiLog` and
+  never over the player's toast line (the A1 rule, which A2 completes for this call).
 
 ## Win / lose
 
@@ -341,20 +352,23 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
 
 - **Envelope** — `saveGame(path, Game, at = now())` (`src/save.js:126`) writes
   `{ version, seed, writtenAt, state }`: `version` is `CFG.VERSION` (`src/config.js:27`),
-  `3`; `seed` is `Game.world.seed` falling back to `CFG.SEED`; `writtenAt` is the `at`
+  `4`; `seed` is `Game.world.seed` falling back to `CFG.SEED`; `writtenAt` is the `at`
   argument, pinned so the same `Game` saved twice gives the same bytes; `state` is
   `encodeState(Game)` (`src/save.js:81`), the schema the
   harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:56`) — since G6 it also
   carries `rngState`, the mulberry32 state `nextRand` (`src/world.js`) advances, so the
   rng stream no longer needs the seed to be rebuilt.
-- **Version rule** — `migrate(payload)` (`src/save.js:142`) takes `CFG.VERSION` (3) as written and
-  converts a `version: 2` payload by filling its missing `rngState` from the world's `seed`, and a
-  `version: 1` payload — one global `age`, `ageBonus` and `techs` set — into the
-  per-team shape (the player's half filled, the enemy's empty) plus the same `rngState`
-  fill, instead of throwing such a save away; any other version is refused. `validState(payload)` (`src/save.js:166`) then checks the
-  shape before a single field is assigned — the world's `w`/`h`/`seed` against `CFG.MAP_W`/`MAP_H`,
-  the array and object containers (the per-team `age` / `ageBonus` / `techs` pair among them),
-  `time` and `nextId` as numbers. Every refusal
+- **Version rule** — `migrate(payload)` (`src/save.js`) takes `CFG.VERSION` (4) as written and
+  repairs every older shape by filling exactly the fields it predates, newest first: a
+  `version: 3` payload gains the `ai` brain slot (A2), a `version: 2` payload gains that plus
+  the `rngState` G6 introduced (from the world's `seed`), and a `version: 1` payload — one
+  global `age`, `ageBonus` and `techs` set — folds into the per-team shape (the player's half
+  filled, the enemy's empty) before taking both fills. The answer comes back stamped
+  `CFG.VERSION`, so a repaired save is never repaired twice; any other version — a newer one
+  included — is refused. `validState(payload)` (`src/save.js`) then checks the shape before a
+  single field is assigned — the world's `w`/`h`/`seed` against `CFG.MAP_W`/`MAP_H`, the array
+  and object containers (the per-team `age` / `ageBonus` / `techs` pair and the two-slot `ai`
+  pair among them), `time` and `nextId` as numbers. Every refusal
   (missing slot, empty slot, unparseable text, an unreadable version, an unwalkable shape) ends
   the same way: `loadGame(path, Game, raw = storageGet(path))` (`src/save.js:266`) calls
   `resetGame` and answers `false` — it never throws.
@@ -368,8 +382,8 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   `aiLog` (the enemy toast history, transient since A1) and since G6 `simAcc` (`rngState`
   joined the payload instead of being rebuilt from the seed).
 - **References become ids** — `Game.selectedBuilding` is stored as an id and relinked on load
-  (`decodeState`, `src/save.js:203`); a projectile's target becomes `tk` (`'unit' | 'building'`)
-  plus `tid` (`encodeProjectile`, `src/save.js:71`, and `decodeProjectile`, `src/save.js:204`
+  (`decodeState`, `src/save.js:223`); a projectile's target becomes `tk` (`'unit' | 'building'`)
+  plus `tid` (`encodeProjectile`, `src/save.js:71`, and `decodeProjectile`, `src/save.js:210`
   relinks it and drops an arrow whose mark is gone); a `harvest` / `go_deposit` order's `src` is
   stored as the tile or farm it names (`encodeSource`, `src/save.js:38`) and rebuilt through
   `sourceFromTile` (`src/entities.js:16`) / `sourceFromFarm` (`src/entities.js:29`) — a parsed `src`
@@ -380,12 +394,12 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   every command mutator and by `stepSim`'s three completion events (a unit trains, a tech finishes, a
   unit dies), pulls the schedule earlier and never later, so a burst of commands inside the
   window costs ONE write. The write itself sits in `stepGame` after `stepSim(Game, dt)`
-  (`src/boot.js:233-235`) so the saved frame is the one just run, and `stepSim` never writes —
+  (`src/boot.js:225-227`) so the saved frame is the one just run, and `stepSim` never writes —
   driving the simulation from a test touches no storage. `resetGame` sets `Game.autosaveAt =
   Game.time` (`src/boot.js:61`): a new settlement is written by the very next frame, which is
   what makes `N` (`requestReset`, `src/input.js:248`) overwrite the slot instead of waiting out the debounce.
 - **The page surface** — the header's `Save` button (`index.html:20`) writes the slot through
-  `saveGame` (`src/boot.js:185`) and toasts `Saved`; `boot` (`src/boot.js:138`) calls
+  `saveGame` (`src/boot.js:185`) and toasts `Saved`; `boot` (`src/boot.js:142`) calls
   `storageGet` / `loadGame` (`src/boot.js:143-144`) right after `createState` (`src/boot.js:38`),
   so reopening the page lands on the saved game; the three new-game paths — `N`
   (`requestReset`, `src/input.js:248`), the footer's `New map` (the `restart` action, `src/input.js:274`) and the victory overlay's
@@ -406,7 +420,7 @@ the table is the contract, the audio path and the checks are its two readers, th
 | `hit` | triangle | 170 → 60 | 0.14 | 0.35 | `hitUnit` (`src/sim.js:81`) |
 | `arrow` | sawtooth | 880 → 320 | 0.10 | 0.18 | `spawnArrow` (`src/sim.js:97`) |
 | `build` | square | 220 → 140 | 0.20 | 0.25 | `updateUnit`'s `b.built >= 1` branch (`src/sim.js:255`) |
-| `age` | triangle | 392 → 523 → 659 | 0.60 | 0.30 | `upgradeAge` (`src/commands.js:269`) |
+| `age` | triangle | 392 → 523 → 659 | 0.60 | 0.30 | `upgradeAge` (`src/commands.js:290`) |
 | `victory` | sawtooth | 523 → 659 → 784 | 0.90 | 0.30 | `setResult` (`src/entities.js:141`) |
 | `defeat` | sawtooth | 392 → 311 → 262 | 1.10 | 0.28 | `setResult` (`src/entities.js:141`) |
 
@@ -424,7 +438,7 @@ the table is the contract, the audio path and the checks are its two readers, th
   (`src/config.js:288`) through the same `storageSet` the save slot uses; `isMuted`
   (`src/sound.js:12`) reads the button when there is one and the key when there isn't, so a
   muted game stays muted after a reload and a fresh tab starts unmuted. `boot` calls
-  `applyMuteButton` once (`src/boot.js:162`) to honour the saved preference without writing
+  `applyMuteButton` once (`src/boot.js:142`) to honour the saved preference without writing
   the key back, and the sound handle never enters `encodeState`.
 
 ## Interface

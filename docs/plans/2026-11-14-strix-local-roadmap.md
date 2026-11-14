@@ -227,7 +227,7 @@ reports `tools/ai-arena.js` before/after.
     `aiLog`; blue's 409 checks still green.
   - **Done when:** verify green. **Size:** M.
 
-- [ ] **A2 — AI state and tick, no cheating** (fixes TODO 21)
+- [x] **A2 — AI state and tick, no cheating** (fixes TODO 21)
   - **Change:** `Game.ai = [null, {…}]` per-team brain state (saved; version bump if G6 did
     not already). `aiStep` runs a decision every `CFG.AI_TICK` (1 s) and keeps the wave clock
     separately. Delete `queueTrain`; all training through `train`. Split `src/ai.js` into

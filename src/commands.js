@@ -146,7 +146,7 @@ function build(Game, kind, atX, atY, team = 0, crew = null) {
      or the placement is refused; findSite still answers the button call, which
      has no tile to honour and has always meant "put it up near a villager". */
   const site = clicked
-    ? (canPlaceAt(Game, kind, clicked.tx, clicked.ty) ? clicked : null)
+    ? (canPlaceAt(Game, kind, clicked.tx, clicked.ty, team) ? clicked : null)
     : findSite(Game.world, Math.floor(picked[0].x / CFG.TILE), Math.floor(picked[0].y / CFG.TILE), def.w);
   if (!site) return toast(Game, "Can't build there", team);
   spend(Game, team, def.cost);
@@ -166,12 +166,15 @@ function build(Game, kind, atX, atY, team = 0, crew = null) {
 /** The single rule that judges a tile a player wants to put `kind` on: the row's
  *  age gate plus a buildable footprint (`siteFree`). `build` and the placement
  *  ghost in render.js both ask it, so the ghost is never green over a tile the
- *  click would refuse (docs/TODO.md P0-3). Cost is not part of it — the ghost
- *  colours the land, not the wallet — and neither is distance: the builder
- *  walks to whatever tile was clicked. */
-function canPlaceAt(Game, kind, tx, ty) {
+ *  click would refuse (docs/TODO.md P0-3). The age is read per team: `team` (default
+ *  0, the player) says whose age gate the tile is judged by, so a red site is judged by
+ *  red's age — the A1 rule completed here, since `build` already pays and owns per team
+ *  and the ghost keeps the default. Cost is not part of it — the ghost colours the land,
+ *  not the wallet — and neither is distance: the builder walks to whatever tile was
+ *  clicked. */
+function canPlaceAt(Game, kind, tx, ty, team = 0) {
   const def = BLD[kind];
-  if (!def || (def.age ?? 0) > Game.age[0]) return false;
+  if (!def || (def.age ?? 0) > Game.age[team]) return false;
   return siteFree(Game, tx, ty, def.w, def.h);
 }
 
@@ -227,14 +230,19 @@ function siteFree(Game, tx, ty, w, h) {
   return true;
 }
 
-/** Train button. */
+/** The train button and the only door onto a building's queue. A1's team rule, closed
+ *  here by A2: every refusal — a kind the row does not train, a site still going up, a
+ *  full queue, no money, no population room — is answered for `bld.team`, so what the
+ *  enemy hears goes into Game.aiLog and never overwrites the player's toast line. This
+ *  is also what makes the AI's training honest: the row's `trains` list is the law, so a
+ *  Town Center answers 'villager' and nothing else (docs/TODO.md P1-21). */
 function train(Game, bld, kind) {
   const def = BLD[bld.kind];
-  if (!def.trains || def.trains.indexOf(kind) < 0) return toast(Game, KINDS[kind].label + ' needs a ' + def.label);
-  if (bld.built < 1) return toast(Game, 'Still building');
-  if (bld.queue.length >= 5) return toast(Game, 'Queue full');
-  if (!canAfford(Game, bld.team, KINDS[kind].cost)) return toast(Game, 'Not enough ' + missing(Game, bld.team, KINDS[kind].cost));
-  if (popCommitted(Game, bld.team) >= popCap(Game, bld.team)) return toast(Game, 'Need more houses');
+  if (!def.trains || def.trains.indexOf(kind) < 0) return toast(Game, KINDS[kind].label + ' needs a ' + def.label, bld.team);
+  if (bld.built < 1) return toast(Game, 'Still building', bld.team);
+  if (bld.queue.length >= 5) return toast(Game, 'Queue full', bld.team);
+  if (!canAfford(Game, bld.team, KINDS[kind].cost)) return toast(Game, 'Not enough ' + missing(Game, bld.team, KINDS[kind].cost), bld.team);
+  if (popCommitted(Game, bld.team) >= popCap(Game, bld.team)) return toast(Game, 'Need more houses', bld.team);
   spend(Game, bld.team, KINDS[kind].cost);
   bld.queue.push({ kind, t: KINDS[kind].time });
   markDirty(Game);                         // the paid-for queue is a change

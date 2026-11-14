@@ -7,12 +7,14 @@ const {
 } = require('../lib/harness');
 
 /* ---- 15. enemy AI ----------------------------------------------------- */
-/* aiStep acts once per CFG.WAVE_EVERY seconds of a started game. Every fixture is
-   its own createState() stepped through stepSim, so the AI is driven by the same
-   clock the browser drives it with and nothing else is in play. */
+/* aiStep makes at most one decision per CFG.AI_TICK second of a started game (roadmap A2),
+   and the CFG.WAVE_EVERY attack clock lives in Game.wave, apart from the brain's own tick.
+   Every fixture is its own createState() stepped through stepSim, so the AI is driven by
+   the same clock the browser drives it with and nothing else is in play. */
 const red = (g) => g.units.filter((u) => u.team === 1 && !u.dead);
 const redTc = (g) => g.buildings.find((b) => b.team === 1 && b.kind === 'town_center');
 const oneWave = (g) => { for (let i = 0; i < Math.ceil(AoE2.CFG.WAVE_EVERY / DT) + 1; i++) AoE2.stepSim(g, DT); };
+const oneSecond = (g) => { for (let i = 0; i < 30; i++) AoE2.stepSim(g, DT); };   // exactly 1 s: one CFG.AI_TICK
 /** A state whose red villagers stand idle, so the only thing that can move red's stockpile
  *  is the AI. `keep` leaves that many villagers standing and marks the rest dead the way
  *  hitUnit does: popUsed counts every living unit (docs/TODO.md P1-10), so a red village
@@ -47,18 +49,20 @@ const cap = AoE2.popCap(full, 1), used = AoE2.popUsed(full, 1);
 const home = redTc(full);
 const prey = full.units.filter((u) => u.team === 0)
   .sort((a, b) => ((a.x - home.x) ** 2 + (a.y - home.y) ** 2) - ((b.x - home.x) ** 2 + (b.y - home.y) ** 2))[0];
-oneWave(full);
+oneSecond(full);                                     // the tick that acts, not the whole wave
 const sentAt = red(full).filter((u) => u.kind === 'militia');
 check(used >= cap && sentAt.length > 0 && sentAt.every((u) => u.order.kind === 'attack' && u.order.target === prey.id) &&
-      redTc(full).queue.length === 0 && full.toastMsg === 'Red attack wave!',
+      redTc(full).queue.length === 0 && full.toastMsg === '' &&
+      full.aiLog.length === 1 && full.aiLog[0].msg === 'Red attack wave!' && full.aiLog[0].t === full.time,
   'ai: at the population cap the wave sends its militia at the nearest blue unit',
-  'pop ' + used + '/' + cap + ' prey=' + prey.id + ' militia=' + orders(full) + ' toast=' + JSON.stringify(full.toastMsg));
+  'pop ' + used + '/' + cap + ' prey=' + prey.id + ' militia=' + orders(full) +
+  ' toast=' + JSON.stringify(full.toastMsg) + ' log=' + full.aiLog.map((e) => e.t + ':' + e.msg).join(','));
 
 // 3. below the cap with a small village - two villagers and a militia, three of five - so
 //    the militia counting toward the cap (P1-10) does not stop it wanting a villager
 const grow = village(true, 2);
 const before = AoE2.popUsed(grow, 1), food0 = grow.res[1].food;
-oneWave(grow);
+oneSecond(grow);       // A2: the decision is the AI's own tick, so the window is one second
 const q = redTc(grow).queue;
 check(before < AoE2.popCap(grow, 1) && q.length === 1 && q[0].kind === 'villager' &&
       grow.res[1].food === food0 - AoE2.KINDS.villager.cost.food,
@@ -202,5 +206,135 @@ check((r11.aiLog || []).length === 50 && r11.aiLog[0].msg === 'm10' && r11.aiLog
       r11.toastMsg === '',
   'a1: aiLog caps at 50 entries and drops the oldest',
   'log=' + a1Peek(r11) + ' toast=' + JSON.stringify(r11.toastMsg));
+
+/* ---- 17. roadmap A2: the AI state and its tick ------------------------- */
+/* A2 (docs/plans/2026-11-14-strix-local-roadmap.md §5, fixes docs/TODO.md P1-21): the red
+   brain's state is Game.ai[1] — {lastTick}, saved — and aiStep acts at most once per
+   CFG.AI_TICK of Game.time, sends every training order through `train` (queueTrain, which
+   pushed militia onto the Town Center queue behind train's back, is gone), answers through
+   Game.aiLog, and judges a red build by red's own age. These checks step by CFG.SIM_DT —
+   the fixed step itself, the number harness DT carries — so a tick boundary lands on an
+   exact second of Game.time and is compared as a value, not a tolerance. */
+const SIM_DT = AoE2.CFG.SIM_DT;
+const steps = (g, n) => { for (let i = 0; i < n; i++) AoE2.stepSim(g, SIM_DT); };
+const brainOf = (g) => (g.ai || [])[1];
+const tickOf = (g) => (brainOf(g) === undefined ? 'no Game.ai[1]' : String(brainOf(g).lastTick));
+/* write the tick the way its owner does; safe on a build that has no slot yet, so the check
+   fails on the missing field instead of taking the rest of the file down with a TypeError */
+const setTick = (g, t) => { if (brainOf(g)) brainOf(g).lastTick = t; return g; };
+const rich = (g) => { g.res[1] = { food: 9000, wood: 9000, gold: 9000, stone: 9000 }; return g; };
+const peek = (g) => (g.aiLog || []).map((e) => e.t + ':' + e.msg).join(',');
+
+// 12. the cadence constant the card authors, and the slot it drives
+check(AoE2.CFG.AI_TICK === 1, 'a2: CFG.AI_TICK is authored as one second per decision',
+  'AI_TICK=' + AoE2.CFG.AI_TICK);
+const a2slot = village(true);
+check(Array.isArray(a2slot.ai) && a2slot.ai.length === 2 && a2slot.ai[0] === null &&
+      a2slot.ai[1].lastTick === -1,
+  'a2: Game.ai is [null, {lastTick: -1}] — no brain for the player (A10), a sleeping one for red',
+  'ai=' + JSON.stringify(a2slot.ai));
+
+// 13. the cadence itself: 29 steps (0.9666 s) do nothing, the 30th (exactly 1 s) ticks and
+//     pushes exactly one queue entry, the next 29 do nothing again, and the 60th ticks again
+//     without pushing a second one — the Town Center never double-queues (docs/GAME_RULES.md)
+const a2cad = rich(village(true, 2));                   // pop 3 of 5: a tick can only train
+const a2q = (g) => redTc(g).queue.length;
+steps(a2cad, 29);
+check(tickOf(a2cad) === '-1' && a2q(a2cad) === 0,
+  'a2: 29 steps (0.9666 s) — no tick and no queue entry',
+  'tick=' + tickOf(a2cad) + ' queue=' + a2q(a2cad));
+steps(a2cad, 1);
+check(tickOf(a2cad) === String(AoE2.CFG.AI_TICK) && a2q(a2cad) === 1,
+  'a2: the 30th step (1 s) moves lastTick to the boundary and pushes exactly one entry',
+  'tick=' + tickOf(a2cad) + ' queue=' + a2q(a2cad) + ' ' + redTc(a2cad).queue.map((x) => x.kind).join(','));
+steps(a2cad, 29);
+check(tickOf(a2cad) === String(AoE2.CFG.AI_TICK) && a2q(a2cad) === 1,
+  'a2: 29 more steps (1.9666 s) — still that one tick, still that one entry',
+  'tick=' + tickOf(a2cad) + ' queue=' + a2q(a2cad));
+steps(a2cad, 1);
+check(tickOf(a2cad) === '2' && a2q(a2cad) === 1,
+  'a2: the 2 s tick moves the clock and pushes nothing while that villager is still training',
+  'tick=' + tickOf(a2cad) + ' queue=' + a2q(a2cad) + ' ' + redTc(a2cad).queue.map((x) => x.kind).join(','));
+
+// 14. the wave clock stays separate from the tick: Game.wave counts every second of a
+//     started game and resets on CFG.WAVE_EVERY — 44 brain ticks never reset it
+const a2wave = village(true);
+steps(a2wave, 1320);                                    // 44 s of fixed steps
+check(a2wave.wave === a2wave.time && a2wave.wave > 43 && a2wave.wave < 45 && tickOf(a2wave) === '44',
+  'a2: at 44 s Game.wave still counts the wave (equal to Game.time, 44 ticks in)',
+  'wave=' + a2wave.wave + ' time=' + a2wave.time + ' tick=' + tickOf(a2wave));
+steps(a2wave, 30);                                      // 45 s: the wave fires, here and only here
+check(a2wave.wave === 0 && tickOf(a2wave) === '45',
+  'a2: Game.wave resets at CFG.WAVE_EVERY, not on a brain tick',
+  'wave=' + a2wave.wave + ' time=' + a2wave.time + ' tick=' + tickOf(a2wave));
+
+// 15. docs/TODO.md P1-21, the cheat itself. The fixture is the village with a finished red
+//     house — pop cap 5 -> 10, the range where queueTrain put a militia on the Town Center —
+//     with stockpiles rich enough to buy militia, run 9000 steps (5 simulated minutes) and
+//     every red queue read after every tick.
+const a2five = (() => {
+  const g = rich(village(true, 2));
+  const pad = freeSpotAround(g.world, g, redTc(g).tx, redTc(g).ty, 2, 2, 8);
+  const house = AoE2.makeBuilding(g, 'house', 1, pad.tx, pad.ty);
+  house.built = 1; house.hp = house.maxHp;
+  const kinds = new Set();
+  for (let i = 0; i < 9000; i++) {
+    AoE2.stepSim(g, SIM_DT);
+    if ((i + 1) % 30 !== 0) continue;                     // read the queues on the tick grid
+    for (const b of g.buildings) if (b.team === 1) for (const j of b.queue) kinds.add(j.kind);
+  }
+  return { kinds: [...kinds].sort().join(','), cap: AoE2.popCap(g, 1), used: AoE2.popUsed(g, 1), tick: tickOf(g) };
+})();
+check(a2five.cap === 10 && a2five.kinds === 'villager',
+  'a2: a red village with no Barracks never queues militia over 5 simulated minutes',
+  'cap=' + a2five.cap + ' used=' + a2five.used + ' tick=' + a2five.tick + ' queue kinds=' + a2five.kinds);
+
+// 16. A1's toast rule, extended to the command A1 left out: a red `train` refusal is logged
+//     and the player's toast line does not move
+const a2msg = village(true);
+const a2Toast0 = a2msg.toastMsg, a2Queue0 = redTc(a2msg).queue.length;
+const a2Refused = AoE2.train(a2msg, redTc(a2msg), 'militia');
+check(a2Refused === undefined && a2msg.toastMsg === a2Toast0 && a2Queue0 === 0 &&
+      a2msg.aiLog.length === 1 &&
+      a2msg.aiLog[0].msg === AoE2.KINDS.militia.label + ' needs a ' + AoE2.BLD[redTc(a2msg).kind].label,
+  'a2: a red train refusal appends to Game.aiLog and leaves Game.toastMsg alone',
+  'out=' + String(a2Refused) + ' toast=' + JSON.stringify(a2msg.toastMsg) + ' log=' + peek(a2msg));
+
+// 17. A1's second gap: canPlaceAt judged every tile by the player's age, so a red Feudal
+//     site was refused by the tile rule. It takes the team now; the player's ghost — the
+//     other caller, in render.js — keeps the default and still refuses the same tile
+const a2age = rich(village(true));
+a2age.age[0] = 0; a2age.age[1] = 1;                      // player: Dark Age, red: Feudal
+const a2Spot = a1Spot(a2age, 1);                          // a legal 2x2 pad beside a red villager
+const a2Built = a2age.buildings.length;
+const a2Barracks = AoE2.build(a2age, 'barracks', a2Spot.x, a2Spot.y, 1, [a2Spot.v.id]);
+check(!!a2Barracks && a2Barracks.team === 1 && a2age.buildings.length === a2Built + 1 &&
+      a2age.toastMsg === '' && a2age.aiLog.length === 1 &&
+      a2age.aiLog[0].msg === AoE2.BLD.barracks.label + ' started' &&
+      AoE2.canPlaceAt(a2age, 'barracks', tOf(a2Spot.x), tOf(a2Spot.y)) === false,
+  'a2: canPlaceAt takes the team — red builds a Feudal barracks the player\'s ghost still refuses',
+  'built=' + a2Built + '->' + a2age.buildings.length +
+  (a2Barracks ? ' team=' + a2Barracks.team : ' no site') +
+  ' toast=' + JSON.stringify(a2age.toastMsg) + ' log=' + peek(a2age));
+
+// 18. the brain is saved: a v3 payload (no ai field) migrates into [null, {lastTick: -1}]
+//     and a v4 payload round-trips the tick clock byte for byte
+const a2saved = setTick(AoE2.createState(), 12.5);
+const a2v4 = AoE2.saveGame(AoE2.SAVE_PATH + ':a2', a2saved, 1);
+const a2v3body = Object.assign({}, JSON.parse(a2v4).state);
+delete a2v3body.ai;                                       // the v3 shape: no brain slot at all
+const a2v3 = JSON.stringify({ version: 3, seed: a2saved.world.seed, writtenAt: 1, state: a2v3body });
+const a2loaded = AoE2.createState();
+const a2LoadV3 = AoE2.loadGame(AoE2.SAVE_PATH + ':a2', a2loaded, a2v3);
+check(a2LoadV3 === true && JSON.stringify(a2loaded.ai) === '[null,{"lastTick":-1}]',
+  'a2: a v3 payload without ai migrates to [null, {lastTick: -1}] instead of being refused',
+  'loaded=' + a2LoadV3 + ' ai=' + JSON.stringify(a2loaded.ai));
+const a2back = AoE2.createState();
+const a2LoadV4 = AoE2.loadGame(AoE2.SAVE_PATH + ':a2', a2back, a2v4);
+check(a2LoadV4 === true && String(a2back.ai && a2back.ai[1] && a2back.ai[1].lastTick) === '12.5' &&
+      AoE2.saveGame(AoE2.SAVE_PATH + ':a2b', a2back, 1) === a2v4,
+  'a2: a v4 round-trip preserves ai[1].lastTick and re-saves identically',
+  'loaded=' + a2LoadV4 + ' ai=' + JSON.stringify(a2back && a2back.ai) +
+  ' resave=' + (a2LoadV4 === true && AoE2.saveGame(AoE2.SAVE_PATH + ':a2b', a2back, 1) === a2v4));
 
 report();

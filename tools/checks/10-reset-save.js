@@ -50,10 +50,12 @@ check(seedRoundTrip[0], 'save: a round trip on seed 7 keeps that seed and that m
 /* ---- 13. save/load (this plan, T1) -------------------------------- */
 /* The save contract. SAVE_FIELDS IS the schema: encodeState returns exactly these
    keys in this order, and every check below reads the JSON string saveGame hands
-   back (plus what the fake storage in §2 ended up holding). */
+   back (plus what the fake storage in §2 ended up holding). `ai` (roadmap A2) is part
+   of it: the enemy brain's tick clock travels with the game it belongs to, while
+   Game.aiLog — the enemy's toast history — stays with the runtime, like the DOM fields. */
 const SAVE_FIELDS = ['world', 'units', 'buildings', 'projectiles', 'blocks', 'occupied', 'res',
   'selection', 'selectedBuilding', 'groups', 'keys', 'cam', 'cursor', 'mouse', 'drag', 'placing',
-  'time', 'wave', 'age', 'ageBonus', 'techs', 'nextId', 'started', 'result', 'rngState'];
+  'time', 'wave', 'age', 'ageBonus', 'techs', 'ai', 'nextId', 'started', 'result', 'rngState'];
 const saveOf = (g, at) => {
   const raw = AoE2.saveGame(AoE2.SAVE_PATH, g, at);
   return [raw, JSON.parse(raw)];
