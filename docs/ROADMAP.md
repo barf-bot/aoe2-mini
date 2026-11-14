@@ -7,6 +7,10 @@ prototypes stall.
 **Bugs come first:** `docs/TODO.md` lists the known defects in fix order. Work through
 that before starting anything below.
 
+**Next work is carded** in `docs/plans/2026-11-14-strix-local-roadmap.md`: a review of the
+tree at 2026-11-14 plus small, check-first task cards (groundwork, a real AI opponent,
+quality of life, new content) sized for a local model, in the order to do them.
+
 ## P0 — make it actually playable by someone else
 
 1. **Real-browser smoke test.** Shipped 2026-11-13 by `tools/browser-smoke.js`: Playwright
