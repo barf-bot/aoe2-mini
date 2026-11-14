@@ -14,6 +14,32 @@ function workersOnTile(Game, u, tx, ty) {
   return n;
 }
 
+/** Where a villager works: the nearest tile of `res` (any resource when `res` is null)
+ *  with a free worker slot — `{ src, full: false }` — else the nearest tile of that
+ *  resource whose slots are all taken, `{ src, full: true }`, else null. The ring
+ *  search `assignStarter` (`src/boot.js`) used to run inline, so the starting squad and
+ *  the enemy AI (`aiJobs`, `src/ai.js`) now answer the question the same way: never more
+ *  than CFG.WORKERS_PER_TILE on one tile (the food-stall regression) and an
+ *  overcrowded tile only as the fallback, never as the first choice. */
+function findJob(Game, v, res) {
+  const ux = Math.floor(v.x / CFG.TILE), uy = Math.floor(v.y / CFG.TILE);
+  let taken = null;
+  for (let r = 1; r <= 12; r++) {                  // the radius assignStarter searched, per resource
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const t = tileRes(Game.world, ux + dx, uy + dy);
+        if (!t || (res && t.res !== res)) continue;
+        const s = sourceFromTile(Game, v, t.tx, t.ty);   // null: no walkable tile to work from
+        if (!s) continue;
+        if (workersOnTile(Game, v, t.tx, t.ty) < CFG.WORKERS_PER_TILE) return { src: s, full: false };
+        if (!taken) taken = s;                     // every tile full: still better than idling
+      }
+    }
+  }
+  return taken ? { src: taken, full: true } : null;
+}
+
 /** Score a drop-off candidate for a carried resource: the resource's dedicated
  *  building is best (0), a Town Center always works (+300), another farm takes
  *  food when no mill exists (+150); everything else is not a drop-off. */

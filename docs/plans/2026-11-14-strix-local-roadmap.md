@@ -236,7 +236,7 @@ reports `tools/ai-arena.js` before/after.
     over 5 simulated minutes; `aiStep` acts on a 1 s cadence.
   - **Size:** M. **Needs:** A1.
 
-- [ ] **A3 — Every red villager has a job**
+- [x] **A3 — Every red villager has a job**
   - **Read:** `assignStarter` (`src/boot.js`), `findAlternative` (`src/world.js`),
     `sourceFromTile` (`src/entities.js`).
   - **Change:** move `assignStarter`'s search into a pure `findJob(Game, v, res)` in

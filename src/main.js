@@ -17,7 +17,7 @@ const AoE2 = {
   popCap, popUsed, popCommitted, selectedUnits, canAfford, spend, refund, resetGame, requestReset,
   SAVE_PATH, saveGame, loadGame, encodeState, markDirty, storageGet, storageSet, applyMuteButton, setMuted,
   infoHtml, hudState, hudHtml, commandsHtml, queueHtml, resultHtml,
-  findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
+  findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile, findJob,
 };
 
 if (typeof window !== 'undefined') {

@@ -21,12 +21,14 @@ a bug.
 ## Economy
 
 - Villagers gather at **1.5 units/second** (`CFG.GATHER_RATE`) and carry **10** at a time
-  (`findDropoff`, `src/economy.js:31`)
+  (`findDropoff`, `src/economy.js:57`)
   and deposit into the matching stockpile (`u.carryRes`).
-- At most **2 villagers per resource tile** (`CFG.WORKERS_PER_TILE`). The 4 starters are
+- At most **2 villagers per resource tile** (`CFG.WORKERS_PER_TILE`), and the tile a villager
+  works is answered in one place — `findJob` (`src/economy.js`), which `assignStarter`
+  (`src/boot.js`) and the enemy AI (`aiJobs`, `src/ai.js`) both call. The 4 starters are
   placed food-first (berries), then wood, then anything — putting all four on one berry
   bush is what used to stall the economy at 420 food (the food-stall regression, fixed).
-- A tile that runs dry disappears (T4): `depleteTile` (`src/economy.js:61`) runs on the
+- A tile that runs dry disappears (T4): `depleteTile` (`src/economy.js:87`) runs on the
   harvest tick the moment a tile's `amount` reaches 0 and reverts the tile to `T.GRASS`
   (the amount stays 0), so the bush, tree or ore node stops being drawn and — per the
   Movement rules below — stops blocking movement. Farms are not tiles: a field empties
@@ -221,7 +223,7 @@ a bug.
   line of sight 10 tiles, reload 2 s, accuracy 100 %) drive the existing arrow path —
   reach is `lineOfSight × CFG.TILE`, which is why the Market (attack 0, LOS 6) never
   fires while the Town Center and the tower do.
-- Drop-off routing (`findDropoff`, `src/economy.js:31`): wood goes to the Lumber Camp,
+- Drop-off routing (`findDropoff`, `src/economy.js:57`): wood goes to the Lumber Camp,
   Center (and food also to farms) when the dedicated building doesn't exist. A farm
   never receives its own harvest. Farms feed 170 food (`BLD.farm.field`) before going
   idle; the mill tracks `field` the same way.
@@ -263,16 +265,16 @@ a bug.
 - Training: a building can only train what's in its `trains` list ("Militia needs a Town
   Center" when wrong), must be finished (`Still building`), max 5 in queue (`Queue full`),
   must be affordable, and must have population room (`Need more houses`). Room is measured by
-  one helper, `popCommitted` (`src/economy.js:118`): every living unit of the team
-  (`popUsed`, `src/economy.js:108` — villagers, militia and archers alike, docs/TODO.md
+  one helper, `popCommitted` (`src/economy.js:144`): every living unit of the team
+  (`popUsed`, `src/economy.js:134` — villagers, militia and archers alike, docs/TODO.md
   P1-10) plus every unit still queued in its buildings. `train` (`src/commands.js:231`) and
   the footer's disabled buttons (`commandsHtml`, `src/hud.js:109`) both read it, so the
   opening village reads 5/5 and a button never offers a click the command would refuse.
 
 - `built` is a **0..1 progress fraction**, not a built/not-built flag (docs/TODO.md P1-9):
   a building counts for its population cap, receives a carried load and can be worked only
-  once it is complete — `popCap` (`src/economy.js:102`), `findDropoff` (`src/economy.js:31`),
-  `resumeGather` (`src/economy.js:88`), the farm case of `orderForUnit`
+  once it is complete — `popCap` (`src/economy.js:128`), `findDropoff` (`src/economy.js:57`),
+  `resumeGather` (`src/economy.js:114`), the farm case of `orderForUnit`
   (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:193`) all test
   `built >= 1`, as does the enemy's `aiStep` (`src/ai.js:4`). An *enemy* building follows the
   other half of the rule: attackable at any progress, a 0 % foundation included, the way
@@ -317,12 +319,24 @@ Red has a brain slot of its own — `Game.ai` (`src/boot.js`), saved with the ga
 `Game.wave` keeps the separate **45 s** (`CFG.WAVE_EVERY`) attack clock the rules below
 document: a wave is not a decision and a decision is not a wave (roadmap A2).
 
-- **Train** (`aiTrain`, `src/ai.js`) — one unit per tick, asked through `train`
-  (`src/commands.js`) like any other player's: the building's own `trains` row is the law, so
-  a Town Center queues `villager` and nothing else until a Barracks exists (card A6). The
-  removed `queueTrain` used to spend and push militia onto the Town Center queue behind that
-  row's back (docs/TODO.md P1-21). A building with a unit in its queue trains nothing more,
-  and a half-built enemy Town Center caps nobody, trains nobody and sends no wave
+- **Work** (`aiJobs`, `src/ai.js`, roadmap A3) — every idle villager a tick finds is given the
+  resource furthest below its `CFG.AI_SPLIT` share (**.5** food, **.35** wood, **.15** gold) and
+  the job `findJob` (`src/economy.js`) offers there; when that resource has no job at all the
+  next-biggest deficit is asked, and finally any tile at all. The count of who works what is
+  read off the `harvest` / `go_deposit` orders the villagers hold, and each hire updates it, so
+  the five villagers one tick produces are spread by the split instead of stacked on one berry
+  — and, because `findJob` is `assignStarter`'s own search, the AI cannot hold a villager to a
+  different standard than the one the game starts a village with. One `markDirty` per tick that
+  hired anyone; a tick that changed nothing leaves the save schedule alone.
+- **Train** (`aiTrain`, `src/ai.js`) — one unit per tick while the village is smaller than
+  `min(CFG.AI_VILLAGERS, popCap(Game, team))` (`aiWantsVillager`, `src/ai.js`: A3 sets the
+  target at 22 and A4's houses raise the cap, so the cap — not the target — still stops red at
+  5 for now, and asking `train` past it would log `Need more houses` every second), asked
+  through `train` (`src/commands.js`) like any other player's: the building's own `trains` row
+  is the law, so a Town Center queues `villager` and nothing else until a Barracks exists
+  (card A6). The removed `queueTrain` used to spend and push militia onto the Town Center queue
+  behind that row's back (docs/TODO.md P1-21). A building with a unit in its queue trains
+  nothing more, and a half-built enemy Town Center caps nobody, trains nobody and sends no wave
   (docs/TODO.md P1-9).
 - **Fight** (`aiAttackWave`, `src/ai.js`) — at population cap, every militia holding no live
   order is sent at the closest blue unit (`nearestEnemy`, `src/ai.js`) and the village
@@ -345,7 +359,7 @@ clearing `result` back to `null`. No auto-restart, no countdown.
 
 ## Save / load
 
-The game remembers itself through one `localStorage` slot: `SAVE_PATH` (`src/config.js:287`) is the
+The game remembers itself through one `localStorage` slot: `SAVE_PATH` (`src/config.js:291`) is the
 key, `storageGet` / `storageSet` (`src/save.js:9` / `src/save.js:18`) the only door, and both
 answer quietly (`null` / `false`) when the platform has none or refuses the write — which is how
 node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode keep running.
@@ -399,11 +413,11 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   Game.time` (`src/boot.js:61`): a new settlement is written by the very next frame, which is
   what makes `N` (`requestReset`, `src/input.js:248`) overwrite the slot instead of waiting out the debounce.
 - **The page surface** — the header's `Save` button (`index.html:20`) writes the slot through
-  `saveGame` (`src/boot.js:185`) and toasts `Saved`; `boot` (`src/boot.js:142`) calls
+  `saveGame` (`src/boot.js:143`) and toasts `Saved`; `boot` (`src/boot.js:142`) calls
   `storageGet` / `loadGame` (`src/boot.js:143-144`) right after `createState` (`src/boot.js:38`),
   so reopening the page lands on the saved game; the three new-game paths — `N`
   (`requestReset`, `src/input.js:248`), the footer's `New map` (the `restart` action, `src/input.js:274`) and the victory overlay's
-  `New game` (`src/boot.js:181`) — clear the slot before `resetGame`, which schedules the rewrite.
+  `New game` (`src/boot.js:238`) — clear the slot before `resetGame`, which schedules the rewrite.
 
 ## Sound (SFX)
 
@@ -438,7 +452,7 @@ the table is the contract, the audio path and the checks are its two readers, th
   (`src/config.js:288`) through the same `storageSet` the save slot uses; `isMuted`
   (`src/sound.js:12`) reads the button when there is one and the key when there isn't, so a
   muted game stays muted after a reload and a fresh tab starts unmuted. `boot` calls
-  `applyMuteButton` once (`src/boot.js:142`) to honour the saved preference without writing
+  `applyMuteButton` once (`src/boot.js:122`) to honour the saved preference without writing
   the key back, and the sound handle never enters `encodeState`.
 
 ## Interface

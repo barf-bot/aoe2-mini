@@ -13,7 +13,7 @@
     "cfg.GATHER_RATE", "cfg.CANCEL_REFUND", "cfg.AGE_FOOD", "cfg.WAVE_EVERY", "cfg.ACQUIRE",
     "cfg.BUILDING_ACQUIRE", "cfg.UNIT_SEP", "cfg.PAN_SPEED", "cfg.EDGE", "cfg.RES",
     "cfg.PROJ_SPEED", "cfg.ASTAR_MAX_NODES", "cfg.VERSION", "cfg.SIM_DT", "cfg.AI_TICK",
-    "cfg.AUTOSAVE_DEBOUNCE", "cfg.AUTOSAVE_EVERY",
+    "cfg.AI_SPLIT", "cfg.AI_VILLAGERS", "cfg.AUTOSAVE_DEBOUNCE", "cfg.AUTOSAVE_EVERY",
     "units.*.label", "units.*.r", "units.*.buildable", "units.*.atkType"
   ],
   "design": {
@@ -44,6 +44,8 @@
     "VERSION": 4,
     "SIM_DT": 0.03333333333333333,
     "AI_TICK": 1,
+    "AI_SPLIT": { "food": 0.5, "wood": 0.35, "gold": 0.15 },
+    "AI_VILLAGERS": 22,
     "AUTOSAVE_DEBOUNCE": 2, "AUTOSAVE_EVERY": 30
   },
   "cfgNotes": {
@@ -65,6 +67,8 @@
     "VERSION": "save payload schema stamp - loadGame accepts only this version, migrate() converts older ones",
     "SIM_DT": "s per simulation tick (authored: the table carries no sim tick rate)",
     "AI_TICK": "s between enemy AI decisions (authored: the table carries no AI cadence)",
+    "AI_SPLIT": "share of the village working each resource (authored: the table carries no AI work policy)",
+    "AI_VILLAGERS": "villagers the enemy village grows to (authored: the table carries no AI population target)",
     "AUTOSAVE_DEBOUNCE": "seconds a mutator waits before the save writes (a burst inside the window keeps ONE pending save)",
     "AUTOSAVE_EVERY": "seconds between autosaves of a quiet game (the table carries no save cadence)"
   },

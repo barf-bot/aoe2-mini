@@ -3,7 +3,7 @@
    Runs on its own (`node tools/checks/12-ai.js`) against a freshly booted game. */
 
 const {
-  AoE2, DT, check, report, freeSpotAround, tOf,
+  AoE2, DT, check, report, freeSpotAround, setTile, solidTile, tOf, tileCentre,
 } = require('../lib/harness');
 
 /* ---- 15. enemy AI ----------------------------------------------------- */
@@ -336,5 +336,124 @@ check(a2LoadV4 === true && String(a2back.ai && a2back.ai[1] && a2back.ai[1].last
   'a2: a v4 round-trip preserves ai[1].lastTick and re-saves identically',
   'loaded=' + a2LoadV4 + ' ai=' + JSON.stringify(a2back && a2back.ai) +
   ' resave=' + (a2LoadV4 === true && AoE2.saveGame(AoE2.SAVE_PATH + ':a2b', a2back, 1) === a2v4));
+
+/* ---- 18. roadmap A3: every red villager has a job ---------------------- */
+/* A3 (docs/plans/2026-11-14-strix-local-roadmap.md §5, needs A2): the ring search
+   `assignStarter` (`src/boot.js`) ran inline is now `findJob` (`src/economy.js`) — the one
+   answer to "where does this villager work", shared by the starting squad and the AI — and
+   `aiJobs` (`src/ai.js`) hires every idle red villager onto the resource furthest below
+   `CFG.AI_SPLIT`, with `CFG.AI_VILLAGERS` as the village size the Town Center staffs (until
+   A4 raises the cap with houses, `train` must not be asked past `popCap`: a `Need more
+   houses` refusal per second is noise, not a plan).
+   The 10 simulated minutes below are the card's proof. The lifetime gathered counter is
+   card S5, so — as G7 documented for tools/ai-arena.js — the stockpiles are what shows the
+   work actually happened. */
+const a3vill = (g) => g.units.filter((u) => u.team === 1 && u.kind === 'villager' && !u.dead);
+const a3idle = (g) => a3vill(g).filter((u) => u.order.kind === 'idle');
+const attempt = (fn) => { try { return fn(); } catch (e) { return { err: String((e && e.message) || e) }; } };
+
+// 19. the two numbers the card authors, the way SIM_DT and AI_TICK are authored
+check(AoE2.CFG.AI_VILLAGERS === 22 && JSON.stringify(AoE2.CFG.AI_SPLIT) ===
+      JSON.stringify({ food: 0.5, wood: 0.35, gold: 0.15 }),
+  'a3: CFG.AI_VILLAGERS is 22 and CFG.AI_SPLIT is .5 food / .35 wood / .15 gold',
+  'AI_VILLAGERS=' + AoE2.CFG.AI_VILLAGERS + ' AI_SPLIT=' + JSON.stringify(AoE2.CFG.AI_SPLIT));
+
+/* 20-21. an authored map, so the split is judged on the rule and not on whatever seed 1337
+   happens to scatter next to the red Town Center: the seeded tiles wiped to grass, one tile
+   per resource stamped on the free ground ringing the keep — rings 1..3, minus the keep's own
+   footprint and the tiles the seeded roster stands on — and the roster topped up to
+   `villagers` living villagers, since the seeded side has four plus a militia and the card
+   counts five. */
+const a3Tile = {                          // the tile each resource lives on, and the stock it holds
+  food: { t: AoE2.T.BERRY, n: AoE2.CFG.RES.berry },      // CFG.RES is keyed by tile, not by resource
+  wood: { t: AoE2.T.FOREST, n: AoE2.CFG.RES.tree },
+  gold: { t: AoE2.T.GOLD, n: AoE2.CFG.RES.gold },
+};
+function onMap(resList, villagers) {
+  const g = village(true);
+  const w = g.world, tc = redTc(g);
+  for (let i = 0; i < w.type.length; i++) { w.type[i] = AoE2.T.GRASS; w.amount[i] = 0; }
+  const onTiles = new Set(g.units.filter((u) => !u.dead)
+    .map((u) => Math.floor(u.y / AoE2.CFG.TILE) * w.w + Math.floor(u.x / AoE2.CFG.TILE)));
+  const free = [];
+  for (let r = 1; r <= 3; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = tc.tx + dx, y = tc.ty + dy;
+        if (!solidTile(g, x, y) && !onTiles.has(y * w.w + x)) free.push({ x, y });
+      }
+    }
+  }
+  resList.forEach((res, i) => setTile(g, free[i].x, free[i].y, a3Tile[res].t, a3Tile[res].n));
+  const seeded = a3vill(g).length;
+  for (let i = seeded; i < villagers; i++) {
+    const p = tileCentre(g, free[resList.length + i - seeded].x, free[resList.length + i - seeded].y);
+    AoE2.makeUnit(g, 'villager', 1, p.x, p.y);
+  }
+  return g;
+}
+
+// 20. the extraction itself, asked the way resetGame asks it: the same source the starter
+//     already holds, and the same answers for the other two resources (`01-world-roster.js`
+//     holds the starter-squad rules and is untouched by this card)
+const a3job = attempt(() => {
+  const g = AoE2.createState();
+  const v = a3vill(g)[0];
+  const ask = (res) => {
+    const j = AoE2.findJob(g, v, res);
+    return j ? j.src.res + '@' + j.src.tx + ',' + j.src.ty + ':' + j.full : 'none';
+  };
+  return { starter: v.order.src.res + '@' + v.order.src.tx + ',' + v.order.src.ty,
+    food: ask('food'), wood: ask('wood'), gold: ask('gold'), any: ask(null), order: v.order.kind };
+});
+check(!a3job.err && a3job.order === 'harvest' && a3job.food === a3job.starter + ':false' &&
+      a3job.any === a3job.starter + ':false' && /^wood@\d+,\d+:false$/.test(a3job.wood) &&
+      /^gold@\d+,\d+:false$/.test(a3job.gold),
+  'a3: findJob returns the very source assignStarter gave that villager, and the nearest wood and gold tiles besides',
+  'order=' + (a3job.order || '-') + ' starter=' + (a3job.starter || '-') +
+  ' food=' + (a3job.food || '-') + ' wood=' + (a3job.wood || '-') +
+  ' gold=' + (a3job.gold || '-') + ' any=' + (a3job.any || '-') + (a3job.err ? ' err=' + a3job.err : ''));
+
+/* 21. the split, on one berry (2 slots), one tree (2) and one gold (2) with five idle
+   villagers: CFG.AI_SPLIT over five villagers wants 2.5 food, 1.75 wood, 0.75 gold, so the
+   rule's answer is food, wood, food, wood, gold — the card's "the first three go
+   food/wood/food by deficit order", with the fourth taking the last wood slot and the fifth
+   the gold the moment food and wood have nothing free left. */
+const a3map = attempt(() => {
+  const g = onMap(['food', 'wood', 'gold'], 5);
+  steps(g, 30);                                        // one CFG.AI_TICK: the whole village is hired at once
+  const seq = a3vill(g).map((u) => (u.order.src ? u.order.src.res : 'idle')).join(',');
+  const v = a3vill(g)[4];                              // the fifth is the one with nothing free left
+  const full = (res) => { const j = AoE2.findJob(g, v, res); return j === null ? 'none' : String(j.full); };
+  return { seq, food: full('food'), wood: full('wood'), gold: full('gold') };
+});
+check(!a3map.err && a3map.seq === 'food,wood,food,wood,gold',
+  'a3: five idle villagers are hired in CFG.AI_SPLIT deficit order — food, wood, food, wood, gold',
+  'assigned=' + (a3map.seq || '-') + (a3map.err ? ' err=' + a3map.err : '') + ' want=food,wood,food,wood,gold');
+check(!a3map.err && a3map.food === 'true' && a3map.wood === 'true' && a3map.gold === 'false',
+  'a3: with its food and wood slots taken the fifth villager still counts them as full and works gold',
+  'food=' + (a3map.food || '-') + ' wood=' + (a3map.wood || '-') + ' gold=' + (a3map.gold || '-') +
+  (a3map.err ? ' err=' + a3map.err : ''));
+
+/* 22-23. the card's 10 simulated minutes on the seeded village (18 000 fixed steps), read
+   once per simulated minute: nobody left standing idle in 9 of the 10 samples, and the wood
+   the village now chops actually reaching the stockpile. */
+const a3run = attempt(() => {
+  const g = village(true);
+  const wood0 = g.res[1].wood;
+  const idle = [];
+  for (let m = 0; m < 10; m++) { steps(g, 1800); idle.push(a3idle(g).length); }
+  return { idle, zero: idle.filter((n) => n === 0).length, wood0, wood1: g.res[1].wood, vills: a3vill(g).length };
+});
+check(!a3run.err && a3run.zero >= 9,
+  'a3: 10 simulated minutes leave 0 idle red villagers in at least 9 of the 10 samples',
+  'villagers=' + (a3run.vills === undefined ? '-' : a3run.vills) + ' idle per minute=' +
+  (a3run.idle ? a3run.idle.join(',') : '-') + ' zeros=' + (a3run.zero === undefined ? '-' : a3run.zero) +
+  '/10' + (a3run.err ? ' err=' + a3run.err : ''));
+check(!a3run.err && a3run.wood1 > a3run.wood0,
+  'a3: the wood column moves — red\'s stockpile ends above the 100 it started with (the lifetime counter is S5)',
+  'wood ' + (a3run.wood0 === undefined ? '-' : a3run.wood0) + ' -> ' +
+  (a3run.wood1 === undefined ? '-' : Math.floor(a3run.wood1)) + (a3run.err ? ' err=' + a3run.err : ''));
 
 report();

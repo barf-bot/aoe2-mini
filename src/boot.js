@@ -95,39 +95,19 @@ function resetGame(Game, seed = CFG.SEED) {
 }
 
 /** Put a starting villager on the nearest harvestable tile that is not already
- *  swarmed: food first (AoE2 opens on berries), then wood, then anything, and
- *  never more than CFG.WORKERS_PER_TILE per tile — the old "nearest tile for
- *  everyone" answer parked all four villagers on one berry bush. */
+ *  swarmed: food first (AoE2 opens on berries), then wood, then anything. The search
+ *  itself is findJob (`src/economy.js`) — since roadmap A3 the enemy AI asks it the
+ *  same question, so the village the game starts with and the village the AI grows
+ *  cannot disagree about what a job is. */
 function assignStarter(Game, v) {
-  const ux = Math.floor(v.x / CFG.TILE), uy = Math.floor(v.y / CFG.TILE);
-  const ring = (r) => {
-    const out = [];
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        const t = tileRes(Game.world, ux + dx, uy + dy);
-        if (t) out.push(t);
-      }
-    }
-    return out;
-  };
-  let fallback = null;
+  let full = null;
   for (const res of ['food', 'wood', null]) {
-    for (let r = 1; r <= 12; r++) {
-      for (const t of ring(r)) {
-        if (res && t.res !== res) continue;
-        const s = sourceFromTile(Game, v, t.tx, t.ty);   // null: no walkable tile to work from
-        if (!s) continue;
-        if (workersOnTile(Game, v, t.tx, t.ty) < CFG.WORKERS_PER_TILE) {
-          v.order = { kind: 'harvest', src: s };
-          return;
-        }
-        if (!fallback) fallback = t;                       // every tile full: still better than idling
-      }
-    }
+    const job = findJob(Game, v, res);
+    if (!job) continue;
+    if (!job.full) { v.order = { kind: 'harvest', src: job.src }; return; }
+    if (!full) full = job;                         // a swarmed tile beats standing idle
   }
-  const fb = fallback && sourceFromTile(Game, v, fallback.tx, fallback.ty);
-  if (fb) v.order = { kind: 'harvest', src: fb };
+  if (full) v.order = { kind: 'harvest', src: full.src };
 }
 
 /** Fetch the unit atlas once, at boot (node has no Image, so this is a no-op

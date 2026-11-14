@@ -27,10 +27,10 @@ simulation.
 | `src/entities.js` | no | `setAtlas`, `sourceFromTile`/`sourceFromFarm`, `workSpot`, `makeUnit` (the unit shape: `KINDS` stats, `order`, the route cache and `garrisonedIn`), `makeBuilding`, `rebuildBlocks`, `removeBuilding`/`setResult`, `workPos`, `standingSpots` |
 | `src/sim.js` | no | `stepSim`/`updateUnit` (the order state machine — its `build` branch ends a site by calling `promoteBuilding` when the site is an upgrade in progress, and its first guard parks a unit whose `garrisonedIn` is set instead of moving him), combat math (`unitAttack`/`unitArmor`/`hitUnit`/`hitBuilding`/`autoAcquire`/`attackableAsEnemy`/`targetableAsEnemy`), projectiles (`spawnArrow`/`updateProjectiles`/`stepBuildingAttacks`) |
 | `src/movement.js` | no | `tileOf`, A\* (`findPath`), `stepToward`/`moveUnit`/`standTarget`, `formationSlots`, `walkable`, `reachOf`, `separate` |
-| `src/economy.js` | no | gathering (`workersOnTile`, `findDropoff`, `deposit`, `depleteTile`, `nextSource`, `resumeGather`), `popCap`/`popUsed`, `selectedUnits`, `canAfford`/`spend`/`refund` |
+| `src/economy.js` | no | gathering (`workersOnTile`, `findJob`, `findDropoff`, `deposit`, `depleteTile`, `nextSource`, `resumeGather`), `popCap`/`popUsed`, `selectedUnits`, `canAfford`/`spend`/`refund` |
 | `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`/`pickBuilders`, `canPlaceAt`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, plus `toast` — `build`, `pickBuilders` and `upgradeAge` take a `team` (default `0`, the player) and `build` an optional `crew` of villager ids (roadmap A1); `train` answers for `bld.team` and `canPlaceAt` takes a `team` too (A2), so the AI orders through the same commands without writing on the player's toast line |
 | `src/structures.js` | no | the building chain and its garrison helpers: `upgradeBuilding`/`promoteBuilding` (the two halves of a tower upgrade), `ringSpot`/`placeOnRing`, `garrisonUnits`/`leaveBuilding` |
-| `src/ai.js` | no | `aiStep` — the enemy village: the red brain's tick clock (`Game.ai[1]`, roadmap A2) plus its two decisions, `aiAttackWave` and `aiTrain`, ordered through the same commands |
+| `src/ai.js` | no | `aiStep` — the enemy village: the red brain's tick clock (`Game.ai[1]`, roadmap A2) plus its three decisions — `aiJobs` (A3: every idle villager hired through `findJob`, the resource furthest below `CFG.AI_SPLIT` first), `aiTrain` (up to `CFG.AI_VILLAGERS`) and `aiAttackWave` — ordered through the same commands |
 | `src/save.js` | guarded | `storageGet`/`storageSet` (the one door to `localStorage`, node-safe), `encodeState`/`decodeState`, `markDirty`, `saveGame`/`loadGame`, `migrate`/`validState` |
 | `src/sound.js` | guarded | `playSfx` (WebAudio synth of the `SFX` rows), `isMuted`/`setMuted`/`applyMuteButton` |
 | `src/render.js` | yes | `beginCanvas`, world/building/unit drawing (`drawBuildings`, `unitAnim`, `drawUnits`, `drawProjectiles`), ghost, drag box, minimap, `renderFrame` |
@@ -169,7 +169,7 @@ schema — the field list the harness pins as `SAVE_FIELDS` (`tools/checks/10-re
 state }` and hands the string to `storageSet` (`src/save.js:18`), and
 `loadGame(path, Game, raw = storageGet(path))` (`src/save.js:252`) reads the slot back. The
 shipped signature is that three-argument one rather than the design's `loadGame(path, raw)`: the
-target `Game` sits in the middle so a test — or `boot` (`src/boot.js:142`) opening the page — can
+target `Game` sits in the middle so a test — or `boot` (`src/boot.js:127`) opening the page — can
 load a slot into a game that already exists. `migrate` (`src/save.js`) — `CFG.VERSION` (4) as
 written, and every older shape repaired by filling what it predates: a v3 payload gains the
 `ai` brain slot (roadmap A2), v2 gains that plus `rngState`, v1 folds its global `age` /
@@ -240,7 +240,7 @@ arm every placeable building, `T` upgrade age, `Esc` clears placement then selec
 rebuilt every frame, so its clicks are **delegated to its parent** — `Game.dom.commands ||
 Game.dom.hud`, the footer in a browser — and `buttonAt` (`src/input.js:121`) is the single
 button lookup that delegate and the `#result` overlay's listener (wired in `boot`,
-`src/boot.js:179`).
+`src/boot.js:142`).
 
 ## Test harness design
 

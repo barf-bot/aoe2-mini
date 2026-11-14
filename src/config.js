@@ -27,6 +27,8 @@ const CFG = {
   VERSION: 4,                     // save payload schema stamp - loadGame accepts only this version, migrate() converts older ones
   SIM_DT: 0.03333333333333333,    // s per simulation tick (authored: the table carries no sim tick rate)
   AI_TICK: 1,                     // s between enemy AI decisions (authored: the table carries no AI cadence)
+  AI_SPLIT: { food: 0.5, wood: 0.35, gold: 0.15 },// share of the village working each resource (authored: the table carries no AI work policy)
+  AI_VILLAGERS: 22,               // villagers the enemy village grows to (authored: the table carries no AI population target)
   AUTOSAVE_DEBOUNCE: 2,           // seconds a mutator waits before the save writes (a burst inside the window keeps ONE pending save)
   AUTOSAVE_EVERY: 30,             // seconds between autosaves of a quiet game (the table carries no save cadence)
 };

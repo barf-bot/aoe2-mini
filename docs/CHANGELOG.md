@@ -154,6 +154,19 @@ commits on `main`.
   takes a `team`, closing the two routing gaps A1 left.
 - checks: `12-ai.js` 13 → 26 (suite 459 → 472); the `tools/ai-arena.js` after-table is in the commit body.
 
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` A3: every red villager has a job
+
+- `findJob(Game, v, res)` (`src/economy.js`) is the one answer to where a villager works — the
+  nearest tile of `res` (any resource when `res` is null) with a free slot, else the nearest one
+  whose slots are all taken, else `null` — moved out of `assignStarter` (`src/boot.js`), which
+  still asks food → wood → anything, so `01-world-roster.js`'s starter assertions pass untouched.
+- `aiJobs` (`src/ai.js`) hires every idle red villager the tick gives it onto the resource
+  furthest below `CFG.AI_SPLIT` (authored in `data/units.json` — .5 food, .35 wood, .15 gold),
+  then the next deficit, then any tile; `aiWantsVillager` replaces A2's `popUsed` vs `popCap`
+  with `min(CFG.AI_VILLAGERS, popCap)` (22), so `train` is never asked past an unreraised cap.
+- checks: `12-ai.js` 26 → 32 (suite 472 → 478): the card's 10 simulated minutes leave 0 idle red
+  villagers in 10 of 10 samples and take red's wood from 100 to 820; the arena table is in the body.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep
