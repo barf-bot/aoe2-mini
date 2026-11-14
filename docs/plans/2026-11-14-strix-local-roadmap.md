@@ -192,7 +192,7 @@ A prompt you can paste per session is in §10.
     This is the **measuring stick for every §5 card** — paste its before/after output into the
     commit message body.
 
-- [ ] **G8 — Determinism check**
+- [x] **G8 — Determinism check**
   - **Change:** new `tools/checks/14-determinism.js`: two `createState()` with the same seed,
     the same scripted orders at the same steps (move, build a house, train), 3000 steps each,
     then `JSON.stringify(encodeState(...))` must match; a third with a different seed must not.

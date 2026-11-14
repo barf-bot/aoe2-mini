@@ -82,18 +82,22 @@ those five and outside `npm run check`: it opens the page in a real Chrome (Play
 `1.58.0` — the version whose bundled Chromium build is the one this box ships), asserts the
 app booted on both the working copy and the live site, writes `tools/out/local.png` and
 `tools/out/live.png` and prints a JSON summary per target. It needs a browser and network,
-so `tools/headless-check.js` must never require it: the 409-check suite stays plain node.
+so `tools/headless-check.js` must never require it: the 451-check suite stays plain node.
 The generated `tools/out/` is scratch, not committed.
 
 `tools/headless-check.js` runs every file in `tools/checks/`, each in its own process.
 A check file starts by requiring `tools/lib/harness.js`, which stubs the DOM and boots the
 game, and then asserts its topic's invariants
-(economy/pathfinding/construction/training/combat/input/UI/save/sound/AI) against that
+(economy/pathfinding/construction/training/combat/input/UI/save/sound/AI/determinism) against that
 freshly booted `Game` — so the files are independent, and one runs alone with
 `node tools/checks/07-combat.js` or `node tools/headless-check.js combat`. `-q` prints
 failures and totals only. All tools load the game through `tools/lib/load-game.js`, which
 reads the `<script src>` list from `index.html` and runs the same files in the same order
 the browser does.
+
+`tools/checks/14-determinism.js` (roadmap G8) is the seed-pair check: two games built from one
+seed and handed one script (a move order, a house, a train) must encode byte-for-byte
+identically after 3000 steps — and a third game built from another seed must not.
 
 `tools/render-preview.js` renders a real frame through `@napi-rs/canvas` so the *renderer*
 is proven too — commit the regenerated `preview.png` when visuals change, and look at it

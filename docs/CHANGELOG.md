@@ -103,6 +103,19 @@ commits on `main`.
 - checks: `00-boot.js` measures the clock (steps per frame, the carry, the five-step clamp) and
   `10-reset-save.js` proves a loaded game replays the never-saved run's state (suite 437 → 443).
 
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` G8: the determinism check
+
+- `tools/checks/14-determinism.js` plays one script on two games built from the same seed
+  (`createState()` then `resetGame(g, seed)` — `createState` takes no seed): a move order for
+  a villager at step 0, a house that villager raises from step 60, a villager trained at the
+  Town Center from step 1500, two `nextRand` draws, then 3000 `CFG.SIM_DT` steps. The two
+  `JSON.stringify(encodeState(...))` blobs must be byte-for-byte equal (they are, 62216 bytes),
+  the transcript must show every command was accepted, and a third game from another seed must
+  differ — state, `world.seed` and `rngState` alike. No logic change was needed: the step path
+  reads no wall clock and no ambient rng (the only `Date.now`/`performance.now` left are
+  `startLoop`'s frame time and the save envelope, neither of them encoded).
+- checks: suite 443 → 451; the file itself runs 8 checks in 64 ms.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep

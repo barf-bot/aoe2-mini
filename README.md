@@ -58,8 +58,8 @@ Start with `AGENTS.md` if you're an agent picking the repo up cold.
 | `data/units.json`, `data/buildings.json`, `data/techs.json` | the vendored AoE2 stat tables (sources in [`data/README.md`](data/README.md)) — the only place unit/building/tech/world numbers are authored |
 | `data/sprites.json`, `data/sprites/` | the vendored sprite frames (ripped AoE2 art, recoloured per team) and the atlas manifest `tools/gen-atlas.js` composes the sheet from |
 | `tools/verify.js` | the one-command gate: runs the five checks below in order, stops at the first failure, and ends with exactly one verdict line — `VERIFY OK` (exit 0) or `VERIFY FAIL: <step>` (exit 1) |
-| `tools/headless-check.js` | runs every file in `tools/checks/` (each in its own process, against a stub DOM) and adds up the results — 409 invariants; pass a name fragment to run a subset, `-q` for failures only |
-| `tools/checks/` | the checks themselves, one independent file per topic (`node tools/checks/07-combat.js` runs one alone) |
+| `tools/headless-check.js` | runs every file in `tools/checks/` (each in its own process, against a stub DOM) and adds up the results — 451 invariants; pass a name fragment to run a subset, `-q` for failures only |
+| `tools/checks/` | the checks themselves, one independent file per topic (`node tools/checks/07-combat.js` runs one alone) — `tools/checks/14-determinism.js` is the G8 seed-pair check: two games from one seed, one script, byte-for-byte equal encodings |
 | `tools/lib/` | `load-game.js`, the loader every tool uses (runs the scripts `index.html` lists, in the same order the browser does), and `harness.js`, the stub DOM and fixtures every check file starts from |
 | `tools/check-stats.mjs` | renders `CFG`/`KINDS`/`BLD`/`TECHS` in `src/config.js` from `data/` and fails with one line per field when they drift (`--write` regenerates the blocks) |
 | `tools/gen-atlas.js` | composes `assets/sprites.png` from `data/sprites.json` + `data/sprites/` and regenerates the sprite tables in `src/config.js` |
@@ -70,7 +70,7 @@ Start with `AGENTS.md` if you're an agent picking the repo up cold.
 
 ```bash
 npm run verify --prefix tools       # the five commands below in one: prints VERIFY OK or VERIFY FAIL: <step>
-node tools/headless-check.js        # 409/409 checks passed
+node tools/headless-check.js        # 451/451 checks passed
 node tools/check-stats.mjs          # verifies src/config.js against the vendored stat tables
 node tools/audit-line-refs.js       # verifies the docs against the code
 npm install --prefix tools          # once: the canvas backend and playwright the next three need
