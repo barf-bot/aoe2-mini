@@ -641,6 +641,140 @@ check(gLeaveEmpty.threw === null && gLeaveEmpty.n === 0 &&
   'input: leaveBuilding on an empty building toasts and marks nothing',
   JSON.stringify(gLeaveEmpty));
 
+/* ---- 10f. the HOTKEYS table (docs/plans/2026-11-14-strix-local-roadmap.md G5) ----
+   `attachInput` used to carry the keyboard as an if-ladder written into src/input.js.
+   Every key the game answers is now a row in `HOTKEYS` (src/config.js) and the handler is
+   a lookup, so this section drives the TABLE instead of a hand-written list of letters:
+   each `build` row arms its kind and the same key arms nothing else, the `cmd` rows still
+   do what the ladder did (`age` advances, `newMap` arms, `clear` empties the frame,
+   `groupsSave` stores behind ctrl, `groups` recalls, `pan` feeds `Game.keys`), no key name
+   appears twice across the table (the bug class the ladder had — `w` is a pan key and, as
+   docs/ROADMAP.md claims, also a barricade key), and a modified non-digit key changes
+   nothing, the way `ctrl+b` never reached the barracks row. */
+const HOT = (() => {
+  const H = AoE2.HOTKEYS;
+  const out = { exported: !!H, build: [], names: 0, dupes: [], ageKey: '', ageTo: null,
+    ageMsg: '', newMapKey: '', armed: null, armAt: null, armMsg: '', saveKey: '', saved: [],
+    savedPrevented: false, recallKey: '', recalled: [], clearKey: '', escPlacing: 'x',
+    escSel: -1, escBld: 'x', panW: {}, panArrow: {}, ctrlB: [] };
+  if (!H) return out;
+  const press = (key, mods) => {
+    let prevented = false;
+    doc.fire('keydown', Object.assign({ key, target: view }, mods,
+      { preventDefault: () => { prevented = true; } }));
+    return prevented;
+  };
+  const release = (key) => doc.fire('keyup', { key, target: view });
+  const keyFor = (action) => Object.keys(H.cmd).filter((k) => H.cmd[k] === action)[0] || '';
+  /* a row's value is a letter (`h`), a digit range (`1-9`) or a modified range
+     (`ctrl+1-9`); expanding all three gives every pressable name the table claims, which
+     is what the uniqueness assertion collects. */
+  const expand = (spec) => {
+    const v = String(spec), plus = v.indexOf('+');
+    const mod = plus < 0 ? '' : v.slice(0, plus + 1);
+    const key = plus < 0 ? v : v.slice(plus + 1);
+    const dash = key.indexOf('-');
+    if (dash < 0) return [mod + key];
+    const all = [];
+    for (let c = key.charCodeAt(0); c <= key.charCodeAt(dash + 1); c++) all.push(mod + String.fromCharCode(c));
+    return all;
+  };
+  for (const k of Object.keys(H.build)) {                  // arm, then disarm, per row
+    const kind = H.build[k];
+    press(k);
+    const armed = Game.placing;
+    press(k);
+    out.build.push({ k, kind, armed, cleared: Game.placing });
+  }
+  const digits = expand(H.cmd.groups), ctrlDigits = expand(H.cmd.groupsSave);
+  const names = Object.keys(H.pan).concat(Object.keys(H.build),
+    Object.keys(H.cmd).filter((k) => k !== 'groups' && k !== 'groupsSave'), digits, ctrlDigits);
+  const seen = {}, dupes = [];
+  for (const n of names) { if (seen[n]) dupes.push(n); seen[n] = 1; }
+  out.names = names.length; out.dupes = dupes;
+
+  out.ageKey = keyFor('age');                              // the `t` row: spend, then advance
+  const ageFrom = Game.age[0], foodWas = Game.res[0].food;
+  Game.res[0].food = ageFrom === 0 ? AoE2.CFG.AGE_FOOD : AoE2.CFG.AGE_FOOD * 2;
+  press(out.ageKey);
+  out.ageTo = Game.age[0]; out.ageMsg = Game.toastMsg;
+  Game.res[0].food = foodWas;
+
+  out.newMapKey = keyFor('newMap');                        // the `n` row: arm, never wipe (10g)
+  const armWas = Game.confirmReset;
+  Game.confirmReset = null;
+  press(out.newMapKey);
+  out.armed = Game.confirmReset; out.armAt = Game.time; out.armMsg = Game.toastMsg;
+  Game.confirmReset = armWas;
+
+  out.saveKey = ctrlDigits[0].split('+')[1];               // ctrl+digit stores, and says so
+  const selWas = Game.selection.slice();
+  Game.selection = [pick.id];
+  out.savedPrevented = press(out.saveKey, { ctrlKey: true });
+  out.saved = (Game.groups[out.saveKey] || []).slice();
+  Game.selection = [];
+  out.recallKey = digits[0];                               // the bare digit recalls it
+  press(out.recallKey);
+  out.recalled = Game.selection.slice();
+
+  out.clearKey = keyFor('clear');                          // esc empties all three slots
+  Game.placing = 'farm';
+  out.escBld = Game.selectedBuilding;
+  press(out.clearKey);
+  out.escPlacing = Game.placing; out.escSel = Game.selection.length; out.escBld = Game.selectedBuilding;
+  Game.selection = selWas;
+
+  const panTest = (k) => {                                 // pan rows feed Game.keys
+    const dir = H.pan[k];
+    if (!dir) return {};
+    Game.keys[dir] = false;
+    press(k);
+    const held = Game.keys[dir];
+    release(k);
+    return { dir, held, released: Game.keys[dir] };
+  };
+  out.panW = panTest('w'); out.panArrow = panTest('arrowup');
+
+  const snap = () => JSON.stringify([Game.placing, Game.selection, Game.selectedBuilding,
+    Game.confirmReset, Game.keys]);                        // any other modified key: no-op
+  const before = snap();
+  press('b', { ctrlKey: true });
+  out.ctrlB = [before, snap()];
+  return out;
+})();
+check(HOT.exported, 'hotkeys: HOTKEYS is exported by AoE2', typeof AoE2.HOTKEYS);
+for (const b of HOT.build) check(b.armed === b.kind && b.cleared === null,
+  'hotkeys: ' + b.k + ' toggles ' + b.kind + ' placement',
+  'armed=' + String(b.armed) + ' again=' + String(b.cleared));
+check(HOT.exported && HOT.dupes.length === 0, 'hotkeys: no key name appears twice in HOTKEYS',
+  !HOT.exported ? 'no table'
+    : HOT.dupes.length ? 'duplicates: ' + HOT.dupes.join(' ') : HOT.names + ' names, all unique');
+check(HOT.ageTo !== null && HOT.ageMsg === AoE2.AGES[HOT.ageTo] + ' reached',
+  'hotkeys: the age row advances the player age',
+  'key=' + JSON.stringify(HOT.ageKey) + ' age=' + String(HOT.ageTo) + ' toast=' + JSON.stringify(HOT.ageMsg));
+check(typeof HOT.armed === 'number' && HOT.armed === HOT.armAt &&
+      HOT.armMsg === 'Press N again to start a new map',
+  'hotkeys: the newMap row arms the confirmation',
+  'key=' + JSON.stringify(HOT.newMapKey) + ' confirmReset=' + String(HOT.armed) +
+  ' time=' + String(HOT.armAt) + ' toast=' + JSON.stringify(HOT.armMsg));
+check(HOT.savedPrevented && HOT.saved.length === 1 && HOT.saved[0] === pick.id,
+  'hotkeys: the groupsSave row stores the selection',
+  'key=ctrl+' + JSON.stringify(HOT.saveKey) + ' group=' + JSON.stringify(HOT.saved) +
+  ' prevented=' + HOT.savedPrevented);
+check(HOT.recalled.length === 1 && HOT.recalled[0] === pick.id,
+  'hotkeys: the groups row recalls the stored group',
+  'key=' + JSON.stringify(HOT.recallKey) + ' selection=' + JSON.stringify(HOT.recalled));
+check(HOT.escPlacing === null && HOT.escSel === 0 && HOT.escBld === null,
+  'hotkeys: the clear row clears placing, selection and building',
+  'key=' + JSON.stringify(HOT.clearKey) + ' placing=' + String(HOT.escPlacing) +
+  ' selection=' + HOT.escSel + ' building=' + String(HOT.escBld));
+check(HOT.panW.dir === 'up' && HOT.panW.held === true && HOT.panW.released === false,
+  'hotkeys: pan.w drives Game.keys.up', JSON.stringify(HOT.panW));
+check(HOT.panArrow.dir === 'up' && HOT.panArrow.held === true && HOT.panArrow.released === false,
+  'hotkeys: pan.arrowup drives Game.keys.up', JSON.stringify(HOT.panArrow));
+check(HOT.ctrlB.length === 2 && HOT.ctrlB[0] === HOT.ctrlB[1],
+  'hotkeys: a modified non-digit key changes nothing', HOT.ctrlB.join(' -> '));
+
 /* ---- 10g. new-map confirmation (docs/TODO.md item 23, finding R6) ---------- */
 /* `N` used to wipe the save on the first keystroke. requestReset now arms: the first
    press stores Game.confirmReset and toasts, and only a second press inside

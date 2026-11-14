@@ -4,7 +4,7 @@
    out of the shared scope, which is how every tool in tools/ drives the game. */
 
 const AoE2 = {
-  CFG, KINDS, BLD, TECHS, AGES, T, PAL, TEAM, RES_OF_TILE, SFX, MUTE_PATH,
+  CFG, KINDS, BLD, TECHS, AGES, HOTKEYS, T, PAL, TEAM, RES_OF_TILE, SFX, MUTE_PATH,
   SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor, BLD_SPRITES, bldSpriteFor,
   makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot,
   makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,

@@ -67,6 +67,17 @@ commits on `main`.
   `src/main.js` exports the same names, now from the other file. No behaviour change:
   the suite stays 416/416 and `src/commands.js` goes 418 → 291 lines.
 
+### Changed — `docs/plans/2026-11-14-strix-local-roadmap.md` G5: hotkeys become a table
+
+- `HOTKEYS` (`src/config.js`) now declares every key the game answers — the `pan` directions,
+  the placeable `build` kinds, and the `cmd` rows (`age`, `newMap`, `clear`, the control-group
+  digits with and without ctrl) — so a new key is a new row, and `attachInput` (`src/input.js`)
+  is a lookup: `setKey` reads `HOTKEYS.pan` and the keydown handler walks the table in the old
+  order, ctrl+digit first, then the modifier guard that keeps `ctrl+b` from placing a barracks.
+- checks: `tools/checks/08-input.js` drives the table — one check per `build` row (arm, then
+  disarm), a uniqueness check over every name the table claims, one per `cmd` row
+  (suite 416 → 437); `docs/GAME_RULES.md` now lists exactly the table's keys.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep

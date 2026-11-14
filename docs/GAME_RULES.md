@@ -370,12 +370,12 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   (`src/boot.js:233-235`) so the saved frame is the one just run, and `stepSim` never writes —
   driving the simulation from a test touches no storage. `resetGame` sets `Game.autosaveAt =
   Game.time` (`src/boot.js:61`): a new settlement is written by the very next frame, which is
-  what makes `N` (`requestReset`, `src/input.js:241`) overwrite the slot instead of waiting out the debounce.
+  what makes `N` (`requestReset`, `src/input.js:248`) overwrite the slot instead of waiting out the debounce.
 - **The page surface** — the header's `Save` button (`index.html:20`) writes the slot through
   `saveGame` (`src/boot.js:185`) and toasts `Saved`; `boot` (`src/boot.js:138`) calls
   `storageGet` / `loadGame` (`src/boot.js:143-144`) right after `createState` (`src/boot.js:38`),
   so reopening the page lands on the saved game; the three new-game paths — `N`
-  (`requestReset`, `src/input.js:241`), the footer's `New map` (the `restart` action, `src/input.js:267`) and the victory overlay's
+  (`requestReset`, `src/input.js:248`), the footer's `New map` (the `restart` action, `src/input.js:274`) and the victory overlay's
   `New game` (`src/boot.js:181`) — clear the slot before `resetGame`, which schedules the rewrite.
 
 ## Sound (SFX)
@@ -453,12 +453,14 @@ finger pans the camera instead of moving the anchored box) · drag to box-select
 villagers) · right click, or a hold of `LONG_PRESS_MS` 600 ms that stays within 8 px of its
 press (`src/config.js:278`), issues move / attack / gather / build (context decided by
 what is under the cursor) · panning is
-`WASD / arrows` at 620 px/s (`W` pans — the Barricade hotkey moved to `Q`), or the 1:1
-two-finger pan (`panCamera`, `src/input.js:317`) · 14 px
+:`WASD / arrows` at 620 px/s (`W` pans — the Barricade hotkey moved to `Q`), or the 1:1
+two-finger pan (`panCamera`, `src/input.js`) · 14 px
 edge-scroll band, active only while the pointer is over the
-canvas (not over header/footer chrome) · `Ctrl+1..9` store group, `1..9` recall · `H`
-house, `F` farm, `B` barracks, `L` lumber camp, `G` mining camp, `M` mill, `R` archery
-range, `K` blacksmith, `E` market, `C` watch tower, `Q` barricade, `T` upgrade age,
-`Esc` cancels placement then clears selection · `N` new game (`src/input.js:230`) · minimap
+canvas (not over header/footer chrome) · the keys the game answers, and the only keys it
+answers, are the rows of `HOTKEYS` (`src/config.js`): pan `W` `S` `A` `D` and the four arrow
+keys; build `H` house, `F` farm, `B` barracks, `L` lumber camp, `G` mining camp, `M` mill,
+`R` archery range, `K` blacksmith, `E` market, `C` watch tower, `Q` barricade; command `T`
+upgrade age, `N` new map (the confirmation in `requestReset`, `src/boot.js`), `Esc` cancels
+placement then clears the selection, `1..9` recall a group and `Ctrl+1..9` store one · minimap
 click/drag moves the camera ·
 "New map" reseeds and resets.

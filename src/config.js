@@ -334,3 +334,21 @@ const SFX = {
    the confirming press; requestReset (src/boot.js) arms, then wipes within that gap.
    Hand-written beside the other UI timing constants, not in the generated CFG. */
 const CONFIRM_RESET_SECS = 3;
+
+/* Every key the game answers, in one table (card G5): attachInput (src/input.js) looks a
+   key up here instead of carrying an if-ladder, so a new key is a new row and nothing else.
+   The three groups say what the key does — `pan` feeds Game.keys with a direction, `build`
+   toggles Game.placing to a BLD kind, `cmd` runs a named action (`age`, `newMap`, `clear`)
+   or covers the control-group digits (`groups` recalls `1-9`, `groupsSave` stores them
+   behind ctrl). Add a row here for a new key; keys MUST stay unique across the whole table,
+   which tools/checks/08-input.js §10f enforces — `w` used to be both a pan key and a
+   barricade key. The build rows are the placeable BLD kinds: town_center has no letter (it
+   is the start), and guard_tower/keep are promotions of watch_tower, not built by hand. */
+const HOTKEYS = {
+  pan:   { w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down',
+           a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right' },
+  build: { h: 'house', f: 'farm', b: 'barracks', l: 'lumber_camp', g: 'mining_camp',
+           m: 'mill', r: 'archery_range', k: 'blacksmith', e: 'market',
+           c: 'watch_tower', q: 'barricade' },
+  cmd:   { t: 'age', n: 'newMap', escape: 'clear', groups: '1-9', groupsSave: 'ctrl+1-9' },
+};

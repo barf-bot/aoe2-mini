@@ -155,7 +155,7 @@ A prompt you can paste per session is in §10.
   - **Done when:** verify green, `commands.js` < 300 lines, file map + AGENTS table updated,
     `audit-line-refs --fix` applied. **Size:** S. **Needs:** G2.
 
-- [ ] **G5 — Hotkeys become a table**
+- [x] **G5 — Hotkeys become a table**
   - **Read:** the keydown listener in `attachInput` (`src/input.js`).
   - **Change:** in the hand-written part of `src/config.js`, add
     `const HOTKEYS = { build: { h: 'house', f: 'farm', ... q: 'barricade' }, pan: {...},

@@ -213,32 +213,39 @@ function attachInput(Game, d) {
     issueOrder(Game, w.x, w.y);
   });
 
+  /* The keyboard contract is the HOTKEYS table (src/config.js) and both listeners below are
+     lookups, so a new key needs a row there and no code here. `hotkeyMatch` reads a row's
+     value — a plain name (`escape`), a digit range (`1-9`) or a modified range
+     (`ctrl+1-9`) — because the two control-group rows name a set of keys, not one key. The
+     order is the old ladder's: ctrl+digit stores a group and swallows the browser's
+     bookmark shortcut, every other modified key returns (so `ctrl+b` never places a
+     barracks), the plain digits recall a group, `Esc` clears the frame, the build rows
+     toggle `Game.placing`, `t` and `n` run their commands, and only an unmatched key
+     reaches the `pan` lookup at the bottom. */
   const keys = Game.keys;
-  const setKey = (k, v) => {
-    if (k === 'w' || k === 'arrowup') keys.up = v;
-    else if (k === 's' || k === 'arrowdown') keys.down = v;
-    else if (k === 'a' || k === 'arrowleft') keys.left = v;
-    else if (k === 'd' || k === 'arrowright') keys.right = v;
+  const hotkeyMatch = (spec, e) => {
+    const k = (e.key || '').toLowerCase();
+    if (!k) return false;
+    const plus = spec.indexOf('+');
+    const mod = plus < 0 ? '' : spec.slice(0, plus);
+    const key = plus < 0 ? spec : spec.slice(plus + 1);
+    if (mod === 'ctrl' ? !e.ctrlKey : (e.ctrlKey || e.metaKey || e.altKey)) return false;
+    const dash = key.indexOf('-');
+    if (dash < 0) return k === key;
+    return k.length === 1 && k >= key.slice(0, dash) && k <= key.slice(dash + 1);
   };
+  const setKey = (k, v) => { const dir = HOTKEYS.pan[k]; if (dir) keys[dir] = v; };
   d.addEventListener('keydown', (e) => {
     const k = (e.key || '').toLowerCase();
-    if (e.ctrlKey && /^[1-9]$/.test(k)) { Game.groups[k] = Game.selection.slice(); e.preventDefault(); return; }
+    if (hotkeyMatch(HOTKEYS.cmd.groupsSave, e)) { Game.groups[k] = Game.selection.slice(); e.preventDefault(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (k === 'escape') { Game.placing = null; Game.selection = []; Game.selectedBuilding = null; return; }
-    if (/^[1-9]$/.test(k)) { Game.selection = (Game.groups[k] || []).slice(); return; }
-    if (k === 'h') { Game.placing = Game.placing === 'house' ? null : 'house'; return; }
-    if (k === 'f') { Game.placing = Game.placing === 'farm' ? null : 'farm'; return; }
-    if (k === 'b') { Game.placing = Game.placing === 'barracks' ? null : 'barracks'; return; }
-    if (k === 'l') { Game.placing = Game.placing === 'lumber_camp' ? null : 'lumber_camp'; return; }
-    if (k === 'g') { Game.placing = Game.placing === 'mining_camp' ? null : 'mining_camp'; return; }
-    if (k === 'm') { Game.placing = Game.placing === 'mill' ? null : 'mill'; return; }
-    if (k === 'r') { Game.placing = Game.placing === 'archery_range' ? null : 'archery_range'; return; }
-    if (k === 'k') { Game.placing = Game.placing === 'blacksmith' ? null : 'blacksmith'; return; }
-    if (k === 'e') { Game.placing = Game.placing === 'market' ? null : 'market'; return; }
-    if (k === 'c') { Game.placing = Game.placing === 'watch_tower' ? null : 'watch_tower'; return; }
-    if (k === 'q') { Game.placing = Game.placing === 'barricade' ? null : 'barricade'; return; }
-    if (k === 't') { upgradeAge(Game); return; }
-    if (k === 'n') { requestReset(Game, Date.now() >>> 0); return; }
+    if (hotkeyMatch(HOTKEYS.cmd.groups, e)) { Game.selection = (Game.groups[k] || []).slice(); return; }
+    const cmd = HOTKEYS.cmd[k];
+    if (cmd === 'clear') { Game.placing = null; Game.selection = []; Game.selectedBuilding = null; return; }
+    const kind = HOTKEYS.build[k];
+    if (kind) { Game.placing = Game.placing === kind ? null : kind; return; }
+    if (cmd === 'age') { upgradeAge(Game); return; }
+    if (cmd === 'newMap') { requestReset(Game, Date.now() >>> 0); return; }
     setKey(k, true);
   });
   d.addEventListener('keyup', (e) => setKey((e.key || '').toLowerCase(), false));
