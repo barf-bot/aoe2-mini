@@ -329,3 +329,8 @@ const SFX = {
   victory: { wave: 'sawtooth', freq: [523, 659, 784], dur: 0.90, gain: 0.30, fire: 'setResult' },
   defeat:  { wave: 'sawtooth', freq: [392, 311, 262], dur: 1.10, gain: 0.28, fire: 'setResult' },
 };
+
+/* How long a second N (or New map / New game click) may lag the first and still count as
+   the confirming press; requestReset (src/boot.js) arms, then wipes within that gap.
+   Hand-written beside the other UI timing constants, not in the generated CFG. */
+const CONFIRM_RESET_SECS = 3;

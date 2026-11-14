@@ -65,19 +65,6 @@ same seed-1337 map. `docs/GAME_RULES.md` claims `New map` reseeds.
 - **Done when:** `10-reset-save.js` asserts `resetGame(g, 7)` and `resetGame(g, 8)` produce
   different `world.type` arrays and that a save/load round-trip keeps `world.seed`.
 
-### 23. `N` deletes the save and restarts with no confirmation
-
-**Verified** by reading the keydown handler in `attachInput` (`src/input.js`): `n` calls
-`storageSet(SAVE_PATH, null)` and `resetGame` immediately. `N` sits between `B` and `M`,
-both build hotkeys, so one slip erases the game and its autosave.
-
-- **Fix:** the first `N` (or `New map` click) arms `Game.confirmReset = Game.time` and toasts
-  `Press N again to start a new map`; a second press within 3 s resets. Pure state, so the
-  check can drive it without a DOM.
-- **Done when:** `08-input.js` asserts one `N` leaves the world and the save untouched and
-  two `N` within 3 s reset it.
-
-
 ---
 
 ## P2 — smaller defects

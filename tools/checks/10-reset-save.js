@@ -578,7 +578,8 @@ uiCheck('ui: N starts a new game, clears the slot and writes the new game back',
   const [src, raw] = savedFixture();
   return bootFixture(raw, (doc, Game) => {
     const loaded = Game.units.length === src.units.length && Game.age[0] === 1 && Game.res[0].gold === 999;
-    doc.fire('keydown', { key: 'n' });
+    doc.fire('keydown', { key: 'n' });                    // first press arms the confirm
+    doc.fire('keydown', { key: 'n' });                    // the confirming press runs the wipe
     const cleared = AoE2.storageGet(AoE2.SAVE_PATH) === null;
     const after = [Game.units.length, Game.time, Game.age[0]].join('/');
     AoE2.stepGame(Game, DT);
@@ -595,7 +596,9 @@ uiCheck('ui: the footer’s New map button clears the slot too', () => {
   return bootFixture(raw, (doc, Game) => {
     const btn = stubEl('button', 'btnRestart', 80, 24);
     btn.setAttribute('data-act', 'restart');
-    Game.dom.commands.listeners.click.forEach((fn) => fn({ target: btn }));
+    const click = () => Game.dom.commands.listeners.click.forEach((fn) => fn({ target: btn }));
+    click();                                              // first click arms, the second resets
+    click();
     return [Game.units.length === 10 && Game.age[0] === 0 && Game.res[0].gold === AoE2.CFG.START.gold &&
       AoE2.storageGet(AoE2.SAVE_PATH) === null,
       'was=' + src.units.length + ' units, now=' + Game.units.length + ' age=' + Game.age[0] +
@@ -608,7 +611,9 @@ uiCheck('ui: the result overlay’s New game button clears the slot too', () => 
   return bootFixture(raw, (doc, Game) => {
     const btn = stubEl('button', 'btnNew', 80, 24);
     btn.setAttribute('data-act', 'restart');
-    Game.dom.result.listeners.click.forEach((fn) => fn({ target: btn }));
+    const click = () => Game.dom.result.listeners.click.forEach((fn) => fn({ target: btn }));
+    click();                                              // first click arms, the second resets
+    click();
     return [Game.units.length === 10 && Game.result === null &&
       AoE2.storageGet(AoE2.SAVE_PATH) === null,
       'was=' + src.units.length + ' units, now=' + Game.units.length +

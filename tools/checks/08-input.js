@@ -641,4 +641,47 @@ check(gLeaveEmpty.threw === null && gLeaveEmpty.n === 0 &&
   'input: leaveBuilding on an empty building toasts and marks nothing',
   JSON.stringify(gLeaveEmpty));
 
+/* ---- 10g. new-map confirmation (docs/TODO.md item 23, finding R6) ---------- */
+/* `N` used to wipe the save on the first keystroke. requestReset now arms: the first
+   press stores Game.confirmReset and toasts, and only a second press inside
+   CONFIRM_RESET_SECS runs the old wipe. The n key, the bar's New map and the overlay's
+   New game share that one function, so firing the real keydown the harness booted (the
+   way every check above drives it) proves the whole contract. The save's own bytes are
+   the world's fingerprint: arming must leave the slot byte-for-byte as it was, and the
+   confirming wipe must rebuild exactly the seeded start. Game.time is pinned so a
+   "second press 1 s later" and "a press 4 s later" are measured, not simulated. */
+const RST = (() => {
+  const G = Game, st = () => AoE2.saveGame(AoE2.SAVE_PATH, G, 0);
+  const press = () => doc.fire('keydown', { key: 'n', target: view });
+  const r = {};
+  G.time = 20; r.pre = st();                       // pin the clock, stash the live save
+  press();                                         // first N: arm, do not wipe
+  r.c1 = G.confirmReset; r.t1 = G.time; r.slot1 = AoE2.storageGet(AoE2.SAVE_PATH);
+  r.msg1 = G.toastMsg; r.toastAt1 = G.toastAt;
+  G.time = 21; press();                            // a second N 1 s later: the old wipe runs
+  r.c2 = G.confirmReset; r.t2 = G.time; r.n2 = G.units.length; r.b2 = G.buildings.length;
+  r.slot2 = AoE2.storageGet(AoE2.SAVE_PATH);
+  G.time = 5; r.pre3 = st();                       // a fresh settlement, then arm again at t=5
+  press(); r.cA = G.confirmReset;
+  G.time = 9; press();                             // a press 4 s after the first: re-arm only
+  r.c4 = G.confirmReset; r.t4 = G.time; r.slot4 = AoE2.storageGet(AoE2.SAVE_PATH);
+  r.msg4 = G.toastMsg;
+  return r;
+})();
+check(RST.c1 === 20 && RST.msg1 === 'Press N again to start a new map',
+  'input: one N arms the new-map confirmation instead of wiping',
+  'confirmReset=' + String(RST.c1) + ' want=20 toast=' + JSON.stringify(RST.msg1));
+check(RST.slot1 === RST.pre && RST.t1 === 20 && RST.toastAt1 === 20,
+  'input: arming leaves the world and the save slot byte-identical',
+  'slot ' + (RST.slot1 === RST.pre ? 'identical' : 'changed') + ' time=' + String(RST.t1));
+check(RST.c2 === null && RST.t2 === 0 && RST.slot2 === null && RST.n2 === 10 && RST.b2 === 2,
+  'input: a second N within 3 s runs the old wipe and clears the save',
+  'confirm=' + String(RST.c2) + ' time=' + RST.t2 + ' slot=' + String(RST.slot2) +
+  ' units=' + RST.n2 + ' buildings=' + RST.b2);
+check(RST.cA === 5 && RST.c4 === 9 && RST.t4 === 9 && RST.slot4 === RST.pre3 &&
+      RST.msg4 === 'Press N again to start a new map',
+  'input: a press 4 s after the first only re-arms, never resets',
+  'arm=' + String(RST.cA) + ' rearm=' + String(RST.c4) + ' time=' + RST.t4 +
+  ' slot=' + (RST.slot4 === RST.pre3 ? 'kept' : 'cleared'));
+
 report();

@@ -238,7 +238,7 @@ function attachInput(Game, d) {
     if (k === 'c') { Game.placing = Game.placing === 'watch_tower' ? null : 'watch_tower'; return; }
     if (k === 'q') { Game.placing = Game.placing === 'barricade' ? null : 'barricade'; return; }
     if (k === 't') { upgradeAge(Game); return; }
-    if (k === 'n') { storageSet(SAVE_PATH, null); resetGame(Game); return; }
+    if (k === 'n') { requestReset(Game); return; }
     setKey(k, true);
   });
   d.addEventListener('keyup', (e) => setKey((e.key || '').toLowerCase(), false));
@@ -264,7 +264,7 @@ function attachInput(Game, d) {
       else if (act === 'cancel' && Game.selectedBuilding) cancelConstruction(Game, Game.selectedBuilding);
       else if (act === 'demolish' && Game.selectedBuilding) demolish(Game, Game.selectedBuilding);
       else if (act === 'age') upgradeAge(Game);
-      else if (act === 'restart') { storageSet(SAVE_PATH, null); resetGame(Game); }
+      else if (act === 'restart') requestReset(Game);
     });
   }
 

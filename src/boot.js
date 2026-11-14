@@ -179,7 +179,7 @@ function boot(doc) {
   if (Game.dom.result && Game.dom.result.addEventListener) {
     Game.dom.result.addEventListener('click', (e) => {
       const b = buttonAt(e);
-      if (b && b.getAttribute('data-act') === 'restart') { storageSet(SAVE_PATH, null); resetGame(Game); }
+      if (b && b.getAttribute('data-act') === 'restart') requestReset(Game);
     });
   }
   if (Game.dom.save && Game.dom.save.addEventListener) {
@@ -235,4 +235,19 @@ function stepGame(Game, dt) {
     saveGame(SAVE_PATH, Game);
     Game.autosaveAt = Game.time + CFG.AUTOSAVE_EVERY;
   }
+}
+
+/* N / New map / New game used to wipe the save on the first press (docs/TODO.md item 23,
+   finding R6). requestReset now asks: the first call arms Game.confirmReset and toasts, a
+   second within CONFIRM_RESET_SECS runs the old wipe (forget the save, rebuild the seeded
+   start) and clears the arm, and a call after the window simply re-arms. One exported
+   function so the n key and both New buttons cannot disagree; confirmReset is transient and
+   never enters the save payload (src/save.js:30). */
+function requestReset(Game) {
+  const armed = typeof Game.confirmReset === 'number' &&
+                Game.time - Game.confirmReset <= CONFIRM_RESET_SECS;
+  if (!armed) { Game.confirmReset = Game.time; toast(Game, 'Press N again to start a new map'); return; }
+  storageSet(SAVE_PATH, null);
+  resetGame(Game);
+  Game.confirmReset = null;
 }

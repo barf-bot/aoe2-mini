@@ -291,7 +291,9 @@ AoE2.renderFrame(go);
 const winOverlay = overlayHtml(go);
 const newBtn = stubEl('button', 'btnNew', 80, 24);
 newBtn.setAttribute('data-act', 'restart');
-((go.dom.result.listeners && go.dom.result.listeners.click) || []).forEach((fn) => fn({ target: newBtn }));
+const clickNew = () => ((go.dom.result.listeners && go.dom.result.listeners.click) || []).forEach((fn) => fn({ target: newBtn }));
+clickNew();                                               // first click arms the confirmation
+clickNew();                                               // the confirming click resets the won game
 AoE2.renderFrame(go);
 check(/Victory/.test(winOverlay) && winOverlay.includes('data-act="restart"') &&
       go.result === null && go.units.length === 10 && overlayHtml(go) === '',

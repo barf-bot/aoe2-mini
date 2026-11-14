@@ -369,12 +369,12 @@ node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode kee
   (`src/boot.js:233-235`) so the saved frame is the one just run, and `stepSim` never writes —
   driving the simulation from a test touches no storage. `resetGame` sets `Game.autosaveAt =
   Game.time` (`src/boot.js:61`): a new settlement is written by the very next frame, which is
-  what makes `N` (`storageSet` + `resetGame`, `src/input.js:241`) overwrite the slot instead of waiting out the debounce.
+  what makes `N` (`requestReset`, `src/input.js:241`) overwrite the slot instead of waiting out the debounce.
 - **The page surface** — the header's `Save` button (`index.html:20`) writes the slot through
   `saveGame` (`src/boot.js:185`) and toasts `Saved`; `boot` (`src/boot.js:138`) calls
   `storageGet` / `loadGame` (`src/boot.js:143-144`) right after `createState` (`src/boot.js:38`),
   so reopening the page lands on the saved game; the three new-game paths — `N`
-  (`storageSet`, `src/input.js:241`), the footer's `New map` (the `restart` action, `src/input.js:267`) and the victory overlay's
+  (`requestReset`, `src/input.js:241`), the footer's `New map` (the `restart` action, `src/input.js:267`) and the victory overlay's
   `New game` (`src/boot.js:181`) — clear the slot before `resetGame`, which schedules the rewrite.
 
 ## Sound (SFX)

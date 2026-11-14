@@ -34,6 +34,17 @@ commits on `main`.
   header, the condensed working rules, one empty `Read`/`Change`/`Check`/`Done when`/`Size`/
   `Needs` card and the hard-stop list, 58 lines so a new plan starts short.
 
+### Fixed — `docs/TODO.md` item 23: `N` asks before it wipes the save
+
+- The `n` key, the footer's `New map` button and the victory overlay's `New game` button now
+  all call one exported `requestReset(Game)` (`src/boot.js`): the first press arms a
+  confirmation (`Game.confirmReset` — transient and kept out of the save, so `CFG.VERSION`
+  is unchanged) and toasts `Press N again to start a new map`; a second press within
+  `CONFIRM_RESET_SECS` (3 s) runs the old wipe and clears the arm, a later press re-arms.
+- checks: `tools/checks/08-input.js` gains the arm / confirm / re-arm cases (suite 409 → 413);
+  the three new-game checks in `tools/checks/10-reset-save.js` and the result-overlay check in
+  `tools/checks/07-combat.js` now drive the confirming second press.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep
