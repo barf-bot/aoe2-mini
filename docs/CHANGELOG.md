@@ -13,6 +13,16 @@ commits on `main`.
   writes the PNG to `os.tmpdir()`, so a verify run never rewrites the tracked `preview.png`.
   `npm run check --prefix tools` and `.github/workflows/check.yml` are unchanged.
 
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` G2: `audit-line-refs.js --fix`
+
+- `node tools/audit-line-refs.js --fix` repairs the refs it can place with certainty instead of
+  making whoever moved the code renumber them by hand: it reads the identifiers out of the citing
+  sentence, searches the target file for `function <word>` / `const <word>` / `<word>:` and moves
+  the ref to that line only when the target declares the name exactly once (a range shifts by the
+  same delta; several candidates resolve to the one nearest the number written). It prints
+  `fixed N, left M` and exits 1 unless nothing needed fixing and nothing is broken. Without
+  `--fix` the checks and their output are byte-identical to before.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep

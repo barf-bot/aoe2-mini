@@ -10,7 +10,14 @@
    3. the logic files (DOM column `no` in that map) must not name a browser global;
    4. everything in tools/ must be documented in AGENTS.md and README.md.
 
-   usage: node tools/audit-line-refs.js
+   usage: node tools/audit-line-refs.js [-v] [--fix]
+
+   --fix repairs the refs it can place with certainty and writes the doc back: a failing ref
+   whose citing sentence names a symbol the target file declares exactly once moves to that
+   declaration (a range shifts by the same delta, so its length is kept). The run ends with
+   `fixed N, left M` and exits 1 unless nothing needed fixing and nothing is broken -- refs
+   it cannot place honestly are reported as left, never guessed at. Without --fix the tool
+   only checks, exactly as before.
  */
 'use strict';
 const fs = require('fs');
@@ -31,11 +38,12 @@ const CONTEXT = 3;   // a citation may point inside a function: its name can sit
 const wordSet = (t) => (t.replace(REF, ' ')
   .match(/[A-Za-z_][A-Za-z0-9_]{2,}/g) || []).map((w) => w.toLowerCase()).filter((w) => !STOP.has(w));
 
-let fail = 0, passed = 0;
+let fail = 0, passed = 0, fixedCount = 0, leftCount = 0;
 const bad = (f, m) => { console.log('FAIL ' + f + ': ' + m); fail++; };
 const ok = (f, m) => { passed++; if (process.argv.includes('-v')) console.log('ok   ' + f + ': ' + m); };
 
 /* ---- 1. line refs in every doc ---- */
+const FIX = process.argv.includes('--fix');
 const cache = {};
 const linesOf = (rel) => {
   if (!(rel in cache)) {
@@ -43,22 +51,74 @@ const linesOf = (rel) => {
   }
   return cache[rel];
 };
+// Every line in `rel` that declares a name, in the three forms --fix reads: `function x`,
+// `const x` and an object key `x:`. Lower-cased, the way wordSet returns them.
+const declCache = {};
+const declarations = (rel) => {
+  if (!(rel in declCache)) {
+    const m = new Map();
+    const add = (name, n) => { const k = name.toLowerCase(); if (!m.has(k)) m.set(k, []); m.get(k).push(n); };
+    (linesOf(rel) || []).forEach((l, i) => {
+      for (const d of l.matchAll(/\b(?:function|const)\s+([A-Za-z_$][\w$]*)/g)) add(d[1], i + 1);
+      const key = l.match(/^\s*(['"`]?)([A-Za-z_$][\w$]*)\1\s*:/);
+      if (key) add(key[2], i + 1);
+    });
+    declCache[rel] = m;
+  }
+  return declCache[rel];
+};
+// Where a failing ref belongs. A word the target declares twice proves nothing, so it gives
+// no candidate; when several names each give one line, the closest to the number written wins
+// -- a stale ref drifts by a few lines, and each ref on a line points at its own symbol.
+// null means there is no honest answer, so the ref is left for whoever reads the report.
+const relocate = (rel, ids, from) => {
+  const decl = declarations(rel);
+  const found = [...new Set(ids.filter((w) => (decl.get(w) || []).length === 1).map((w) => decl.get(w)[0]))]
+    .sort((a, b) => a - b);
+  if (!found.length) return null;
+  const best = found.reduce((b, n) => (Math.abs(n - from) < Math.abs(b - from) ? n : b), found[0]);
+  return found.some((n) => n !== best && Math.abs(n - from) === Math.abs(best - from)) ? null : best;
+};
+// The same ref with new numbers, or null: a range keeps its length, and the rewrite has to
+// still fit inside the target file.
+const rewrite = (rel, m, ids) => {
+  const from = +m[2], to = Math.max(from, +(m[3] || m[2]));
+  const n = relocate(m[1], ids, from);
+  if (n === null || n + to - from > (linesOf(m[1]) || []).length) return null;
+  return m[1] + ':' + n + (to > from ? '-' + (n + to - from) : '');
+};
+// Splice a line's replacements back in without touching a single other byte of the doc.
+const applyLine = (line, list) => {
+  if (!list) return line;
+  let out = '', at = 0;
+  for (const e of list) { out += line.slice(at, e.start) + e.text; at = e.end; }
+  return out + line.slice(at);
+};
 for (const rel of DOCS) {
   const doc = read(rel).split('\n');
+  const fixes = new Map();   // doc line -> its replacements, in match order
+  const report = (i, m, ids, msg) => {
+    const nu = FIX ? rewrite(rel, m, ids) : null;
+    if (!nu) { bad(rel, msg); leftCount++; return; }
+    console.log('fix  ' + rel + ': ' + m[0] + ' -> ' + nu);
+    fixedCount++;
+    (fixes.get(i) || fixes.set(i, []).get(i)).push({ start: m.index, end: m.index + m[0].length, text: nu });
+  };
   doc.forEach((line, i) => {
     for (const m of line.matchAll(REF)) {
       const lines = linesOf(m[1]);
-      if (!lines) { bad(rel, `${m[0]} cites a file that does not exist`); continue; }
+      if (!lines) { report(i, m, [], `${m[0]} cites a file that does not exist`); continue; }
       const from = +m[2];
       const to = Math.max(from, +(m[3] || m[2]));
-      if (to > lines.length) { bad(rel, `${m[0]} is past the end of ${m[1]} (${lines.length} lines)`); continue; }
+      const ids = wordSet(line).concat(i ? wordSet(doc[i - 1]) : []);
+      if (to > lines.length) { report(i, m, ids, `${m[0]} is past the end of ${m[1]} (${lines.length} lines)`); continue; }
       const span = lines.slice(Math.max(0, from - 1 - CONTEXT), to + CONTEXT).join('\n').toLowerCase();
-      const ids = [...wordSet(line), ...(i ? wordSet(doc[i - 1]) : [])];
       const hit = ids.find((id) => span.includes(id));
-      if (!hit) bad(rel, m[0] + ' cites "' + (ids.slice(0, 3).join(',') || 'nothing') + '" but line ' + from + ' reads: "' + lines[from - 1].trim().slice(0, 56) + '"');
+      if (!hit) report(i, m, ids, m[0] + ' cites "' + (ids.slice(0, 3).join(',') || 'nothing') + '" but line ' + from + ' reads: "' + lines[from - 1].trim().slice(0, 56) + '"');
       else ok(rel, m[0] + ' -> ' + hit + ' (' + (to - from + 1) + ' line(s) checked)');
     }
   });
+  if (fixes.size) fs.writeFileSync(path.join(ROOT, rel), doc.map((l, i) => applyLine(l, fixes.get(i))).join('\n'));
 }
 
 /* ---- 2. ARCHITECTURE file map vs what index.html loads ---- */
@@ -97,5 +157,6 @@ for (const rel of ['AGENTS.md', 'README.md']) {
   else ok(rel, `all ${present.length} tool(s) documented: ${present.join(', ')}`);
 }
 
+if (FIX) console.log('fixed ' + fixedCount + ', left ' + leftCount);
 console.log(fail ? fail + ' problem(s), ' + passed + ' ok' : passed + ' doc checks ok: line refs, file map, DOM-free rule and tool inventory agree with the code');
-process.exit(fail ? 1 : 0);
+process.exit(fail || (FIX && fixedCount) ? 1 : 0);

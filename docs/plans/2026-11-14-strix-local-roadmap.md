@@ -125,7 +125,7 @@ A prompt you can paste per session is in §10.
     `check-stats`), then restore.
   - **Done when:** `npm run verify --prefix tools` prints `VERIFY OK`. **Size:** S.
 
-- [ ] **G2 — `audit-line-refs.js --fix`**
+- [x] **G2 — `audit-line-refs.js --fix`**
   - **Read:** `tools/audit-line-refs.js` (whole file, it is the subject).
   - **Change:** with `--fix`, for each failing `path:NNN[-MMM]` ref, find the identifiers the
     audit already extracts from the citing sentence (`wordSet`); search the target file for
