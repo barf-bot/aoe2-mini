@@ -81,8 +81,3 @@ frames). At 60 fps that is a visible hitch.
 - **Done when:** `04-pathfinding.js` asserts no single `stepSim` issues more than the budget
   and that every unit of a 150-unit order still arrives.
 
-### 26. ROADMAP says the barricade hotkey is `w`
-
-**Verified:** the code uses `q` (`w` pans the camera); `docs/GAME_RULES.md` already says `Q`.
-Fix the sentence in `docs/ROADMAP.md` item 6.
-

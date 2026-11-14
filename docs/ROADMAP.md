@@ -67,7 +67,7 @@ quality of life, new content) sized for a local model, in the order to do them.
    built tower into them.
 6. **Wooden barricade (Feudal Age wall segment) + gated choke points.** Shipped
    2026-11-12 by the wooden barricade plan (`docs/plans/2026-11-12-wooden-barricade.md`):
-   a Feudal-gated 1×1 `BLD.barricade` row — `w`, 150 hp, 3 wood, 7 s — run through the
+   a Feudal-gated 1×1 `BLD.barricade` row — `Q`, 150 hp, 3 wood, 7 s — run through the
    existing build pipeline, so enemy fighters raze segments and every raze reopens the
    gap. Left over: the Stone Wall / Ruins / Fortified Wall chain and gates,
    drag-to-build a run of walls, and the barricade's ripped atlas frame (folded into

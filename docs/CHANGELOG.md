@@ -78,6 +78,18 @@ commits on `main`.
   disarm), a uniqueness check over every name the table claims, one per `cmd` row
   (suite 416 → 437); `docs/GAME_RULES.md` now lists exactly the table's keys.
 
+### Fixed — `docs/TODO.md` item 26: the roadmap named the wrong barricade key
+
+- `docs/ROADMAP.md` P1 item 6 still carried the pre-G5 letter — "a Feudal-gated 1×1
+  `BLD.barricade` row — `w`, 150 hp, 3 wood, 7 s" — while `HOTKEYS` (`src/config.js`)
+  gives the barricade `q` and `w` to panning up, and `docs/GAME_RULES.md` already said
+  `Q`. The sentence now quotes the table's letter; the entry still cites its code by name
+  (`BLD.barricade`, `docs/plans/2026-11-12-wooden-barricade.md`) with no line number.
+- Nothing else states a current barricade key: the `w` in `docs/CHANGELOG.md` and in the
+  wooden-barricade plan is the record of the row's first shipping state and of the later
+  move to `q`, so it stands.
+- Docs only — no check file touched, the suite stays 437/437.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep
