@@ -28,7 +28,8 @@ simulation.
 | `src/sim.js` | no | `stepSim`/`updateUnit` (the order state machine — its `build` branch ends a site by calling `promoteBuilding` when the site is an upgrade in progress, and its first guard parks a unit whose `garrisonedIn` is set instead of moving him), combat math (`unitAttack`/`unitArmor`/`hitUnit`/`hitBuilding`/`autoAcquire`/`attackableAsEnemy`/`targetableAsEnemy`), projectiles (`spawnArrow`/`updateProjectiles`/`stepBuildingAttacks`) |
 | `src/movement.js` | no | `tileOf`, A\* (`findPath`), `stepToward`/`moveUnit`/`standTarget`, `formationSlots`, `walkable`, `reachOf`, `separate` |
 | `src/economy.js` | no | gathering (`workersOnTile`, `findDropoff`, `deposit`, `depleteTile`, `nextSource`, `resumeGather`), `popCap`/`popUsed`, `selectedUnits`, `canAfford`/`spend`/`refund` |
-| `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`, `canPlaceAt`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, `upgradeBuilding`/`promoteBuilding`, `garrisonUnits`/`leaveBuilding`, plus `toast` |
+| `src/commands.js` | no | everything a player or the AI can order: `orderForUnit`/`issueOrder`, `build`, `canPlaceAt`, `cancelConstruction`, `demolish`, `siteFree`, `train`, `researchTech`, `trade`, `upgradeAge`, plus `toast` |
+| `src/structures.js` | no | the building chain and its garrison helpers: `upgradeBuilding`/`promoteBuilding` (the two halves of a tower upgrade), `ringSpot`/`placeOnRing`, `garrisonUnits`/`leaveBuilding` |
 | `src/ai.js` | no | `aiStep` — the enemy village, acting through the same commands |
 | `src/save.js` | guarded | `storageGet`/`storageSet` (the one door to `localStorage`, node-safe), `encodeState`/`decodeState`, `markDirty`, `saveGame`/`loadGame`, `migrate`/`validState` |
 | `src/sound.js` | guarded | `playSfx` (WebAudio synth of the `SFX` rows), `isMuted`/`setMuted`/`applyMuteButton` |
@@ -91,11 +92,11 @@ type lookup is a flat array index (`ty * world.w + tx`).
 
 `idle` → `move` → `harvest` → `go_deposit` → (re-acquire source via `nextSource`) …
 plus `build` (works on a site until `built >= 1`, and promotes it through `promoteBuilding`
-(`src/commands.js:318`) when the site is an upgrade in progress) and `attack` (chase to
+(`src/structures.js:42`) when the site is an upgrade in progress) and `attack` (chase to
 `u.r + target.r + 4`, then swing on `atkTime` cooldown). Carry capacity is
 `CFG.CARRY_MAX`; the carried resource is recorded in `u.carryRes` so `deposit()` credits
 the right stockpile — that field being unset was a real bug (deposits silently vanished). A
-`move` order can also carry `garrison: <building id>` (`garrisonUnits`, `src/commands.js:363`):
+`move` order can also carry `garrison: <building id>` (`garrisonUnits`, `src/structures.js:87`):
 the garrison walk, and the only order `updateUnit` runs for a unit with `garrisonedIn` set —
 retiring it on arrival at the ring tile is the single place that order ends
 (docs/plans/2026-11-13-garrison.md).

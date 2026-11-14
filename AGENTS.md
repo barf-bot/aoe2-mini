@@ -45,6 +45,7 @@ no-build-step rule above (a PNG needs no build), so it is stated separately and 
 | pathfinding, steering, formations | `src/movement.js` |
 | gathering, drop-offs, population, resources | `src/economy.js` |
 | player/AI commands (build, train, research, trade, garrison, orders) | `src/commands.js` |
+| building upgrade/promotion, garrison helpers | `src/structures.js` |
 | the enemy AI | `src/ai.js` |
 | save / load | `src/save.js` |
 | sound | `src/sound.js` |

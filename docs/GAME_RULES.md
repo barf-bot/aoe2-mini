@@ -78,7 +78,7 @@ a bug.
   and a slot taken by another order forces a re-ask instead of a stack. `attack` and
   `harvest` orders keep their targets: no slots for a fight.
 - A `move` order can also name the building it walks into (`order.garrison`,
-  `src/commands.js:363`): the garrison walk (docs/plans/2026-11-13-garrison.md) is the only
+  `src/structures.js:87`): the garrison walk (docs/plans/2026-11-13-garrison.md) is the only
   order `updateUnit` (`src/sim.js:190`) executes for a unit with `garrisonedIn` set, and the
   arrival line retires it to `idle` — that single place is where a garrison order ends, so no
   second timer is involved and the parked unit stops moving, animating and being drawn.
@@ -162,11 +162,11 @@ a bug.
   builds it for exactly its cost.
 - The tower upgrade chain (`docs/plans/2026-11-13-tower-upgrade-chain.md`): `BLD` carries an
   authored `upgradesTo` on `watch_tower` (→ `guard_tower`) and on `guard_tower` (→ `keep`),
-  and `upgradeBuilding` (`src/commands.js:281`) is the command that reads it. It reuses the
+  and `upgradeBuilding` (`src/structures.js:5`) is the command that reads it. It reuses the
   construction pipeline instead of a second timer — spend the next row's cost, write
   `b.upgrade = <next kind>`, restart `b.built` at 0 over the next row's `time`, draft the
   village's builder — so the half-upgraded tower shoots nobody (`stepBuildingAttacks`,
-  `src/sim.js:136`) and `promoteBuilding` (`src/commands.js:318`) flips `b.kind` the frame
+  `src/sim.js:136`) and `promoteBuilding` (`src/structures.js:42`) flips `b.kind` the frame
   the site finishes; hp, attack, armours, range and footprint are then the new row's and the
   `Guard Tower complete` toast names it. The refusal ladder is `build`'s, in order:
   `Not your building`, `Already under construction`, `<label> has no upgrade`,
@@ -179,7 +179,7 @@ a bug.
   grid offers the button only when the next tier exists and the team's age allows it, and
   `disabled` when its cost is short (`commandsHtml`, `src/hud.js:109`); §7f of
   `tools/checks/05-construction.js` proves the ladder, both edges and the refund.
-- Garrison (`garrisonUnits` / `leaveBuilding`, `src/commands.js:363` / `src/commands.js:397`,
+- Garrison (`garrisonUnits` / `leaveBuilding`, `src/structures.js:87` / `src/structures.js:121`,
   `docs/plans/2026-11-13-garrison.md`): the seven rows carrying a `garrisonCapacity` — Town
   Center 15, Barracks 10, Archery Range 10, Market 10, Watch Tower 5, Guard Tower 5, Keep 5 —
   can house units; the other seven (capacity 0: House, Farm, Lumber Camp, Mining Camp, Mill,

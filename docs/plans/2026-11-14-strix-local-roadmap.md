@@ -145,7 +145,7 @@ A prompt you can paste per session is in §10.
     `docs/plans/TEMPLATE.md` holding the card format of §2 so later plans stay short.
   - **Done when:** verify green; `TEMPLATE.md` exists. **Size:** S.
 
-- [ ] **G4 — Split `src/commands.js` (418 lines)**
+- [x] **G4 — Split `src/commands.js` (418 lines)**
   - **Read:** `src/commands.js` function list (`grep -n "^function"`), `index.html` script
     list, the file-map table in `docs/ARCHITECTURE.md`.
   - **Change:** move `upgradeBuilding`, `promoteBuilding`, `ringSpot`, `placeOnRing`,

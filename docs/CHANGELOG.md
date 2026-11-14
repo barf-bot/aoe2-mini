@@ -59,6 +59,14 @@ commits on `main`.
   cases (suite 413 → 416); the confirm-flow check in `tools/checks/08-input.js` also asserts the
   wiped game's `world.seed` is no longer `CFG.SEED`.
 
+### Changed — `docs/plans/2026-11-14-strix-local-roadmap.md` G4: split `src/commands.js`
+
+- The six building-chain and garrison helpers (`upgradeBuilding`, `promoteBuilding`,
+  `ringSpot`, `placeOnRing`, `garrisonUnits`, `leaveBuilding`) move verbatim out of
+  `src/commands.js` into a new DOM-free `src/structures.js`, loaded right after it;
+  `src/main.js` exports the same names, now from the other file. No behaviour change:
+  the suite stays 416/416 and `src/commands.js` goes 418 → 291 lines.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep
@@ -73,11 +81,11 @@ commits on `main`.
   reach `src/config.js` no other way than the data: 333 → 373 fields checked, `src/config.js`
   317 → 331 lines. No art entered the repo — `assets/sprites.png` is byte-identical before and
   after `tools/gen-atlas.js`, because both rows are `noSprite`.
-- `upgradeBuilding` (`src/commands.js:278`) refuses through `toast` — `Not your building`,
+- `upgradeBuilding` (`src/structures.js:5`) refuses through `toast` — `Not your building`,
   `Already under construction`, `<label> has no upgrade`, `<label> requires <Age>`,
   `Not enough <res>`, `All villagers are building` / `No villager available` — and otherwise spends
   the next row's cost, writes `b.upgrade` and restarts the site on that row's clock;
-  `promoteBuilding` (`src/commands.js:315`), called by the sim's `b.built >= 1` branch
+  `promoteBuilding` (`src/structures.js:42`), called by the sim's `b.built >= 1` branch
   (`src/sim.js:252`), flips `b.kind` so hp, attack, armours, range and footprint come from the new
   row. A tower mid-upgrade is therefore just a half-built building (it shoots nobody, which
   `stepBuildingAttacks` already enforced) and `src/save.js` needed no new field and no
@@ -109,7 +117,7 @@ commits on `main`.
 
 ### Added — `docs/ROADMAP.md` P1-5 (garrison half): housing units in buildings
 
-- `garrisonUnits` / `leaveBuilding` (`src/commands.js:363` / `src/commands.js:397`) and the
+- `garrisonUnits` / `leaveBuilding` (`src/structures.js:87` / `src/structures.js:121`) and the
   right-click path that reaches them (`issueOrder`, `src/commands.js:59`): with own units
   selected, a right-click on a finished own building whose row carries a `garrisonCapacity`
   (Town Center 15; Barracks, Archery Range and Market 10; Watch Tower, Guard Tower and Keep 5)
