@@ -1,14 +1,32 @@
 'use strict';
 /* world -- seeded map generation (terrain + resources) and tile queries. No DOM. */
 
+/* The one mulberry32 step, as a pure function of its state: the value returned
+   and the state to call it with next (G6 — a resumable rng). mulberry32 below
+   wraps it in the classic closure for map generation, nextRand advances the
+   number saved on Game, and both draw the identical stream from one seed. */
+function randFrom(state) {
+  const a = (state + 0x6D2B79F5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return [a >>> 0, ((t ^ (t >>> 14)) >>> 0) / 4294967296];
+}
+
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
-    a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    const [next, value] = randFrom(a);
+    a = next;
+    return value;
   };
+}
+
+/** Draw the next [0, 1) from Game.rngState and advance the stored state — the
+ *  simulation's only rng (the old Game.rnd() closure, src/save.js now saves it). */
+function nextRand(Game) {
+  const [next, value] = randFrom(Game.rngState);
+  Game.rngState = next;
+  return value;
 }
 
 function hash2(x, y, seed) {

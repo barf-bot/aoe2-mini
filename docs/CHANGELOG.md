@@ -90,6 +90,19 @@ commits on `main`.
   move to `q`, so it stands.
 - Docs only — no check file touched, the suite stays 437/437.
 
+### Changed — `docs/plans/2026-11-14-strix-local-roadmap.md` G6: the sim runs on a fixed timestep
+
+- `stepGame` (`src/boot.js`) keeps panning on the frame dt but now drives `stepSim` from a
+  `Game.simAcc` accumulator in whole `CFG.SIM_DT` steps (max five a frame), so the same input
+  sequence gives the same game at any refresh rate; `simAcc` is transient and never saved.
+- The rng became a saved number: `Game.rngState` advanced by `nextRand` (`src/world.js`),
+  replacing the `Game.rnd` closure everywhere while `mulberry32` keeps generating worlds from
+  the same shared `randFrom` step. `data/units.json` authors `SIM_DT` and bumps `VERSION` to 3
+  (check-stats regenerates the table; `migrate` fills `rngState` from the world seed for
+  payloads that predate it) — this unblocks G8, Q2 and S2.
+- checks: `00-boot.js` measures the clock (steps per frame, the carry, the five-step clamp) and
+  `10-reset-save.js` proves a loaded game replays the never-saved run's state (suite 437 → 443).
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep

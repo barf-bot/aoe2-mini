@@ -16,9 +16,10 @@ stepRender(60);
 check(true, 'reset: simulation runs on the reset state', '60 steps clean');
 
 /* ---- 12b. the seed parameter (docs/TODO.md item 22) ----------------- */
-/* resetGame hard-wired makeWorld(CFG.SEED) and Game.rnd = mulberry32(CFG.SEED), so
-   `New map` rebuilt the seed-1337 map whatever the caller asked for. It takes a seed
-   now and drives both with it — that is what lets the DOM pass a fresh one. */
+/* resetGame hard-wired makeWorld(CFG.SEED) and (since G6) the rng became a saved
+   number — Game.rngState, resumed through nextRand — so `New map` rebuilt the
+   seed-1337 map whatever the caller asked for. It takes a seed now and drives both
+   with it — that is what lets the DOM pass a fresh one. */
 const typeOf = (g) => Array.from(g.world.type).join(',');
 const gSeed = AoE2.createState();
 AoE2.resetGame(gSeed, 7);
@@ -52,7 +53,7 @@ check(seedRoundTrip[0], 'save: a round trip on seed 7 keeps that seed and that m
    back (plus what the fake storage in §2 ended up holding). */
 const SAVE_FIELDS = ['world', 'units', 'buildings', 'projectiles', 'blocks', 'occupied', 'res',
   'selection', 'selectedBuilding', 'groups', 'keys', 'cam', 'cursor', 'mouse', 'drag', 'placing',
-  'time', 'wave', 'age', 'ageBonus', 'techs', 'nextId', 'started', 'result'];
+  'time', 'wave', 'age', 'ageBonus', 'techs', 'nextId', 'started', 'result', 'rngState'];
 const saveOf = (g, at) => {
   const raw = AoE2.saveGame(AoE2.SAVE_PATH, g, at);
   return [raw, JSON.parse(raw)];
@@ -101,6 +102,51 @@ saveCheck('save: the DOM-only fields never enter the payload', () => {
   return [leaked.length === 0 && g.sprites.atlas === atlas,
     'leaked=' + JSON.stringify(leaked) + ' atlasStillLive=' + (g.sprites.atlas === atlas)];
 });
+
+/* G6: the rng stream itself is the save's now (Game.rngState, resumed by
+   nextRand) and Game.simAcc is transient — the v3 schema in the §13 header.
+   The card's proof, in the shape that is actually obtainable: the control game
+   saves one step in, that save is loaded, the load's own re-save is byte-equal,
+   and both games then run the same 300 fixed steps to a state that matches in
+   every field. The literal "save at t = 0, step the loaded game 300, compare"
+   cannot hold byte-for-byte for ANY save/load — a game that has been loaded
+   carries the transient mapEpoch stamp (per-unit pathEpoch, the §13 list keeps
+   it out of the payload's own right) that a game which never saved has never
+   recomputed; that is movement-cache plumbing, not the rng, so the second check
+   compares the state behind the cache and the rngState head-on. */
+check((() => {
+  return withStorage(() => {
+    const g = AoE2.createState();
+    const raw = AoE2.saveGame(AoE2.SAVE_PATH, g, 1000);
+    const g2 = AoE2.createState();
+    const loaded = AoE2.loadGame(AoE2.SAVE_PATH, g2);
+    return loaded === true && typeof g2.rngState === 'number' &&
+      AoE2.saveGame(AoE2.SAVE_PATH, g2, 1000) === raw;
+  });
+})(), 'save: the v3 payload carries a numeric rngState a load resumes byte-for-byte',
+  'schema+round trip per §13');
+saveCheck('save: save, load, step 300 gives the state the never-saved run reaches', () =>
+  withStorage(() => {
+    const strip = (g, path) => {
+      const st = JSON.parse(AoE2.saveGame(path, g, 2000)).state;
+      st.units = st.units.map((u) => {
+        const c = Object.assign({}, u);
+        delete c.path; delete c.pathAt; delete c.pathFor; delete c.pathEpoch;
+        return c;
+      });
+      return JSON.stringify(st);
+    };
+    const gS = AoE2.createState();                 // the run that never saves
+    const raw = AoE2.saveGame(AoE2.SAVE_PATH, gS, 1000);
+    const gL = AoE2.createState();
+    const loaded = AoE2.loadGame(AoE2.SAVE_PATH, gL);
+    for (let i = 0; i < 300; i++) AoE2.stepGame(gL, AoE2.CFG.SIM_DT);
+    for (let i = 0; i < 300; i++) AoE2.stepGame(gS, AoE2.CFG.SIM_DT);
+    const equal = strip(gL, AoE2.SAVE_PATH + ':p') === strip(gS, AoE2.SAVE_PATH + ':q');
+    return [loaded === true && equal,
+      'loaded=' + loaded + ' stateEqualAfter300=' + equal +
+      ' rng ' + gL.rngState + '/' + gS.rngState];
+  }));
 
 saveCheck('save: world arrays mirror live tile amounts', () => {
   const g = AoE2.createState();

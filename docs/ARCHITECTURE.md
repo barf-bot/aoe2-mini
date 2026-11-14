@@ -53,8 +53,8 @@ function — no hidden globals, which is what makes the logic testable from node
 
 ```
 Game = { world, units[](a unit: id, kind, team, x, y, hp/maxHp, stats from KINDS, order, slot, path/pathAt/pathFor/pathEpoch, garrisonedIn), buildings[], projectiles[], blocks(Map buildingId -> tiles), sprites{atlas},
-         res[2], age[2], ageBonus[2], techs[2](per-team Sets of researched tech ids), rnd(mulberry32(CFG.SEED)), cam{x,y}, keys, mouse, drag, selection[],
-         selectedBuilding, groups{}, placing, started, wave, time, frame, autosaveAt(next autosave write),
+         res[2], age[2], ageBonus[2], techs[2](per-team Sets of researched tech ids), rngState(the mulberry32 state nextRand advances), cam{x,y}, keys, mouse, drag, selection[],
+         selectedBuilding, groups{}, placing, started, wave, time, simAcc(fixed-timestep carry), frame, autosaveAt(next autosave write),
          mapEpoch(route cache epoch), pathQueries(findPath calls),
          result('victory' | 'defeat' | null), dom{...}, view, minimapCache, sound }
 ```
@@ -173,7 +173,7 @@ target `Game` sits in the middle so a test — or `boot` (`src/boot.js:138`) ope
 load a slot into a game that already exists. `migrate` (`src/save.js:137`) — it takes v2 and
 converts a v1 payload's global `age` / `ageBonus` / `techs` into the per-team pair — and
 `validState` (`src/save.js:152`) gate the payload (the version, then the shape); every refusal
-ends in `resetGame(Game); return false`; `decodeState` (`src/save.js:203`) then restores in dependency
+ends in `resetGame(Game); return false`; `decodeState` (`src/save.js:217`) then restores in dependency
 order — world → buildings → `blocks` + `rebuildBlocks` (`src/entities.js:102`) → `mapEpoch++` → units
 (with `order.src` rebuilt through `sourceFromTile` (`src/entities.js:16`) / `sourceFromFarm`,
 `src/entities.js:29`) → projectiles (`t` relinked by `decodeProjectile`, `src/save.js:190`) → the

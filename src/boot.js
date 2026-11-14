@@ -43,7 +43,7 @@ function createState() {
     selection: [], selectedBuilding: null, groups: {}, keys: {},
     cam: { x: 0, y: 0 }, cursor: null, mouse: null, drag: null, mmPointer: null, placing: null,
     touches: {}, pan: null,   // live touch fingers + their pivot: input state, never saved (src/save.js:234)
-    time: 0, wave: 0, age: [0, 0], ageBonus: [0, 0], techs: [new Set(), new Set()], nextId: 1, started: false, result: null, rnd: mulberry32(CFG.SEED),
+    time: 0, wave: 0, age: [0, 0], ageBonus: [0, 0], techs: [new Set(), new Set()], nextId: 1, started: false, result: null, rngState: CFG.SEED, simAcc: 0,
     mapEpoch: 0, pathQueries: 0, // walkable-set epoch + findPath budget, both section-4 path state
     dom: null, view: null, mm: null, mmBase: null, toastMsg: '', toastAt: -99, pingAt: -99, frame: 0, autosaveAt: 0, sound: null,
   };
@@ -58,7 +58,7 @@ function resetGame(Game, seed = CFG.SEED) {
   Game.projectiles = [];
   Game.buildings = [];
   Game.nextId = 1;
-  Game.time = 0; Game.wave = 0; Game.age = [0, 0]; Game.ageBonus = [0, 0]; Game.techs = [new Set(), new Set()]; Game.rnd = mulberry32(seed);
+  Game.time = 0; Game.wave = 0; Game.age = [0, 0]; Game.ageBonus = [0, 0]; Game.techs = [new Set(), new Set()]; Game.rngState = seed >>> 0; Game.simAcc = 0;
   Game.autosaveAt = Game.time;             // due now: the next frame writes this settlement
   Game.mapEpoch = 0; Game.pathQueries = 0; // section-4 path state: fresh map, no cached routes
   Game.selection = []; Game.selectedBuilding = null; Game.placing = null; Game.result = null;
@@ -214,7 +214,11 @@ function startLoop(Game) {
   window.requestAnimationFrame(frame);
 }
 
-/** Per-frame work: camera panning, the simulation, then the autosave tick. */
+/** Per-frame work: camera panning, the sim on its fixed clock, then the autosave
+ *  tick. G6: everything time-dependent runs on whole CFG.SIM_DT steps — at most
+ *  five a frame, the remainder carrying to the next — so the same input sequence
+ *  gives the same game whatever the refresh rate; the frame dt only drives the
+ *  camera. startLoop still hands in the real frame time, which is now correct. */
 function stepGame(Game, dt) {
   const s = CFG.PAN_SPEED * dt, k = Game.keys;
   if (k.up) Game.cam.y -= s;
@@ -228,7 +232,11 @@ function stepGame(Game, dt) {
   }
   Game.cam.x = clamp(Game.cam.x, 0, Math.max(0, Game.world.w * CFG.TILE - view_W(Game)));
   Game.cam.y = clamp(Game.cam.y, 0, Math.max(0, Game.world.h * CFG.TILE - view_H(Game)));
-  stepSim(Game, dt);
+  Game.simAcc += dt;
+  for (let steps = 0; Game.simAcc >= CFG.SIM_DT && steps < 5; steps++) {
+    stepSim(Game, CFG.SIM_DT);
+    Game.simAcc -= CFG.SIM_DT;
+  }
   /* The autosave tick, last so the write carries the frame it just ran; the only
      place in the game that ever writes the save. */
   if (Game.time >= Game.autosaveAt) {

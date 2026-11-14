@@ -105,7 +105,7 @@ function spawnArrow(Game, from, target) {
 }
 
 /** Fly every arrow one step toward its mark (CFG.PROJ_SPEED px/s) and resolve the
- *  ones that arrive: the table accuracy rolled on Game.rnd decides whether the hit
+ *  ones that arrive: the table accuracy rolled on nextRand decides whether the hit
  *  lands, hitUnit/hitBuilding applies it, and the arrow is gone either way - a dead
  *  mark swallows the shot. Runs before stepSim's dead-unit cleanup. */
 function updateProjectiles(Game, dt) {
@@ -121,7 +121,7 @@ function updateProjectiles(Game, dt) {
     const isB = t.r === undefined;                              // unit (has r) vs building
     if (d <= (isB ? reachOf(t) : t.r) + step) {                  // arrived: resolve, vanish
       Game.projectiles.splice(i, 1);
-      if (Game.rnd() * 100 < p.accuracy) {
+      if (nextRand(Game) * 100 < p.accuracy) {
         if (isB) hitBuilding(Game, t, p.dmg, 'pierce'); else hitUnit(Game, t, p.dmg, 'pierce');
       }
       continue;

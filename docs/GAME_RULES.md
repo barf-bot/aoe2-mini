@@ -226,7 +226,7 @@ a bug.
 - One rule judges a tile — `canPlaceAt` (`src/commands.js:159`): the row's `age` gate plus a
   free, walkable footprint (`siteFree`, `src/commands.js:203`). A click that fails it is
   refused (`Can't build there`) with nothing spent and `Game.placing` still armed; the old
-  answer was to move the site to `findSite` (`src/world.js:144`) next to the villager, and a
+  answer was to move the site to `findSite` (`src/world.js:162`) next to the villager, and a
   tile more than 7 tiles off the builder failed too (docs/TODO.md P0-3). Distance is no
   longer part of the rule — the builder walks — so `findSite` only answers the button call
   without a tile, and `drawGhost` (`src/render.js:246`) paints with the same `canPlaceAt`.
@@ -268,7 +268,7 @@ a bug.
   a building counts for its population cap, receives a carried load and can be worked only
   once it is complete — `popCap` (`src/economy.js:102`), `findDropoff` (`src/economy.js:31`),
   `resumeGather` (`src/economy.js:88`), the farm case of `orderForUnit`
-  (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:173`) all test
+  (`src/commands.js:7`) and the save's `decodeOrder` (`src/save.js:187`) all test
   `built >= 1`, as does the enemy's `aiStep` (`src/ai.js:4`). An *enemy* building follows the
   other half of the rule: attackable at any progress, a 0 % foundation included, the way
   AoE2 does it (`attackableAsEnemy`, `src/sim.js:317`).
@@ -331,32 +331,36 @@ key, `storageGet` / `storageSet` (`src/save.js:9` / `src/save.js:18`) the only d
 answer quietly (`null` / `false`) when the platform has none or refuses the write — which is how
 node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode keep running.
 
-- **Envelope** — `saveGame(path, Game, at = now())` (`src/save.js:123`) writes
+- **Envelope** — `saveGame(path, Game, at = now())` (`src/save.js:126`) writes
   `{ version, seed, writtenAt, state }`: `version` is `CFG.VERSION` (`src/config.js:27`),
-  `2`; `seed` is `Game.world.seed` falling back to `CFG.SEED`, the only way the excluded `rnd`
-  closure is rebuilt; `writtenAt` is the `at` argument, pinned so the same `Game` saved twice
-  gives the same bytes; `state` is `encodeState(Game)` (`src/save.js:77`), the schema the
-  harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:53`).
-- **Version rule** — `migrate(payload)` (`src/save.js:137`) takes `CFG.VERSION` (2) as written and
-  converts a `version: 1` payload — one global `age`, `ageBonus` and `techs` set — into the
-  per-team shape (the player's half filled, the enemy's empty) instead of throwing such a save
-  away; any other version is refused. `validState(payload)` (`src/save.js:152`) then checks the
+  `3`; `seed` is `Game.world.seed` falling back to `CFG.SEED`; `writtenAt` is the `at`
+  argument, pinned so the same `Game` saved twice gives the same bytes; `state` is
+  `encodeState(Game)` (`src/save.js:81`), the schema the
+  harness pins as `SAVE_FIELDS` (`tools/checks/10-reset-save.js:56`) — since G6 it also
+  carries `rngState`, the mulberry32 state `nextRand` (`src/world.js`) advances, so the
+  rng stream no longer needs the seed to be rebuilt.
+- **Version rule** — `migrate(payload)` (`src/save.js:142`) takes `CFG.VERSION` (3) as written and
+  converts a `version: 2` payload by filling its missing `rngState` from the world's `seed`, and a
+  `version: 1` payload — one global `age`, `ageBonus` and `techs` set — into the
+  per-team shape (the player's half filled, the enemy's empty) plus the same `rngState`
+  fill, instead of throwing such a save away; any other version is refused. `validState(payload)` (`src/save.js:166`) then checks the
   shape before a single field is assigned — the world's `w`/`h`/`seed` against `CFG.MAP_W`/`MAP_H`,
   the array and object containers (the per-team `age` / `ageBonus` / `techs` pair among them),
   `time` and `nextId` as numbers. Every refusal
   (missing slot, empty slot, unparseable text, an unreadable version, an unwalkable shape) ends
-  the same way: `loadGame(path, Game, raw = storageGet(path))` (`src/save.js:252`) calls
+  the same way: `loadGame(path, Game, raw = storageGet(path))` (`src/save.js:266`) calls
   `resetGame` and answers `false` — it never throws.
 - **In and out of `state`** — `Game.techs` (one Set per team, `[player, enemy]`) leaves as the
   pair of id arrays and comes back two Sets; `Game.blocks` (a `Map` of building id → tiles)
   leaves as an object and comes back a `Map` keyed
   by `Number(k)`, then `rebuildBlocks` (`src/entities.js:102`) recomputes it and `decodeState`
-  (`src/save.js:203`) bumps `mapEpoch` instead of restoring it, so every cached route rebuilds on
+  (`src/save.js:217`) bumps `mapEpoch` instead of restoring it, so every cached route rebuilds on
   its first step. Excluded as per-runtime caches: `dom`, `view`, `mm`, `mmBase`, `toastMsg`,
-  `toastAt`, `pingAt`, `frame`, `pathQueries`, `sprites`, `rnd`, `mapEpoch`, `autosaveAt`, `sound`.
+  `toastAt`, `pingAt`, `frame`, `pathQueries`, `sprites`, `mapEpoch`, `autosaveAt`, `sound`,
+  and since G6 `simAcc` (`rngState` joined the payload instead of being rebuilt from the seed).
 - **References become ids** — `Game.selectedBuilding` is stored as an id and relinked on load
   (`decodeState`, `src/save.js:203`); a projectile's target becomes `tk` (`'unit' | 'building'`)
-  plus `tid` (`encodeProjectile`, `src/save.js:71`, and `decodeProjectile`, `src/save.js:190`
+  plus `tid` (`encodeProjectile`, `src/save.js:71`, and `decodeProjectile`, `src/save.js:204`
   relinks it and drops an arrow whose mark is gone); a `harvest` / `go_deposit` order's `src` is
   stored as the tile or farm it names (`encodeSource`, `src/save.js:38`) and rebuilt through
   `sourceFromTile` (`src/entities.js:16`) / `sourceFromFarm` (`src/entities.js:29`) — a parsed `src`

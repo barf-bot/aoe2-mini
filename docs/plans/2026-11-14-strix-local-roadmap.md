@@ -166,7 +166,7 @@ A prompt you can paste per session is in §10.
     keyboard checks do), and no key appears twice across the table.
   - **Done when:** verify green; the if-ladder is gone. **Size:** S.
 
-- [ ] **G6 — Fixed simulation timestep**
+- [x] **G6 — Fixed simulation timestep**
   - **Read:** `startLoop`, `stepGame` (`src/boot.js`), `stepSim` head (`src/sim.js`),
     `decodeState` + `mulberry32` (`src/save.js`, `src/world.js`).
   - **Change:** `CFG.SIM_DT` (1/30, hand-written part of config, with a comment). `stepGame`

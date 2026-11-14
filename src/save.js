@@ -29,8 +29,9 @@ function storageSet(path, raw) {
    reads back. Everything else on Game is a per-runtime cache and stays out of the
    payload — the nine DOM-only fields (dom, view, mm, mmBase, toastMsg, toastAt,
    pingAt, frame, sound), pathQueries (a run counter), sprites (the live atlas Image),
-   rnd (a closure, rebuilt from the envelope's seed), mapEpoch (loadGame recomputes
-   it) and autosaveAt (the save schedule). */
+   mapEpoch (loadGame recomputes it), autosaveAt (the save schedule) and simAcc (the
+   fixed-timestep accumulator, transient since G6 — the saved rngState resumes the
+   stream; Game.rnd used to be the unpersisted closure, now replaced by rngState). */
 
 /* A source reference minus its live part: `amount` is a getter onto world.amount or
    a farm's field, so the payload keeps the tile / farm it names and loadGame hands
@@ -102,6 +103,7 @@ function encodeState(Game) {
     nextId: Game.nextId,
     started: Game.started,
     result: Game.result,
+    rngState: Game.rngState,
   };
 }
 
@@ -117,9 +119,10 @@ function markDirty(Game) {
 
 /* The envelope: { version, seed, writtenAt, state }. `at` pins writtenAt so the
    same Game written twice gives the same bytes (the round-trip check compares
-   strings); it defaults to the frame clock. The seed is the world's own, which is
-   how loadGame rebuilds the rng closure. Returns the JSON whether or not the
-   platform accepted the write, so a caller can still hash or show it. */
+   strings); it defaults to the frame clock. The seed is the world's own — since
+   G6 the state carries the rngState nextRand needs, so the seed no longer has to
+   stand in for the rng. Returns the JSON whether or not the platform accepted the
+   write, so a caller can still hash or show it. */
 function saveGame(path, Game, at = now()) {
   const raw = JSON.stringify({
     version: CFG.VERSION,
@@ -131,18 +134,29 @@ function saveGame(path, Game, at = now()) {
   return raw;
 }
 
-/* The version hook: v2 (age / ageBonus / techs per team, docs/TODO.md P1-11) is what this
-   build writes; a v1 payload — one global age, ageBonus and techs set — converts here into
-   the player's half, the enemy's staying 0 and empty, instead of the save being thrown away. */
+/* The version hook: v3 (rngState joins the state, G6) is what this build writes;
+   a v2 payload — age / ageBonus / techs per team since docs/TODO.md P1-11 — gets
+   rngState filled from its own world seed, the stream restart without a saved
+   number. A v1 payload — one global age, ageBonus and techs set — folds into the
+   player's half first, the enemy's staying 0 and empty, and takes the same fill. */
 function migrate(payload) {
   if (!payload || typeof payload !== 'object') return null;
   if (payload.version === CFG.VERSION) return payload;
-  if (payload.version !== 1) return null;   // v1 is the only older shape there is
+  if (payload.version === 2) {
+    const s = payload.state;
+    if (!s || typeof s !== 'object' || Array.isArray(s) ||
+        !s.world || typeof s.world !== 'object') return null;
+    if (typeof s.rngState === 'number') return payload;
+    return Object.assign({}, payload,
+      { state: Object.assign({}, s, { rngState: s.world.seed }) });
+  }
+  if (payload.version !== 1) return null;   // v2 and v1 are the older shapes there are
   const s = payload.state;
   if (!s || typeof s !== 'object' || Array.isArray(s) || typeof s.age !== 'number' ||
       typeof s.ageBonus !== 'number' || !Array.isArray(s.techs)) return null;
   return Object.assign({}, payload, { state: Object.assign({}, s,
-    { age: [s.age, 0], ageBonus: [s.ageBonus, 0], techs: [s.techs, []] }) });
+    { age: [s.age, 0], ageBonus: [s.ageBonus, 0], techs: [s.techs, []],
+      rngState: s.world ? s.world.seed : payload.seed }) });
 }
 
 /* Everything decodeState needs, checked before a single field is assigned: the
@@ -241,7 +255,7 @@ function decodeState(Game, state, seed) {
   Game.started = state.started;
   Game.result = state.result;
   Game.techs = [new Set(state.techs[0]), new Set(state.techs[1])];
-  Game.rnd = mulberry32(seed);            // the envelope's seed is the only way back to the closure
+  Game.rngState = typeof state.rngState === 'number' ? state.rngState : seed >>> 0;
 }
 
 /* read the slot and put that game on the board: true when the payload was taken,

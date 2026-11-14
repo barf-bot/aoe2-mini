@@ -6,7 +6,7 @@
 const AoE2 = {
   CFG, KINDS, BLD, TECHS, AGES, HOTKEYS, T, PAL, TEAM, RES_OF_TILE, SFX, MUTE_PATH,
   SPRITE_SHEET, SPRITES, WORK_ANIM, spriteFor, BLD_SPRITES, bldSpriteFor,
-  makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot,
+  makeWorld, findSite, berryCluster, tileRes, sourceFromTile, sourceFromFarm, workSpot, nextRand,
   makeUnit, makeBuilding, removeBuilding, walkable, workPos, standingSpots, reachOf,
   tileOf, findPath, formationSlots, separate,
   setAtlas, createState, boot, beginCanvas, loadAtlas, stepGame, stepSim, renderFrame, playSfx, isMuted,
@@ -15,7 +15,7 @@ const AoE2 = {
   hitUnit, hitBuilding, unitAttack, unitArmor, autoAcquire, attackableAsEnemy, targetableAsEnemy, spawnArrow, updateProjectiles, stepBuildingAttacks,
   pickUnit, unitsInBox,
   popCap, popUsed, popCommitted, selectedUnits, canAfford, spend, refund, resetGame, requestReset,
-  SAVE_PATH, saveGame, loadGame, markDirty, storageGet, storageSet, applyMuteButton, setMuted,
+  SAVE_PATH, saveGame, loadGame, encodeState, markDirty, storageGet, storageSet, applyMuteButton, setMuted,
   infoHtml, hudState, hudHtml, commandsHtml, queueHtml, resultHtml,
   findDropoff, dropTargetScore, nextSource, resumeGather, depleteTile, workersOnTile,
 };
