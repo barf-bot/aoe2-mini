@@ -102,7 +102,7 @@ A prompt you can paste per session is in §10.
 
 ## 3. Phase 0 — groundwork (do these first; they make every later card cheaper)
 
-- [ ] **G0 — Deploy what exists, move to `main`**
+- [x] **G0 — Deploy what exists, move to `main`**
   - `git fetch origin && git checkout main && git merge --ff-only origin/ccr-521786a6-e0qp5x`
     (a fast-forward: `main` is an ancestor), verify green, `git push origin main`. Wait ~60 s,
     then byte checks: `curl -s <site>/index.html | diff - index.html` and the same for two `src/` files. Run

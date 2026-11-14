@@ -153,6 +153,9 @@ file in `tools/` for it to pass.
 
 ## Deploy
 
+All work happens on main. Push after every card whose verify is green; never push a red
+tree.
+
 Push to `main`. Pages serves the branch root within ~30s; check with
 `gh api repos/barf-bot/aoe2-mini/pages --jq .status` (`built`) and a `curl` of the URL —
 verify the served bytes match `index.html` and the `src/` files rather than trusting the
