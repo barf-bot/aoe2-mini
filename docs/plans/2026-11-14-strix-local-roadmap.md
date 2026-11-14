@@ -246,7 +246,7 @@ reports `tools/ai-arena.js` before/after.
   - **Check:** after 10 simulated minutes, red has 0 idle villagers ≥ 90 % of samples and
     wood > 0 gathered. **Size:** M. **Needs:** A2.
 
-- [ ] **A4 — Red builds houses** (with A3 this closes TODO 20's first half)
+- [x] **A4 — Red builds houses** (with A3 this closes TODO 20's first half)
   - **Change:** if `popCommitted + 2 >= popCap` and no red house is unfinished, `findSite`
     near the TC and `build('house', …, 1, [nearest wood villager])`.
   - **Check:** idle-player run: red pop > 5 by minute 6. **Size:** S. **Needs:** A3.

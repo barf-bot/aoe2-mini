@@ -323,15 +323,31 @@ document: a wave is not a decision and a decision is not a wave (roadmap A2).
   resource furthest below its `CFG.AI_SPLIT` share (**.5** food, **.35** wood, **.15** gold) and
   the job `findJob` (`src/economy.js`) offers there; when that resource has no job at all the
   next-biggest deficit is asked, and finally any tile at all. The count of who works what is
-  read off the `harvest` / `go_deposit` orders the villagers hold, and each hire updates it, so
-  the five villagers one tick produces are spread by the split instead of stacked on one berry
-  — and, because `findJob` is `assignStarter`'s own search, the AI cannot hold a villager to a
+  read off the `harvest` / `go_deposit` orders the villagers hold plus the `building` tally A4
+  adds — a villager on a `build` order works a foundation, not a resource, and is counted apart
+  so `aiJobs` never re-hires the man a site already has — and each hire updates it, so the
+  five villagers one tick produces are spread by the split instead of stacked on one berry,
+  and because `findJob` is `assignStarter`'s own search the AI cannot hold a villager to a
   different standard than the one the game starts a village with. One `markDirty` per tick that
   hired anyone; a tick that changed nothing leaves the save schedule alone.
+- **Build** (`aiHouse`, `src/ai.js`, roadmap A4) — a tick that finds the village within two
+  population slots of what its built buildings allow — `popCommitted(Game, 1) + 2 >=
+  popCap(Game, 1)`, the two being the room the new house hands out, since an unfinished site
+  adds nothing to `popCap` while `popCommitted` already counts the villagers walking and
+  queued — raises a house, and only one: while a red house stands unfinished the rule stays
+  silent, so a settlement never has two foundations going. The ground is the nearest tile to
+  the Town Center `canPlaceAt` (`src/commands.js`) accepts — `findSite` (`src/world.js`)
+  searches grass only, and the closest grass to a keep is the tile the keep stands on, so the
+  search asks the rule `build` itself applies — and the crew is the nearest red villager
+  working wood, or, while nobody on the village is on wood yet, the nearest one `findJob` can
+  give a wood job. Cost, work time, footprint and the +5 population are `BLD.house`'s
+  (`data/buildings.json`); the card authored no number. Every answer `build` gives — started,
+  `Can't build there`, `No villager in the crew` — is a team-1 `toast`, so it is an `aiLog`
+  line and never the player's (the A1 rule), and one `markDirty` marks the site.
 - **Train** (`aiTrain`, `src/ai.js`) — one unit per tick while the village is smaller than
   `min(CFG.AI_VILLAGERS, popCap(Game, team))` (`aiWantsVillager`, `src/ai.js`: A3 sets the
-  target at 22 and A4's houses raise the cap, so the cap — not the target — still stops red at
-  5 for now, and asking `train` past it would log `Need more houses` every second), asked
+  target at 22, and from A4 on the cap is what the village owns — the Town Center's 5 plus
+  every finished house — so the village stops only while a house is still going up), asked
   through `train` (`src/commands.js`) like any other player's: the building's own `trains` row
   is the law, so a Town Center queues `villager` and nothing else until a Barracks exists
   (card A6). The removed `queueTrain` used to spend and push militia onto the Town Center queue

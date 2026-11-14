@@ -11,8 +11,11 @@
    A3 adds the third decision, `aiJobs`: every idle red villager is hired through
    `findJob` (`src/economy.js`) onto the resource furthest below its `CFG.AI_SPLIT` share of
    the village, and `CFG.AI_VILLAGERS` — not the bare population cap — sets the size the
-   Town Center staffs. The helpers below stay small; src/ai-eco.js appears when this file
-   passes ~250 lines. */
+   Town Center staffs.
+   A4 adds the fourth decision, `aiHouse`: the village raises a house while it still has two
+   population slots left rather than the second after its last one filled, and the `building`
+   tally A4 adds to `aiWorking` is what keeps `aiJobs` from drafting the man already on the
+   site. The helpers below stay small; src/ai-eco.js appears when this file passes ~250 lines. */
 
 function aiStep(Game, dt) {
   if (!Game.started) return;                   // the village sleeps until the game begins
@@ -22,6 +25,7 @@ function aiStep(Game, dt) {
   const tc = aiTownCenter(Game);
   if (!tc) return;                             // no finished keep to order from (docs/TODO.md P1-9)
   if (tick && aiJobs(Game)) markDirty(Game);   // A3: work first — an idle village gathers nothing
+  if (tick && aiHouse(Game, tc)) markDirty(Game);   // A4: then the room — a house before the village runs out of it
   if (aiWantsVillager(Game)) aiTrain(Game, tc);   // A3: then grow to CFG.AI_VILLAGERS, through `train`
   else aiAttackWave(Game);                     // with nothing to make, the village fights instead
 }
@@ -73,22 +77,28 @@ function aiJobs(Game) {
   const idle = villagers.filter((u) => u.order.kind === 'idle');   // a builder or a fighter is not looking
   if (!idle.length) return 0;
   const working = aiWorking(Game, 1);
+  const village = villagers.length - working.building;   // A4: the split is over the villagers who can gather
   let hired = 0;
-  for (const v of idle) if (aiJobFor(Game, v, villagers.length, working)) hired++;
+  for (const v of idle) if (aiJobFor(Game, v, village, working)) hired++;
   return hired;
 }
 
 /** What the village is already doing: the resource each of its villagers works, read off the
  *  `harvest` / `go_deposit` orders the same way `workersOnTile` (`src/economy.js`) reads a
  *  tile — a villager carrying a basket still counts for the source that filled it, so the
- *  count never dips mid-trip and hires a duplicate. */
+ *  count never dips mid-trip and hires a duplicate — plus `building`, the A4 tally of the
+ *  villagers standing on a site. A builder works a foundation, not a resource: counting him
+ *  apart from the resource columns is what stops `aiJobs` sizing the village by villagers it
+ *  can no longer put on any resource, and it is the A3 accounting hole A4 closes — a builder
+ *  read as free would be re-hired off the house and the house would never be finished. */
 function aiWorking(Game, team) {
-  const working = {};
+  const working = { building: 0 };
   for (const res in CFG.AI_SPLIT) working[res] = 0;
   for (const u of Game.units) {
     if (u.dead || u.team !== team || u.kind !== 'villager') continue;
     const src = (u.order.kind === 'harvest' || u.order.kind === 'go_deposit') ? u.order.src : null;
     if (src && working[src.res] !== undefined) working[src.res]++;
+    else if (u.order.kind === 'build') working.building++;
   }
   return working;
 }
@@ -115,6 +125,64 @@ function aiJobFor(Game, v, village, working) {
     return true;
   }
   return false;
+}
+
+/** The house decision (roadmap A4, the half of `aiWantsVillager`'s story A3 left open): the
+ *  village only grows past its Town Center if somebody raises the walls first, so the brain
+ *  asks whether it is within two slots of the population the *built* buildings allow —
+ *  `popCommitted(Game, 1) + 2 >= popCap(Game, 1)` — and with no red house already going up,
+ *  spends the tick on one attempt. The two are the room that house will hand out: an
+ *  unfinished site adds nothing to `popCap` while `popCommitted` already counts the villagers
+ *  walking and queued, so asking at cap-2 buys the room before the village runs out of it
+ *  instead of one second after, which is what the Town Center queue would otherwise spend its
+ *  last second on. `BLD.house` (data/buildings.json) supplies the cost, the 25 s of work, the
+ *  footprint and the +5 pop — the card adds no number of its own. The site is `aiPad`, the
+ *  crew `aiCrew`, and every answer `build` gives — `House started`, `Can't build there`, `No
+ *  villager in the crew` — is a `toast(…, 1)`, so it lands in Game.aiLog (A1's rule) and never
+ *  over the player's line. Only a site actually put up is a change for `aiStep` to mark. */
+function aiHouse(Game, tc) {
+  if (popCommitted(Game, 1) + 2 < popCap(Game, 1)) return false;        // room left: nothing to raise yet
+  if (Game.buildings.some((b) => b.team === 1 && b.kind === 'house' && b.built < 1)) return false;
+  if (!canAfford(Game, 1, BLD.house.cost)) return false;                // the same pre-check `aiTrain` makes
+  const pad = aiPad(Game, tc);                                           // null: nowhere left to stand one
+  const crew = aiCrew(Game, pad || tc);
+  return !!build(Game, 'house', pad ? pad.tx * CFG.TILE : undefined,
+    pad ? pad.ty * CFG.TILE : undefined, 1, crew ? [crew.id] : []);
+}
+
+/** The ground A4 builds on: the nearest tile to the keep `canPlaceAt` — the rule `build`
+ *  applies to a click — accepts for a house. `findSite` (`src/world.js`) cannot answer this
+ *  one: it searches grass only, and the nearest grass to a Town Center is the tile the keep
+ *  stands on, so every site it offers a built settlement is refused for the footprint already
+ *  there (`build` answers `Can't build there`). The search is the same square spiral, bounded
+ *  by the map, and the row's own footprint comes from `canPlaceAt`, not from a number here. */
+function aiPad(Game, tc) {
+  const w = Game.world.w, h = Game.world.h;
+  for (let r = 0; r < Math.max(w, h); r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (canPlaceAt(Game, 'house', tc.tx + dx, tc.ty + dy, 1)) return { tx: tc.tx + dx, ty: tc.ty + dy };
+      }
+    }
+  }
+  return null;
+}
+
+/** The villager A4 sends: the nearest red villager to the pad who works wood — the same
+ *  `harvest` / `go_deposit` reading `aiWorking` uses — or, while nobody in the village is on
+ *  wood yet (its first tick, or a settlement whose wood is all claimed), the nearest one
+ *  `findJob` can actually give a wood job, the card's alternative and the man the forest wants.
+ *  Nobody at all answers `null`, which `aiHouse` hands `build` as an empty crew so the village
+ *  pays one `No villager in the crew` line in Game.aiLog rather than a silent plan. Ties go to
+ *  the lower id, so the same seed sends the same villager. */
+function aiCrew(Game, at) {
+  const near = (u) => (Math.floor(u.x / CFG.TILE) - at.tx) ** 2 + (Math.floor(u.y / CFG.TILE) - at.ty) ** 2;
+  const pool = Game.units.filter((u) => !u.dead && u.team === 1 && u.kind === 'villager')
+    .sort((a, b) => (near(a) - near(b)) || a.id - b.id);
+  const works = (u) => (u.order.kind === 'harvest' || u.order.kind === 'go_deposit') &&
+    u.order.src && u.order.src.res === 'wood';
+  return pool.find(works) || pool.find((v) => !!findJob(Game, v, 'wood')) || null;
 }
 
 /** How big the village should be: `CFG.AI_VILLAGERS` (22), held down by the population the

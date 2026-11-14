@@ -39,7 +39,9 @@ check(idle.started === false && idle.wave === 0 && redTc(idle).queue.length === 
   'started=' + idle.started + ' wave=' + idle.wave + ' queue=' + redTc(idle).queue.length + ' militia=' + orders(idle));
 
 // 2. population full (the seeded village sits at its cap): the wave sends every
-//    idle militia at the blue unit closest to the red Town Center
+//    idle militia at the blue unit closest to the red Town Center. A4 shares that second —
+//    its own `House started` line is in the log as well — so the wave's entry is found by
+//    content and time, which is the rule, not by the log's length.
 const full = village(true);
 const fullTc = redTc(full);
 // P1-10: popUsed counts every living unit, so the seeded roster (four villagers and a
@@ -53,7 +55,7 @@ oneSecond(full);                                     // the tick that acts, not 
 const sentAt = red(full).filter((u) => u.kind === 'militia');
 check(used >= cap && sentAt.length > 0 && sentAt.every((u) => u.order.kind === 'attack' && u.order.target === prey.id) &&
       redTc(full).queue.length === 0 && full.toastMsg === '' &&
-      full.aiLog.length === 1 && full.aiLog[0].msg === 'Red attack wave!' && full.aiLog[0].t === full.time,
+      (full.aiLog || []).some((e) => e.msg === 'Red attack wave!' && e.t === full.time),
   'ai: at the population cap the wave sends its militia at the nearest blue unit',
   'pop ' + used + '/' + cap + ' prey=' + prey.id + ' militia=' + orders(full) +
   ' toast=' + JSON.stringify(full.toastMsg) + ' log=' + full.aiLog.map((e) => e.t + ':' + e.msg).join(','));
@@ -277,17 +279,20 @@ const a2five = (() => {
   const pad = freeSpotAround(g.world, g, redTc(g).tx, redTc(g).ty, 2, 2, 8);
   const house = AoE2.makeBuilding(g, 'house', 1, pad.tx, pad.ty);
   house.built = 1; house.hp = house.maxHp;
+  /* the cap this fixture builds for itself: the keep's 5 plus its own house. A4 lifts it as
+     the village grows, so the number the check judges is the fixture's, not the run's end. */
+  const capAtStart = AoE2.popCap(g, 1);
   const kinds = new Set();
   for (let i = 0; i < 9000; i++) {
     AoE2.stepSim(g, SIM_DT);
     if ((i + 1) % 30 !== 0) continue;                     // read the queues on the tick grid
     for (const b of g.buildings) if (b.team === 1) for (const j of b.queue) kinds.add(j.kind);
   }
-  return { kinds: [...kinds].sort().join(','), cap: AoE2.popCap(g, 1), used: AoE2.popUsed(g, 1), tick: tickOf(g) };
+  return { kinds: [...kinds].sort().join(','), cap: AoE2.popCap(g, 1), capAtStart, used: AoE2.popUsed(g, 1), tick: tickOf(g) };
 })();
-check(a2five.cap === 10 && a2five.kinds === 'villager',
+check(a2five.capAtStart === 10 && a2five.kinds === 'villager',
   'a2: a red village with no Barracks never queues militia over 5 simulated minutes',
-  'cap=' + a2five.cap + ' used=' + a2five.used + ' tick=' + a2five.tick + ' queue kinds=' + a2five.kinds);
+  'cap ' + a2five.capAtStart + ' -> ' + a2five.cap + ' used=' + a2five.used + ' tick=' + a2five.tick + ' queue kinds=' + a2five.kinds);
 
 // 16. A1's toast rule, extended to the command A1 left out: a red `train` refusal is logged
 //     and the player's toast line does not move
@@ -419,20 +424,25 @@ check(!a3job.err && a3job.order === 'harvest' && a3job.food === a3job.starter + 
    villagers: CFG.AI_SPLIT over five villagers wants 2.5 food, 1.75 wood, 0.75 gold, so the
    rule's answer is food, wood, food, wood, gold — the card's "the first three go
    food/wood/food by deficit order", with the fourth taking the last wood slot and the fifth
-   the gold the moment food and wood have nothing free left. */
+   the gold the moment food and wood have nothing free left. A4 decides on the same tick,
+   after the hires, and takes one of the two wood workers off the tree to raise the village's
+   first house: that villager reads as `build` here (the order A4 owns), while the resource he
+   was given is still the one A3's rule gave him — see section 19 for the house itself. */
 const a3map = attempt(() => {
   const g = onMap(['food', 'wood', 'gold'], 5);
   steps(g, 30);                                        // one CFG.AI_TICK: the whole village is hired at once
-  const seq = a3vill(g).map((u) => (u.order.src ? u.order.src.res : 'idle')).join(',');
+  const seq = a3vill(g).map((u) => (u.order.kind === 'build' ? 'build' : u.order.src ? u.order.src.res : 'idle')).join(',');
   const v = a3vill(g)[4];                              // the fifth is the one with nothing free left
   const full = (res) => { const j = AoE2.findJob(g, v, res); return j === null ? 'none' : String(j.full); };
-  return { seq, food: full('food'), wood: full('wood'), gold: full('gold') };
+  return { seq, crew: a3vill(g).findIndex((u) => u.order.kind === 'build'),
+    food: full('food'), wood: full('wood'), gold: full('gold') };
 });
-check(!a3map.err && a3map.seq === 'food,wood,food,wood,gold',
-  'a3: five idle villagers are hired in CFG.AI_SPLIT deficit order — food, wood, food, wood, gold',
-  'assigned=' + (a3map.seq || '-') + (a3map.err ? ' err=' + a3map.err : '') + ' want=food,wood,food,wood,gold');
-check(!a3map.err && a3map.food === 'true' && a3map.wood === 'true' && a3map.gold === 'false',
-  'a3: with its food and wood slots taken the fifth villager still counts them as full and works gold',
+check(!a3map.err && a3map.seq === 'food,wood,food,build,gold',
+  'a3: five idle villagers are hired in CFG.AI_SPLIT order, the A4 crew marked build',
+  'assigned=' + (a3map.seq || '-') + ' crew=' + (a3map.crew === undefined ? '-' : a3map.crew) +
+  (a3map.err ? ' err=' + a3map.err : ''));
+check(!a3map.err && a3map.food === 'true' && a3map.wood === 'false' && a3map.gold === 'false',
+  'a3: the fifth villager counts food full and works gold, the wood slot A4 left open again',
   'food=' + (a3map.food || '-') + ' wood=' + (a3map.wood || '-') + ' gold=' + (a3map.gold || '-') +
   (a3map.err ? ' err=' + a3map.err : ''));
 
@@ -455,5 +465,117 @@ check(!a3run.err && a3run.wood1 > a3run.wood0,
   'a3: the wood column moves — red\'s stockpile ends above the 100 it started with (the lifetime counter is S5)',
   'wood ' + (a3run.wood0 === undefined ? '-' : a3run.wood0) + ' -> ' +
   (a3run.wood1 === undefined ? '-' : Math.floor(a3run.wood1)) + (a3run.err ? ' err=' + a3run.err : ''));
+
+/* ---- 19. roadmap A4: red raises houses ---------------------------------- */
+/* A4 (docs/plans/2026-11-14-strix-local-roadmap.md §5, needs A3; with it the first half of
+   docs/TODO.md 20 closes): on its tick the brain asks for a house once the village is two
+   slots from the population its built buildings allow — `popCommitted(Game, 1) + 2 >=
+   popCap(Game, 1)` — and only while no red house is already going up. `popCommitted` counts
+   living *and* queued villagers while an unfinished site adds no `pop` (`popCap` reads built
+   buildings only), so the two are the room that house will hand out: the village gets the room
+   before it runs out of it, not one second after. The crew is the nearest red villager working
+   wood, the site the nearest pad `canPlaceAt` accepts beside the keep, and every number —
+   25 wood, 25 s of work, +5 pop, 2x2 — is `BLD.house`'s (`src/config.js`, vendored): the card
+   authors no constant, so these checks read the table instead of retyping one. */
+const a4houses = (g) => g.buildings.filter((b) => b.team === 1 && b.kind === 'house');
+
+/* 24-25. the card's proof: the seeded game with an idle player, the shape
+   tools/ai-arena.js plays (`createState()` + `resetGame(g, seed)` + `started = true`), run 20
+   simulated minutes one CFG.SIM_DT step at a time. The population is read once per simulated
+   minute; the village's first house is followed at every step — what it cost, who built it,
+   when it stopped being a foundation — because "the builder is not stolen by aiJobs" is a
+   statement about the seconds in between, not about the minute marks. */
+function a4watch(seed) {
+  const g = AoE2.createState();
+  AoE2.resetGame(g, seed);
+  g.started = true;
+  const out = { seed: g.world.seed, cap: [], used: [], idle: [], steps: 0, maxUnbuilt: 0, first: null };
+  for (let i = 1; i <= 20 * 1800; i++) {
+    const wood = g.res[1].wood;
+    AoE2.stepSim(g, SIM_DT);
+    out.steps = i;
+    if (g.result) break;                             // an ended game stops the clock (red fields no fighter until A6)
+    if (i % 1800 === 0) {
+      out.cap.push(AoE2.popCap(g, 1)); out.used.push(AoE2.popUsed(g, 1)); out.idle.push(a3idle(g).length);
+    }
+    const houses = a4houses(g);
+    if (!out.first && houses.length) {               // the tick the village raised its first site
+      const b = houses[0];
+      const v = g.units.find((u) => !u.dead && u.team === 1 && u.order.kind === 'build' && u.order.b === b.id);
+      out.first = { id: b.id, start: g.time, spent: wood - g.res[1].wood, toast: g.toastMsg,
+        walk: v ? Math.max(0, Math.hypot(v.x - b.x, v.y - b.y) - AoE2.CFG.TILE) / AoE2.KINDS.villager.speed : 0,
+        work: 0, done: 0, builders: v ? 1 : 0 };
+    }
+    let unbuilt = 0;
+    for (const b of houses) {
+      if (b.built < 1) unbuilt++;
+      if (b.id !== out.first.id) continue;           // only the first house is followed; the rest is one rule
+      const h = out.first;
+      if (b.built >= 1) { if (!h.done) h.done = g.time; continue; }
+      if (!h.work && b.built > 0) h.work = g.time;   // the first frame the site grew: the builder got there
+      const n = g.units.filter((u) => !u.dead && u.team === 1 && u.order.kind === 'build' && u.order.b === b.id).length;
+      if (n < h.builders) h.builders = n;            // the smallest crew the unfinished site ever had
+    }
+    if (unbuilt > out.maxUnbuilt) out.maxUnbuilt = unbuilt;
+  }
+  return out;
+}
+const a4r = attempt(() => a4watch(AoE2.CFG.SEED));
+const a4h = !a4r.err ? a4r.first : null;
+const a4past = !a4r.err ? a4r.cap.findIndex((c, i) => c > 5 && a4r.used[i] > 5) : -1;
+
+check(!a4r.err && a4past >= 0 && a4past <= 5,
+  'a4: the idle-player village is past the Town Center cap - popCap and popUsed above 5 by minute 6',
+  'seed=' + (a4r.seed === undefined ? '-' : a4r.seed) + ' first minute past 5=' +
+  (a4past < 0 ? 'never' : a4past + 1) + ' cap=' + (a4r.cap || []).join(',') + ' used=' +
+  (a4r.used || []).join(',') + ' idle=' + (a4r.idle || []).join(',') + (a4r.err ? ' err=' + a4r.err : ''));
+check(!a4r.err && !!a4h && a4r.maxUnbuilt === 1 && a4h.done > 0 && a4h.builders === 1 &&
+      a4h.done - a4h.work <= AoE2.BLD.house.time + SIM_DT && a4h.work - a4h.start <= a4h.walk + 1,
+  'a4: one red house at a time, built by the one villager it was given',
+  'unbuilt_max=' + (a4r.maxUnbuilt === undefined ? '-' : a4r.maxUnbuilt) + ' steps=' +
+  (a4r.steps === undefined ? '-' : a4r.steps) + (a4h ? ' start=' + a4h.start.toFixed(2) + ' work=' +
+  (a4h.work ? a4h.work.toFixed(2) : '-') + ' done=' + (a4h.done ? a4h.done.toFixed(2) : '-') +
+  ' walk=' + a4h.walk.toFixed(2) + ' builders=' + a4h.builders : ' no house') +
+  ' time=' + AoE2.BLD.house.time + (a4r.err ? ' err=' + a4r.err : ''));
+
+/* 26. the guard on both sides of the card's `popCommitted + 2 >= popCap`. Two of the five
+   slots the keep allows is room enough: the tick that hires the village's last free villager
+   and queues the next one raises no site and writes no line in Game.aiLog, because an attempt
+   the village does not want is not made. Three of five — the exact boundary the +2 draws, the
+   room the next house hands out — raises the site on the next tick and spends exactly
+   BLD.house.cost.wood: that fixture is rich and its two villagers were standing idle, so the
+   house is the only thing in that second that can touch the wood column, and the pad is the
+   row's own 2x2 with the row's own 25 s of work. */
+const a4poor = attempt(() => {
+  const g = rich(village(true, 1));                    // one villager and one militia: two of five
+  steps(g, 30);                                        // exactly one CFG.AI_TICK
+  return { houses: a4houses(g).length, logs: (g.aiLog || []).length, toast: g.toastMsg, queue: redTc(g).queue.length };
+});
+const a4edge = attempt(() => {
+  const g = rich(village(true, 2));
+  const wood = g.res[1].wood;
+  steps(g, 30);                                      // exactly one CFG.AI_TICK
+  const h = a4houses(g)[0];
+  return { wood, now: g.res[1].wood, toast: g.toastMsg, log: peek(g), team: h ? h.team : -1,
+    w: h ? h.w : 0, h: h ? h.h : 0, time: h ? h.time : -1,
+    crew: h ? g.units.filter((u) => !u.dead && u.team === 1 && u.order.kind === 'build' && u.order.b === h.id).length : -1 };
+});
+check(!a4poor.err && a4poor.houses === 0 && a4poor.logs === 0 && a4poor.toast === '' &&
+      a4poor.queue === 1,
+  'a4: two of five is room enough - the tick trains, but raises no house and logs nothing',
+  'houses=' + (a4poor.houses === undefined ? '-' : a4poor.houses) + ' logs=' +
+  (a4poor.logs === undefined ? '-' : a4poor.logs) + ' queue=' +
+  (a4poor.queue === undefined ? '-' : a4poor.queue) + ' toast=' +
+  JSON.stringify(a4poor.toast === undefined ? null : a4poor.toast) + (a4poor.err ? ' err=' + a4poor.err : ''));
+check(!a4edge.err && a4edge.team === 1 && a4edge.now === a4edge.wood - AoE2.BLD.house.cost.wood &&
+      a4edge.w === AoE2.BLD.house.w && a4edge.h === AoE2.BLD.house.h && a4edge.time === AoE2.BLD.house.time &&
+      a4edge.crew === 1 && a4edge.toast === '',
+  'a4: three of five raises a red 2x2 house on the next tick for exactly BLD.house.cost.wood',
+  'wood ' + (a4edge.wood === undefined ? '-' : a4edge.wood) + '->' + (a4edge.now === undefined ? '-' : a4edge.now) +
+  ' cost=' + (a4edge.err ? '-' : AoE2.BLD.house.cost.wood) + ' crew=' + (a4edge.crew === undefined ? '-' : a4edge.crew) +
+  ' pad=' + (a4edge.w === undefined ? '-' : a4edge.w + 'x' + a4edge.h) + ' time=' +
+  (a4edge.time === undefined ? '-' : a4edge.time) + ' toast=' +
+  JSON.stringify(a4edge.toast === undefined ? null : a4edge.toast) + ' log=' + (a4edge.log || '-') +
+  (a4edge.err ? ' err=' + a4edge.err : ''));
 
 report();

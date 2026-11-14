@@ -167,6 +167,19 @@ commits on `main`.
 - checks: `12-ai.js` 26 → 32 (suite 472 → 478): the card's 10 simulated minutes leave 0 idle red
   villagers in 10 of 10 samples and take red's wood from 100 to 820; the arena table is in the body.
 
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` A4: red builds houses
+
+- `aiHouse` (`src/ai.js`) is the tick's fourth decision: two slots short of `popCap(Game, 1)`
+  with no red house unfinished, it builds one on the nearest ground `canPlaceAt` accepts beside
+  the keep (`findSite` knows grass only, so the keep's own tile is the first pad it offers),
+  worked by the nearest red villager on wood or the nearest one `findJob` gives a wood job.
+- `aiWorking` counts `building` apart from the resource columns, closing the A3 accounting hole:
+  `aiJobs` sizes the village by the villagers who can gather, so a builder stays on his site
+  until it is finished instead of reading as free the next tick and being re-hired off it.
+- checks: `12-ai.js` 32 → 36 (suite 478 → 482) — pop 7 at minute 2 of the card's 20 simulated
+  minutes, one red house at a time, the first finished in the row's own 25 s of work; the a2/a3
+  checks that read A4's by-products now name the rule. The arena table is in the commit body.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep
