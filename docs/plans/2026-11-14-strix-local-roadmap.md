@@ -112,7 +112,7 @@ A prompt you can paste per session is in §10.
   - **Done when:** the live page has the garrison `Leave` button and the smoke test passes for
     both targets.
 
-- [ ] **G1 — `npm run verify`: one command, one verdict**
+- [x] **G1 — `npm run verify`: one command, one verdict**
   - **Read:** `tools/package.json`, the verify block in `AGENTS.md`, `.github/workflows/check.yml`.
   - **Change:** new `tools/verify.js` that runs, in order, `headless-check.js -q`,
     `check-stats.mjs`, `audit-line-refs.js`, `gen-atlas.js` followed by

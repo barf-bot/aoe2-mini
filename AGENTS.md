@@ -58,15 +58,21 @@ no-build-step rule above (a PNG needs no build), so it is stated separately and 
 ## How to verify a change (never report "done" without this)
 
 ```bash
-node tools/headless-check.js -q  # must end with "NN/NN checks passed", exit 0
-node tools/check-stats.mjs       # verifies src/config.js against data/ (exit 1 prints every drifted field)
-node tools/audit-line-refs.js    # doc line refs, the file map, the DOM-free rule, the tool inventory
-node tools/render-preview.js     # rewrites preview.png from the real renderer
-node tools/gen-atlas.js          # composes assets/sprites.png from data/sprites/ and regenerates the tables
+node tools/verify.js               # everything below in one command: ends "VERIFY OK" or "VERIFY FAIL: <step>"
+node tools/headless-check.js -q    # must end with "NN/NN checks passed", exit 0
+node tools/check-stats.mjs         # verifies src/config.js against data/ (exit 1 prints every drifted field)
+node tools/audit-line-refs.js      # doc line refs, the file map, the DOM-free rule, the tool inventory
+node tools/render-preview.js       # rewrites preview.png from the real renderer
+node tools/gen-atlas.js            # composes assets/sprites.png from data/sprites/ and regenerates the tables
 ```
 
+`tools/verify.js` (`npm run verify --prefix tools`) is the gate: plain node, no dependencies,
+it runs the five commands above in that order, stops at the first failure, streams that step's
+output and ends with the verdict line. Its render step writes the PNG to `os.tmpdir()`, never
+to the tracked `preview.png`, so checking a change never dirties the tree.
+
 The first three are `npm run check --prefix tools`, and `.github/workflows/check.yml` runs
-all five on every push and pull request. The last two need
+all five on every push and pull request (CI keeps its separate steps). The last two need
 `npm install --prefix tools` once (`tools/node_modules` is gitignored); both are
 deterministic, so on an unchanged tree they leave `git status` clean.
 
@@ -145,7 +151,7 @@ reports the right dimensions can still paint nothing (see `tools/lib/harness.js`
 | `docs/ROADMAP.md` | prioritized open work (features and process) |
 | `docs/CHANGELOG.md` | dated entries of what shipped |
 | `docs/plans/` | historical design plans; they predate the `src/` split and cite the old single-file line numbers |
-| `tools/` | `headless-check.js` (runner for `tools/checks/`), `check-stats.mjs`, `render-preview.js`, `gen-atlas.js`, `audit-line-refs.js`, `browser-smoke.js` (the Playwright smoke test, with `tools/out/` for its screenshots), and `tools/lib/` (`load-game.js`, the loader every tool uses, and `harness.js`, the stub DOM + fixtures the checks start from) |
+| `tools/` | `verify.js` (the one-command gate), `headless-check.js` (runner for `tools/checks/`), `check-stats.mjs`, `render-preview.js`, `gen-atlas.js`, `audit-line-refs.js`, `browser-smoke.js` (the Playwright smoke test, with `tools/out/` for its screenshots), and `tools/lib/` (`load-game.js`, the loader every tool uses, and `harness.js`, the stub DOM + fixtures the checks start from) |
 
 The docs are not trusted by eye: `tools/audit-line-refs.js` is what proves the line
 references above and in `docs/` still match the code, and AGENTS/README must list every

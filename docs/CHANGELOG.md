@@ -3,6 +3,16 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions are the git
 commits on `main`.
 
+## [Unreleased] — 2026-11-14
+
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` G1: `npm run verify`
+
+- `tools/verify.js` (`npm run verify --prefix tools`) runs the five verification commands in
+  the order CI uses them, stops at the first failure, streams that step's output and ends with
+  one verdict line: `VERIFY OK` (exit 0) or `VERIFY FAIL: <step>` (exit 1). Its render step
+  writes the PNG to `os.tmpdir()`, so a verify run never rewrites the tracked `preview.png`.
+  `npm run check --prefix tools` and `.github/workflows/check.yml` are unchanged.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep
