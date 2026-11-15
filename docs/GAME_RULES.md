@@ -344,6 +344,33 @@ document: a wave is not a decision and a decision is not a wave (roadmap A2).
   (`data/buildings.json`); the card authored no number. Every answer `build` gives — started,
   `Can't build there`, `No villager in the crew` — is a team-1 `toast`, so it is an `aiLog`
   line and never the player's (the A1 rule), and one `markDirty` marks the site.
+- **Camps** (`aiCamps` / `aiCamp` / `aiFarWorkers`, `src/ai.js`, roadmap A5) — a tick counts the
+  red villagers working a resource tile further than `CFG.AI_DROP_RADIUS` (**8** tiles, tile to
+  drop-off) from the drop-off `findDropoff` (`src/economy.js`) would send them to; once
+  `CFG.AI_DROP_MIN_WORKERS` (**4**) of them work such a tile the village buys the drop building
+  that row is — `lumber_camp` for wood, `mining_camp` for gold, the two pairs
+  `dropTargetScore` tabulates, asked in that order. One camp per resource, ever, finished or not:
+  while one stands the rule is silent, even though `findDropoff` still answers the Town Center and
+  the walk the camp was built to save is still what the workers measure. The ground is the nearest
+  tile `canPlaceAt` accepts around the worked tile closest to the keep — the card's "the nearest
+  forest edge", a resource tile carrying no footprint of its own — and the crew comes from the
+  same pool `aiCrew` (A4) reads, minus the villagers another site already owns, so a camp never
+  drafts the builder a house is paying. Costs, work times and footprints are `BLD.lumber_camp` /
+  `BLD.mining_camp`'s (`data/buildings.json`); the two thresholds named above are all the card
+  authored, and every answer `build` gives is a team-1 `toast` — an `aiLog` line, never the
+  player's.
+- **Fields** (`aiFarms` / `aiMill`, `src/ai.js`, roadmap A5) — when no berry is left within
+  `CFG.AI_BERRY_RADIUS` (**12**) tiles of the red Town Center — `findAlternative`'s
+  (`src/world.js`) outward search, run from the keep's own tile, the way `findJob` searches from
+  the tile of the villager who lives on it — the cluster the village ate is replaced by
+  `BLD.mill` and then `BLD.farm`s: one mill ever, and fields up to `food villagers −
+  tile-gatherers`, the village's food share (`CFG.AI_SPLIT.food` over the villagers a resource can
+  staff, the ones standing on a site removed, floored so the share is never rounded past) minus
+  the ones a food source still employs — one field per tick, each crewed by the food worker the
+  field replaces, the villager who lost the berry. The mill row is Feudal, so a Dark Age village
+  whose berries are gone ploughs and says nothing about the mill until card A7 ages it up; asking
+  `build` there would answer `Mill requires Feudal Age` into `Game.aiLog` once a second, the noise
+  A4 spends its `canAfford` pre-check to avoid. Costs and footprints are `BLD.mill` / `BLD.farm`'s.
 - **Train** (`aiTrain`, `src/ai.js`) — one unit per tick while the village is smaller than
   `min(CFG.AI_VILLAGERS, popCap(Game, team))` (`aiWantsVillager`, `src/ai.js`: A3 sets the
   target at 22, and from A4 on the cap is what the village owns — the Town Center's 5 plus
@@ -465,7 +492,7 @@ the table is the contract, the audio path and the checks are its two readers, th
 - **Mute is presentation, not state** — the header `Sound on/off` button (`index.html:21`)
   toggles through `setMuted` (`src/sound.js:28`), which stamps the button
   (`applyMuteButton`, `src/sound.js:22`) and writes `MUTE_PATH` = `aoe2mini:muted`
-  (`src/config.js:288`) through the same `storageSet` the save slot uses; `isMuted`
+  (`src/config.js:295`) through the same `storageSet` the save slot uses; `isMuted`
   (`src/sound.js:12`) reads the button when there is one and the key when there isn't, so a
   muted game stays muted after a reload and a fresh tab starts unmuted. `boot` calls
   `applyMuteButton` once (`src/boot.js:122`) to honour the saved preference without writing

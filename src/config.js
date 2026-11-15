@@ -29,6 +29,9 @@ const CFG = {
   AI_TICK: 1,                     // s between enemy AI decisions (authored: the table carries no AI cadence)
   AI_SPLIT: { food: 0.5, wood: 0.35, gold: 0.15 },// share of the village working each resource (authored: the table carries no AI work policy)
   AI_VILLAGERS: 22,               // villagers the enemy village grows to (authored: the table carries no AI population target)
+  AI_DROP_MIN_WORKERS: 4,         // villagers on one resource, far enough from its drop-off, that make a camp worth it (authored: the table carries no AI drop-site policy)
+  AI_DROP_RADIUS: 8,              // tiles: the walk a camp has to save before the AI builds one (authored: the table carries no AI drop-site distance)
+  AI_BERRY_RADIUS: 12,            // tiles: the band around the keep the AI looks for a berry in before it farms (authored: the table carries no AI farming radius)
   AUTOSAVE_DEBOUNCE: 2,           // seconds a mutator waits before the save writes (a burst inside the window keeps ONE pending save)
   AUTOSAVE_EVERY: 30,             // seconds between autosaves of a quiet game (the table carries no save cadence)
 };

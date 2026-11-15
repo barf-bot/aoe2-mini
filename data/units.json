@@ -13,7 +13,8 @@
     "cfg.GATHER_RATE", "cfg.CANCEL_REFUND", "cfg.AGE_FOOD", "cfg.WAVE_EVERY", "cfg.ACQUIRE",
     "cfg.BUILDING_ACQUIRE", "cfg.UNIT_SEP", "cfg.PAN_SPEED", "cfg.EDGE", "cfg.RES",
     "cfg.PROJ_SPEED", "cfg.ASTAR_MAX_NODES", "cfg.VERSION", "cfg.SIM_DT", "cfg.AI_TICK",
-    "cfg.AI_SPLIT", "cfg.AI_VILLAGERS", "cfg.AUTOSAVE_DEBOUNCE", "cfg.AUTOSAVE_EVERY",
+    "cfg.AI_SPLIT", "cfg.AI_VILLAGERS", "cfg.AI_DROP_MIN_WORKERS", "cfg.AI_DROP_RADIUS",
+    "cfg.AI_BERRY_RADIUS", "cfg.AUTOSAVE_DEBOUNCE", "cfg.AUTOSAVE_EVERY",
     "units.*.label", "units.*.r", "units.*.buildable", "units.*.atkType"
   ],
   "design": {
@@ -46,6 +47,9 @@
     "AI_TICK": 1,
     "AI_SPLIT": { "food": 0.5, "wood": 0.35, "gold": 0.15 },
     "AI_VILLAGERS": 22,
+    "AI_DROP_MIN_WORKERS": 4,
+    "AI_DROP_RADIUS": 8,
+    "AI_BERRY_RADIUS": 12,
     "AUTOSAVE_DEBOUNCE": 2, "AUTOSAVE_EVERY": 30
   },
   "cfgNotes": {
@@ -69,6 +73,9 @@
     "AI_TICK": "s between enemy AI decisions (authored: the table carries no AI cadence)",
     "AI_SPLIT": "share of the village working each resource (authored: the table carries no AI work policy)",
     "AI_VILLAGERS": "villagers the enemy village grows to (authored: the table carries no AI population target)",
+    "AI_DROP_MIN_WORKERS": "villagers on one resource, far enough from its drop-off, that make a camp worth it (authored: the table carries no AI drop-site policy)",
+    "AI_DROP_RADIUS": "tiles: the walk a camp has to save before the AI builds one (authored: the table carries no AI drop-site distance)",
+    "AI_BERRY_RADIUS": "tiles: the band around the keep the AI looks for a berry in before it farms (authored: the table carries no AI farming radius)",
     "AUTOSAVE_DEBOUNCE": "seconds a mutator waits before the save writes (a burst inside the window keeps ONE pending save)",
     "AUTOSAVE_EVERY": "seconds between autosaves of a quiet game (the table carries no save cadence)"
   },

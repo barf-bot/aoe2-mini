@@ -180,6 +180,20 @@ commits on `main`.
   minutes, one red house at a time, the first finished in the row's own 25 s of work; the a2/a3
   checks that read A4's by-products now name the rule. The arena table is in the commit body.
 
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` A5: drop sites and farms
+
+- `aiCamps` (`src/ai.js`), the tick's fifth decision: `aiFarWorkers` counts the villagers working
+  a tile further than `CFG.AI_DROP_RADIUS` from the drop-off `findDropoff` would answer, and at
+  `CFG.AI_DROP_MIN_WORKERS` of them raises that resource's row — `lumber_camp` for wood,
+  `mining_camp` for gold — beside the tile, one per resource ever, crewed off A4's pool.
+- `aiFarms`, the sixth: with no berry inside `CFG.AI_BERRY_RADIUS` of the keep it raises one
+  `mill` (a Feudal row, so its age gate is asked before `build` is called) and then fields up to
+  the village's food share minus the food sources still working, each crewed by the worker it
+  replaces.
+- checks: `12-ai.js` 36 → 44 (suite 482 → 490) — the seeded field run at minute 12 owns one
+  lumber camp on the forest edge and 11 fields, and never doubles a camp or a mill; the
+  a2/a3/a4 checks are untouched, and the three thresholds are authored in `data/units.json`.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep

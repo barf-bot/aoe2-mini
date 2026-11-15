@@ -15,7 +15,13 @@
    A4 adds the fourth decision, `aiHouse`: the village raises a house while it still has two
    population slots left rather than the second after its last one filled, and the `building`
    tally A4 adds to `aiWorking` is what keeps `aiJobs` from drafting the man already on the
-   site. The helpers below stay small; src/ai-eco.js appears when this file passes ~250 lines. */
+   site.
+   A5 adds the fifth and sixth decisions, `aiCamps` and `aiFarms`: a `lumber_camp` /
+   `mining_camp` on the ground where `CFG.AI_DROP_MIN_WORKERS` of its villagers walk further
+   than `CFG.AI_DROP_RADIUS` to a drop-off, and a `mill` plus `farm`s once no berry is left
+   inside `CFG.AI_BERRY_RADIUS` of the keep — the three thresholds authored in data/units.json
+   like A3's two, every cost and footprint still BLD's. The split into src/ai-eco.js this
+   comment used to announce ("when this file passes ~250 lines") is its own later card. */
 
 function aiStep(Game, dt) {
   if (!Game.started) return;                   // the village sleeps until the game begins
@@ -26,6 +32,8 @@ function aiStep(Game, dt) {
   if (!tc) return;                             // no finished keep to order from (docs/TODO.md P1-9)
   if (tick && aiJobs(Game)) markDirty(Game);   // A3: work first — an idle village gathers nothing
   if (tick && aiHouse(Game, tc)) markDirty(Game);   // A4: then the room — a house before the village runs out of it
+  if (tick && aiCamps(Game, tc)) markDirty(Game);   // A5 1+2: then the ground — a camp where the walk is too long
+  if (tick && aiFarms(Game, tc)) markDirty(Game);   // A5 3: then the food — a mill and fields once the berries are gone
   if (aiWantsVillager(Game)) aiTrain(Game, tc);   // A3: then grow to CFG.AI_VILLAGERS, through `train`
   else aiAttackWave(Game);                     // with nothing to make, the village fights instead
 }
@@ -144,25 +152,30 @@ function aiHouse(Game, tc) {
   if (popCommitted(Game, 1) + 2 < popCap(Game, 1)) return false;        // room left: nothing to raise yet
   if (Game.buildings.some((b) => b.team === 1 && b.kind === 'house' && b.built < 1)) return false;
   if (!canAfford(Game, 1, BLD.house.cost)) return false;                // the same pre-check `aiTrain` makes
-  const pad = aiPad(Game, tc);                                           // null: nowhere left to stand one
+  const pad = aiPad(Game, 'house', tc);              // null: nowhere left to stand one
   const crew = aiCrew(Game, pad || tc);
   return !!build(Game, 'house', pad ? pad.tx * CFG.TILE : undefined,
     pad ? pad.ty * CFG.TILE : undefined, 1, crew ? [crew.id] : []);
 }
 
-/** The ground A4 builds on: the nearest tile to the keep `canPlaceAt` — the rule `build`
- *  applies to a click — accepts for a house. `findSite` (`src/world.js`) cannot answer this
- *  one: it searches grass only, and the nearest grass to a Town Center is the tile the keep
- *  stands on, so every site it offers a built settlement is refused for the footprint already
- *  there (`build` answers `Can't build there`). The search is the same square spiral, bounded
- *  by the map, and the row's own footprint comes from `canPlaceAt`, not from a number here. */
-function aiPad(Game, tc) {
+/** The ground the village builds on, for every row it owns: the nearest tile to `at` that
+ *  `canPlaceAt` — the rule `build` applies to a click — accepts for `kind`. `findSite`
+ *  (`src/world.js`) cannot answer this for a built settlement: it searches grass only, and the
+ *  nearest grass to a Town Center is the tile the keep stands on, so every site it offers is
+ *  refused for the footprint already there (`build` answers `Can't build there`). The search is
+ *  the same square spiral, bounded by the map, and the row's own footprint comes from
+ *  `canPlaceAt`, not from a number here — which is how one helper now answers for the house A4
+ *  asked beside the keep, the camp A5 puts on a resource edge (the tile itself is a resource,
+ *  so the answer is the grass next to it), and the mill and the farms that ring the keep once
+ *  its berries are gone. A4 called it with the keep; A5 calls it with the ground each row
+ *  replaces, which is the card's "the nearest forest edge". */
+function aiPad(Game, kind, at) {
   const w = Game.world.w, h = Game.world.h;
   for (let r = 0; r < Math.max(w, h); r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        if (canPlaceAt(Game, 'house', tc.tx + dx, tc.ty + dy, 1)) return { tx: tc.tx + dx, ty: tc.ty + dy };
+        if (canPlaceAt(Game, kind, at.tx + dx, at.ty + dy, 1)) return { tx: at.tx + dx, ty: at.ty + dy };
       }
     }
   }
@@ -183,6 +196,133 @@ function aiCrew(Game, at) {
   const works = (u) => (u.order.kind === 'harvest' || u.order.kind === 'go_deposit') &&
     u.order.src && u.order.src.res === 'wood';
   return pool.find(works) || pool.find((v) => !!findJob(Game, v, 'wood')) || null;
+}
+
+/** A5's crew, the same pool A4's `aiCrew` reads — red villagers who are not standing on a
+ *  site, nearest `at` first, ties to the lower id — asked for the resource `res` the new
+ *  building replaces: the villager who works it, else the nearest one `findJob` can give it,
+ *  else, when that resource has nothing left to give (the berry field `aiFarms` paves over, the
+ *  gold `aiCamp` moves off a mountain the village has not reached yet), the nearest villager
+ *  `findJob` can employ at all — the card's "the villager who lost the berry tile". A4's
+ *  `aiCrew` stops one answer earlier and stays A4's: whether a house on a map with no wood in
+ *  reach takes a gold worker is that card's open half, not this one's. A builder is never in
+ *  this pool at all, so a camp can never draft the man a house is already paying — the same
+ *  `building` tally that keeps `aiJobs` off him. */
+function aiCrewFor(Game, at, res) {
+  const near = (u) => (Math.floor(u.x / CFG.TILE) - at.tx) ** 2 + (Math.floor(u.y / CFG.TILE) - at.ty) ** 2;
+  const pool = Game.units.filter((u) => !u.dead && u.team === 1 && u.kind === 'villager' &&
+    u.order.kind !== 'build').sort((a, b) => (near(a) - near(b)) || a.id - b.id);
+  const works = (u) => (u.order.kind === 'harvest' || u.order.kind === 'go_deposit') &&
+    u.order.src && u.order.src.res === res;
+  return pool.find(works) || pool.find((v) => !!findJob(Game, v, res)) ||
+    pool.find((v) => !!findJob(Game, v, null)) || null;
+}
+
+/** A5's measure for both camps: the tiles red villagers work for `res` when the drop-off
+ *  `findDropoff` would send them to — `dropTargetScore`'s answer, the resource's own camp first
+ *  and the Town Center after it — sits more than `CFG.AI_DROP_RADIUS` tiles away. The distance is
+ *  the card's, tile to drop-off (`src.tx/ty` plus half a tile, the same anchor `canPlaceAt` and
+ *  `aiPad` work in), not the villager's own step: the rule is about the ground he works, and
+ *  reading the work spot instead would let a man standing on the far side of the tile be closer
+ *  than the tile is. The orders are read the way `aiWorking` reads them, so a villager carrying
+ *  a basket still works the source that filled him and a builder works a foundation, not a
+ *  resource. A source with no drop-off at all is not a long walk either, so it answers nothing,
+ *  and an unfinished camp is not yet a drop-off, so its workers keep measuring the old walk
+ *  until somebody finishes the site that was built to save it. Only tile sources count — a camp
+ *  serves a forest or a gold field, never another building. */
+function aiFarWorkers(Game, res) {
+  const out = [];
+  const mid = (n) => n * CFG.TILE + CFG.TILE / 2;
+  for (const v of Game.units) {
+    if (v.dead || v.team !== 1 || v.kind !== 'villager' || v.order.kind === 'build') continue;
+    const src = (v.order.kind === 'harvest' || v.order.kind === 'go_deposit') ? v.order.src : null;
+    if (!src || src.kind !== 'tile' || src.res !== res) continue;
+    const drop = findDropoff(Game, v, src);
+    if (!drop) continue;                                             // nowhere to carry is nowhere to camp
+    if (Math.hypot(drop.x - mid(src.tx), drop.y - mid(src.ty)) / CFG.TILE > CFG.AI_DROP_RADIUS) out.push(src);
+  }
+  return out;
+}
+
+/** The camp rule, written once and asked twice by `aiCamps` for the two pairs
+ *  `dropTargetScore` already tabulates — `wood` / `lumber_camp`, `gold` / `mining_camp`, in that
+ *  order so the same seed always builds the same camp first. Once `CFG.AI_DROP_MIN_WORKERS`
+ *  villagers work a source further than `CFG.AI_DROP_RADIUS` from their drop-off the village buys
+ *  the row: the ground is the nearest tile `canPlaceAt` accepts around the worked tile closest to
+ *  the keep — the card's "the nearest forest edge", the tile itself being a resource, so the
+ *  answer is the grass beside it — the crew is `aiCrewFor`'s worker of that resource, and every
+ *  answer `build` gives (`Lumber Camp started`, `Can't build there`, `No villager in the crew`)
+ *  is a team-1 toast, so it lands in Game.aiLog and never over the player's line (A1's rule).
+ *  One camp per resource, ever, finished or not: the guard is asked before the cost, so a second
+ *  camp the village cannot pay for never spends a tick on a complaint. */
+function aiCamp(Game, tc, res, kind) {
+  if (Game.buildings.some((b) => b.team === 1 && b.kind === kind)) return false;
+  const far = aiFarWorkers(Game, res);
+  if (far.length < CFG.AI_DROP_MIN_WORKERS) return false;             // not enough walking to buy a camp
+  if (!canAfford(Game, 1, BLD[kind].cost)) return false;              // `build`'s own answer, asked first
+  const d = (t) => (t.tx - tc.tx) ** 2 + (t.ty - tc.ty) ** 2;         // the edge the workers came from
+  const at = far.slice().sort((a, b) => (d(a) - d(b)) || (a.tx - b.tx) || (a.ty - b.ty))[0];
+  const pad = aiPad(Game, kind, at);
+  if (!pad) return false;                                             // nowhere to stand the row's footprint
+  const crew = aiCrewFor(Game, pad, res);
+  return !!build(Game, kind, pad.tx * CFG.TILE, pad.ty * CFG.TILE, 1, crew ? [crew.id] : []);
+}
+
+/** The two camp decisions (roadmap A5 rules 1 and 2); true when either put up a site, which is
+ *  what `aiStep` marks the game dirty for. */
+function aiCamps(Game, tc) {
+  return [aiCamp(Game, tc, 'wood', 'lumber_camp'), aiCamp(Game, tc, 'gold', 'mining_camp')].some(Boolean);
+}
+
+/** The mill half of A5's rule 3, asked once: `BLD.mill`, and one of them forever. Its row is a
+ *  Feudal building, and the age is read the way `canPlaceAt` reads it instead of asking `build`
+ *  — a Dark Age village would hear `Mill requires Feudal Age` in Game.aiLog once a second until
+ *  card A7 ages it up, the noise A4 spent its `canAfford` pre-check to avoid, and the village
+ *  would be right to say nothing. Then the ground beside the keep, then `aiCrewFor`'s food
+ *  worker, then `build`. */
+function aiMill(Game, tc) {
+  if (Game.buildings.some((b) => b.team === 1 && b.kind === 'mill')) return false;
+  if ((BLD.mill.age ?? 0) > Game.age[1]) return false;                // the row's own age gate, asked quietly
+  if (!canAfford(Game, 1, BLD.mill.cost)) return false;
+  const pad = aiPad(Game, 'mill', tc);
+  if (!pad) return false;
+  const crew = aiCrewFor(Game, pad, 'food');
+  return !!build(Game, 'mill', pad.tx * CFG.TILE, pad.ty * CFG.TILE, 1, crew ? [crew.id] : []);
+}
+
+/** A5's rule 3, in the order the card writes it — the mill first, then the fields.
+ *  The gate is the berry band: `findAlternative` (`src/world.js`), the outward search
+ *  `resumeGather` uses to re-house a villager whose tile just emptied, answers whether a
+ *  harvestable food tile exists within `CFG.AI_BERRY_RADIUS` of the keep — asked from the keep's
+ *  own tile (`tc.tx/ty`, the anchor `canPlaceAt` and `aiPad` work from), the way `findJob`
+ *  searches from the tile of the villager who lives on it, so it means "no berry the village can
+ *  reach from home". While one stands the village eats it and ploughs nothing.
+ *  The count is the card's `food villagers − tile-gatherers`: the village's food share
+ *  (`CFG.AI_SPLIT.food × village`, `village` being the number `aiJobs` takes its split over — the
+ *  villagers a resource can staff, the ones standing on a site removed) minus the ones a food
+ *  source still employs (`working.food`, farms included, exactly as `aiWorking` reads them).
+ *  `Math.floor` keeps that share an integer without rounding the village past it, so the village
+ *  never owns more fields than it has food villagers, and one field per tick is the most any
+ *  decision here spends. The crew is `aiCrewFor`'s food worker — the very villager whose berry
+ *  the row replaces — whose `build` order keeps him off the resource columns until the field is
+ *  finished, which is what makes "one farm per villager who lost a berry" and "no more farms
+ *  than food villagers" the same statement twice. */
+function aiFarms(Game, tc) {
+  const home = { x: tc.tx * CFG.TILE, y: tc.ty * CFG.TILE };         // the keep's tile, not its centre
+  if (findAlternative(Game.world, home, 'food', CFG.AI_BERRY_RADIUS)) return false;  // still feeds them
+  const villagers = Game.units.filter((u) => !u.dead && u.team === 1 && u.kind === 'villager');
+  const working = aiWorking(Game, 1);
+  const village = villagers.length - working.building;
+  if (!village) return false;                               // everyone is on a site already: nothing to feed
+  let built = aiMill(Game, tc);
+  const want = Math.max(0, Math.floor(CFG.AI_SPLIT.food * village) - working.food);
+  const farms = Game.buildings.filter((b) => b.team === 1 && b.kind === 'farm').length;
+  if (farms < want && canAfford(Game, 1, BLD.farm.cost)) {
+    const pad = aiPad(Game, 'farm', tc);
+    const crew = pad && aiCrewFor(Game, pad, 'food');           // the field belongs to the villager it replaces
+    if (crew) built = !!build(Game, 'farm', pad.tx * CFG.TILE, pad.ty * CFG.TILE, 1, [crew.id]) || built;
+  }
+  return built;
 }
 
 /** How big the village should be: `CFG.AI_VILLAGERS` (22), held down by the population the

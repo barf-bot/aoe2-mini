@@ -578,4 +578,225 @@ check(!a4edge.err && a4edge.team === 1 && a4edge.now === a4edge.wood - AoE2.BLD.
   JSON.stringify(a4edge.toast === undefined ? null : a4edge.toast) + ' log=' + (a4edge.log || '-') +
   (a4edge.err ? ' err=' + a4edge.err : ''));
 
+/* ---- 20. roadmap A5: drop sites and farms --------------------------------- */
+/* A5 (docs/plans/2026-11-14-strix-local-roadmap.md §5, needs A4) — the village stops walking
+   wood and gold across the map once `CFG.AI_DROP_MIN_WORKERS` of its villagers work a source
+   more than `CFG.AI_DROP_RADIUS` tiles from the drop-off `findDropoff` would send them to: it
+   puts a `lumber_camp` (wood) or a `mining_camp` (gold) on that ground instead, one of each.
+   And when no berry is left inside `CFG.AI_BERRY_RADIUS` of the keep — the radius `findJob`
+   searches, so "no berry the village can reach from home" — the food the cluster used to feed
+   becomes fields: one `mill`, then one `farm` per villager the food share has left without a
+   berry, each crewed by that villager so A4's `building` tally keeps him on the site.
+   `BLD.mill` is a Feudal row, so until card A7 ages red up `canPlaceAt` refuses the ground and
+   the mill waits; the checks say so in both the Dark Age run and a Feudal fixture.
+   The card's proof is an idle-player run to simulated minute 12, and the seeded map at 1337
+   cannot make it: its forest sits inside the 8-tile radius (so the wood workers have no reason
+   to put a camp there) and its berry cluster outlives minute 12 (so the farm rule has nothing
+   to replace). a5seed therefore authors the map the rules judge — two FOREST tiles at ring 10
+   from the red Town Center carrying 6000 wood each (the row's own 60 would leave eight
+   villagers jobless inside a minute and the run would end with nothing to count), two BERRY
+   tiles at `CFG.RES.berry` two tiles from the keep (the seeded 900-food cluster feeds a
+   22-village for five minutes; these two end the band inside two) and one GOLD tile at ring 3
+   — with red's stockpile set to the `rich` fixture's, so a cost is never the answer a check
+   reads. */
+const A5_FIELD = [['wood', 10, 0, 6000], ['wood', 10, 1, 6000], ['food', 2, 0], ['food', 2, 1],
+  ['gold', 3, 0]];
+const a5kind = (g, kind) => g.buildings.filter((b) => b.team === 1 && b.kind === kind);
+const a5wipe = (g) => {
+  const w = g.world;
+  for (let i = 0; i < w.type.length; i++) { w.type[i] = AoE2.T.GRASS; w.amount[i] = 0; }
+  return g;
+};
+const a5put = (g, res, dx, dy, amount) => {
+  const tc = redTc(g), t = a3Tile[res];
+  setTile(g, tc.tx + dx, tc.ty + dy, t.t, amount === undefined ? t.n : amount);
+  return { tx: tc.tx + dx, ty: tc.ty + dy };
+};
+const a5cheb = (a, b) => Math.max(Math.abs(a.tx - b.tx), Math.abs(a.ty - b.ty));
+/** The A5 fixture: the seeded village (`createState()` + `resetGame(g, seed)` + `started =
+ *  true` — the shape tools/ai-arena.js plays, so a check names the seed it ran), `opts.keep`
+ *  living red villagers with the rest marked dead the way `village()` does, the world wiped and
+ *  `puts` (`[res, dx, dy, amount?]` offsets from the red keep — the a3 `onMap` pattern at the
+ *  radii A5 judges; `onMap` stacks its tiles in rings 1..3, inside the walk a camp saves), red
+ *  rich, and `opts.work` (a resource) putting every one of those villagers on a `harvest` order
+ *  at that resource's first stamped tile instead of waiting for `aiJobs` to spread them by
+ *  `CFG.AI_SPLIT`. `opts.house` drops a finished red house beside the keep — the `a2five`
+ *  trick: with `popCap` 10 and a smaller village the A4 rule stays quiet, so a one-tick fixture
+ *  changes exactly what the rule under test ordered and nothing else. */
+function a5seed(seed, puts, opts = {}) {
+  const g = AoE2.createState();
+  AoE2.resetGame(g, seed);
+  g.started = true;
+  if (opts.age !== undefined) g.age[1] = opts.age;   // the age the rows are judged by (A5's mill is Feudal)
+  const vill = a3vill(g);
+  for (const u of (opts.keep === undefined ? [] : vill.slice(opts.keep))) u.dead = true;
+  a5wipe(g);
+  const tiles = {};
+  for (const p of puts) {
+    (tiles[p[0]] = tiles[p[0]] || []).push(a5put(g, p[0], p[1], p[2], p[3]));
+  }
+  if (opts.house) {
+    const pad = freeSpotAround(g.world, g, redTc(g).tx, redTc(g).ty,
+      AoE2.BLD.house.w, AoE2.BLD.house.h, 8);
+    const b = AoE2.makeBuilding(g, 'house', 1, pad.tx, pad.ty);
+    b.built = 1; b.hp = b.maxHp;
+  }
+  for (const v of a3vill(g)) {
+    const src = opts.work ? AoE2.sourceFromTile(g, v, tiles[opts.work][0].tx, tiles[opts.work][0].ty) : null;
+    v.order = src ? { kind: 'harvest', src } : { kind: 'idle' };
+  }
+  return { g, tiles };
+}
+/** One `CFG.AI_TICK` of the brain on that fixture: 30 `CFG.SIM_DT` steps, the new buildings and
+ *  the crew each of them got. `rich` runs first so the tick's spend is the only thing that can
+ *  move a stockpile, which is what lets a check name the exact cost a rule paid. */
+function a5tick(seed, puts, opts) {
+  const f = a5seed(seed, puts, opts);
+  const g = rich(f.g);
+  const before = g.buildings.map((b) => b.id);
+  const wood = g.res[1].wood;
+  steps(g, 30);
+  const made = g.buildings.filter((b) => before.indexOf(b.id) < 0);
+  return { tiles: f.tiles, made: made.map((b) => ({ kind: b.kind, tx: b.tx, ty: b.ty, w: b.w, h: b.h,
+    time: b.time, crew: a3vill(g).filter((u) => u.order.kind === 'build' && u.order.b === b.id).length })),
+    built: g.buildings.length, spent: wood - g.res[1].wood, log: peek(g) };
+}
+/** a minute mark of the field run: the counts every A5 invariant is judged on, plus the ground
+ *  the camps were put on. */
+function a5sample(g) {
+  const vill = a3vill(g);
+  const site = { house: [], farm: [], lumber_camp: [], mining_camp: [], mill: [] };
+  for (const b of g.buildings) if (b.team === 1 && site[b.kind] !== undefined) site[b.kind].push(b);
+  let sites = 0, crewed = 0, strays = '';
+  for (const kind in site) {
+    for (const b of site[kind]) {
+      if (b.built >= 1) continue;
+      const n = vill.filter((u) => u.order.kind === 'build' && u.order.b === b.id).length;
+      sites++;
+      if (n === 1) crewed++;
+      else strays = (strays ? strays + ' ' : '') + kind + '#' + b.id + ':' + n;
+    }
+  }
+  return { t: Math.round(g.time), vills: vill.length, builders: vill.filter((u) => u.order.kind === 'build').length,
+    houses: site.house.length, farms: site.farm.length, camps: site.lumber_camp.length,
+    mines: site.mining_camp.length, mills: site.mill.length, sites, crewed, strays,
+    campTiles: site.lumber_camp.map((b) => ({ tx: b.tx, ty: b.ty })),
+    millTiles: site.mill.map((b) => ({ tx: b.tx, ty: b.ty })),
+    cap: AoE2.popCap(g, 1), used: AoE2.popUsed(g, 1) };
+}
+function a5watch(seed, minutes) {
+  const f = a5seed(seed, A5_FIELD);
+  const g = rich(f.g);
+  const out = { seed: g.world.seed, wood: f.tiles.wood, gold: f.tiles.gold, berry: f.tiles.food, samples: [] };
+  for (let i = 1; i <= minutes * 1800; i++) {
+    AoE2.stepSim(g, SIM_DT);
+    if (g.result) break;                             // an ended game stops the clock (red fields no fighter until A6)
+    if (i % 1800 === 0) out.samples.push(a5sample(g));
+  }
+  return out;
+}
+const a5list = (xs) => xs.map((x) => x.join(':')).join(' ');
+const a5field = attempt(() => a5watch(AoE2.CFG.SEED, 12));
+const a5m12 = !a5field.err ? a5field.samples[11] : null;
+
+// 27. the three numbers the card authors, the way SIM_DT / AI_TICK / AI_SPLIT are authored
+check(AoE2.CFG.AI_DROP_MIN_WORKERS === 4 && AoE2.CFG.AI_DROP_RADIUS === 8 &&
+      AoE2.CFG.AI_BERRY_RADIUS === 12,
+  'a5: CFG.AI_DROP_MIN_WORKERS, AI_DROP_RADIUS and AI_BERRY_RADIUS are authored 4 / 8 / 12',
+  'min_workers=' + AoE2.CFG.AI_DROP_MIN_WORKERS + ' drop_radius=' + AoE2.CFG.AI_DROP_RADIUS +
+  ' berry_radius=' + AoE2.CFG.AI_BERRY_RADIUS);
+
+// 28. the card's proof, read at simulated minute 12 on the field above: a lumber camp on the
+//     forest edge the four wood workers were walking out of (not beside the keep), and the farms
+//     the berry band left behind.
+check(!a5field.err && !!a5m12 && a5m12.camps === 1 &&
+      a5m12.campTiles.some((c) => a5field.wood.some((w) => a5cheb(c, w) === 1)) && a5m12.farms >= 2,
+  'a5: at simulated minute 12 the idle-player village owns one lumber camp on the forest edge and 2+ farms',
+  'seed=' + (a5field.seed === undefined ? '-' : a5field.seed) +
+  ' map wood=' + a5list((a5field.wood || []).map((t) => [t.tx, t.ty])) +
+  ' berry=' + a5list((a5field.berry || []).map((t) => [t.tx, t.ty])) +
+  ' gold=' + a5list((a5field.gold || []).map((t) => [t.tx, t.ty])) +
+  (a5m12 ? ' t=' + a5m12.t + ' vills=' + a5m12.vills + ' camps=' + a5m12.camps +
+    ' camp@=' + a5list(a5m12.campTiles.map((t) => [t.tx, t.ty])) + ' farms=' + a5m12.farms +
+    ' mills=' + a5m12.mills : ' samples=' + (a5field.samples ? a5field.samples.length : '-')) +
+  (a5field.err ? ' err=' + a5field.err : ''));
+
+// 29. one camp of each kind, ever — a second lumber camp is never started while one stands
+//     (finished or not), and neither is a second mill. The field run is judged on those two
+//     counts only: the farm total at a minute mark belongs to the village that ploughed it, not
+//     to the village standing there now (a field outlives the farmer drafted off it to a house),
+//     so the card's "never more farms than food villagers" is proved where the number is
+//     computed — check 32's `no farm yet` — and not by comparing buildings to a moving crowd.
+check(!a5field.err && a5field.samples.length === 12 &&
+      a5field.samples.every((s) => s.camps <= 1 && s.mines <= 1 && s.mills <= 1),
+  'a5: never a second lumber camp while one exists, and never a second mill',
+  'samples=' + a5field.samples.length + ' camps=' + a5field.samples.map((s) => s.camps).join(',') +
+  ' mines=' + a5field.samples.map((s) => s.mines).join(',') +
+  ' mills=' + a5field.samples.map((s) => s.mills).join(',') + (a5field.err ? ' err=' + a5field.err : ''));
+
+// 30. every site the village starts — house, farm or camp — has exactly one red villager on it,
+//     which is A4's `building` tally doing the same job for A5's crews: a builder works one
+//     foundation, so the rules below never draft the man a site already has.
+check(!a5field.err && a5field.samples.length === 12 &&
+      a5field.samples.every((s) => s.sites === s.crewed),
+  'a5: every unfinished red site has exactly the one villager it was crewed with',
+  a5field.samples.map((s) => s.t + 's:' + s.sites + '/' + s.crewed + (s.strays ? ' ' + s.strays : '')).join(' ') +
+  (a5field.err ? ' err=' + a5field.err : ''));
+
+// 31. the card's rule 2, on a village the split could only grow into: `CFG.AI_SPLIT`'s .15 of
+//     22 villagers is three gold workers, so the fixture hands the four the rule asks for to the
+//     gold tile at ring 10 itself (`opts.work`) and the camp is judged by its ground, its cost
+//     and its crew. The finished house keeps A4 quiet and the berry two tiles out keeps A5's
+//     farm rule quiet, so the camp is the only building this tick makes.
+const a5mine = attempt(() => a5tick(AoE2.CFG.SEED,
+  [['gold', 10, 0, 6000], ['gold', 10, 1, 6000], ['food', 2, 0]],
+  { keep: 4, work: 'gold', house: 1 }));
+check(!a5mine.err && a5mine.made.length === 1 && a5mine.made[0].kind === 'mining_camp' &&
+      a5mine.made[0].w === AoE2.BLD.mining_camp.w && a5mine.made[0].h === AoE2.BLD.mining_camp.h &&
+      a5mine.made[0].time === AoE2.BLD.mining_camp.time && a5mine.made[0].crew === 1 &&
+      a5mine.made.some((b) => a5cheb(b, a5mine.tiles.gold[0]) === 1) &&
+      a5mine.spent === AoE2.BLD.mining_camp.cost.wood,
+  'a5: four gold carriers 10 tiles out raise one mining camp on the gold edge, crewed by one of them',
+  'made=' + a5list(a5mine.made.map((b) => [b.kind, b.tx, b.ty, String(b.crew)])) +
+  ' gold=' + a5list((a5mine.tiles ? a5mine.tiles.gold : []).map((t) => [t.tx, t.ty])) +
+  ' built=' + a5mine.built + ' spent=' + a5mine.spent + '/' +
+  (a5mine.err ? '-' : AoE2.BLD.mining_camp.cost.wood) + ' log=' + a5mine.log +
+  (a5mine.err ? ' err=' + a5mine.err : ''));
+
+// 32. the mill's half of rule 3, both sides of its age gate: BLD.mill is a Feudal row, so a
+//     Dark Age village whose berries are gone builds the farm and never the mill (calling
+//     `build` there would answer `Mill requires Feudal Age` into Game.aiLog every second — the
+//     noise A4 spent its `canAfford` pre-check to avoid), and the same village aged to Feudal
+//     builds exactly one mill for the row's cost and stops.
+const a5darkMill = attempt(() => a5tick(AoE2.CFG.SEED, [['wood', 10, 0, 6000], ['gold', 3, 0]], { keep: 4 }));
+check(!a5darkMill.err && a5darkMill.made.length > 0 &&
+      a5darkMill.made.every((b) => b.kind !== 'mill') && !a5darkMill.log.includes(':Mill'),
+  'a5: a Dark Age village with no berries left raises farms and never a mill - the row\'s age gate answers first',
+  'made=' + a5list(a5darkMill.made.map((b) => [b.kind, String(b.crew)])) + ' log=' + a5darkMill.log +
+  (a5darkMill.err ? ' err=' + a5darkMill.err : ''));
+const a5feudal = attempt(() => a5tick(AoE2.CFG.SEED, [['food', 13, 0]], { keep: 1, work: 'food', house: 1, age: 1 }));
+check(!a5feudal.err && a5feudal.made.length === 1 && a5feudal.made[0].kind === 'mill' &&
+      a5feudal.made[0].w === AoE2.BLD.mill.w && a5feudal.made[0].time === AoE2.BLD.mill.time &&
+      a5feudal.made[0].crew === 1 && a5feudal.spent === AoE2.BLD.mill.cost.wood,
+  'a5: the same village, aged to Feudal, raises one mill for BLD.mill\'s cost and no farm yet',
+  'made=' + a5list(a5feudal.made.map((b) => [b.kind, b.tx, b.ty, String(b.crew)])) + ' built=' +
+  a5feudal.built + ' spent=' + a5feudal.spent + '/' + (a5feudal.err ? '-' : AoE2.BLD.mill.cost.wood) +
+  ' log=' + a5feudal.log + (a5feudal.err ? ' err=' + a5feudal.err : ''));
+
+// 33. and the second tick of that mill: the guard holds — one mill exists, so the rule says
+//     nothing and the village raises nothing else while its mill is still going up.
+const a5millTwice = attempt(() => {
+  const f = a5seed(AoE2.CFG.SEED, [['food', 13, 0]], { keep: 1, work: 'food', house: 1, age: 1 });
+  const g = rich(f.g);
+  steps(g, 30);
+  const once = g.buildings.length;
+  steps(g, 30);
+  return { once, twice: g.buildings.length,
+    mills: a5kind(g, 'mill').length, log: peek(g) };
+});
+check(!a5millTwice.err && a5millTwice.once === a5millTwice.twice && a5millTwice.mills === 1,
+  'a5: the tick after the mill is put up starts nothing - one mill, ever',
+  'buildings ' + a5millTwice.once + ' -> ' + a5millTwice.twice + ' mills=' + a5millTwice.mills +
+  ' log=' + a5millTwice.log + (a5millTwice.err ? ' err=' + a5millTwice.err : ''));
+
 report();

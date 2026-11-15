@@ -251,7 +251,7 @@ reports `tools/ai-arena.js` before/after.
     near the TC and `build('house', …, 1, [nearest wood villager])`.
   - **Check:** idle-player run: red pop > 5 by minute 6. **Size:** S. **Needs:** A3.
 
-- [ ] **A5 — Drop sites and farms**
+- [x] **A5 — Drop sites and farms**
   - **Change:** lumber camp at the nearest forest edge once ≥ 4 villagers chop farther than
     8 tiles from a drop-off; mining camp likewise for gold; mill + farms when no berry tile is
     left within 12 tiles of the TC (farm count = food villagers − tile-gatherers).
