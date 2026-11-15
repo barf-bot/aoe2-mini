@@ -14,7 +14,7 @@
     "cfg.BUILDING_ACQUIRE", "cfg.UNIT_SEP", "cfg.PAN_SPEED", "cfg.EDGE", "cfg.RES",
     "cfg.PROJ_SPEED", "cfg.ASTAR_MAX_NODES", "cfg.VERSION", "cfg.SIM_DT", "cfg.AI_TICK",
     "cfg.AI_SPLIT", "cfg.AI_VILLAGERS", "cfg.AI_DROP_MIN_WORKERS", "cfg.AI_DROP_RADIUS",
-    "cfg.AI_BERRY_RADIUS", "cfg.AUTOSAVE_DEBOUNCE", "cfg.AUTOSAVE_EVERY",
+    "cfg.AI_BERRY_RADIUS", "cfg.AI_ARMY", "cfg.AUTOSAVE_DEBOUNCE", "cfg.AUTOSAVE_EVERY",
     "units.*.label", "units.*.r", "units.*.buildable", "units.*.atkType"
   ],
   "design": {
@@ -50,6 +50,7 @@
     "AI_DROP_MIN_WORKERS": 4,
     "AI_DROP_RADIUS": 8,
     "AI_BERRY_RADIUS": 12,
+    "AI_ARMY": { "militia": 0.6, "archer": 0.4 },
     "AUTOSAVE_DEBOUNCE": 2, "AUTOSAVE_EVERY": 30
   },
   "cfgNotes": {
@@ -76,6 +77,7 @@
     "AI_DROP_MIN_WORKERS": "villagers on one resource, far enough from its drop-off, that make a camp worth it (authored: the table carries no AI drop-site policy)",
     "AI_DROP_RADIUS": "tiles: the walk a camp has to save before the AI builds one (authored: the table carries no AI drop-site distance)",
     "AI_BERRY_RADIUS": "tiles: the band around the keep the AI looks for a berry in before it farms (authored: the table carries no AI farming radius)",
+    "AI_ARMY": "share of the enemy army trained per fighter kind (authored: the table carries no army composition)",
     "AUTOSAVE_DEBOUNCE": "seconds a mutator waits before the save writes (a burst inside the window keeps ONE pending save)",
     "AUTOSAVE_EVERY": "seconds between autosaves of a quiet game (the table carries no save cadence)"
   },

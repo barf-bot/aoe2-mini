@@ -194,6 +194,21 @@ commits on `main`.
   lumber camp on the forest edge and 11 fields, and never doubles a camp or a mill; the
   a2/a3/a4 checks are untouched, and the three thresholds are authored in `data/units.json`.
 
+### Added — `docs/plans/2026-11-14-strix-local-roadmap.md` A6: military production
+
+- `aiBarracks` / `aiRange` / `aiArmySite` (`src/ai.js`), the seventh and eighth decisions: a
+  village of 12 living villagers raises a `barracks` beside the keep — one ever, finished or not,
+  crewed off A5's pool — and once it is finished and red is Feudal an `archery_range`; both rows
+  are Feudal, so their age gate is asked before `build`, the way A5 asks `BLD.mill`'s.
+- `aiTrainArmy` / `aiArmyRanked` replace the one kind A2 hardcoded in `aiTrain` with the authored
+  `CFG.AI_ARMY` (`.6` militia / `.4` archer in `data/units.json`): a building trains the
+  trainable kind furthest below its share of red's living+queued fighters, still one per queue.
+- `aiRally`, the ninth: `Game.ai[1].rally` — the tile between the red Town Center and the map
+  centre, computed once and saved with the brain — is where a leaderless fighter is marched.
+- checks: `12-ai.js` 44 → 52 (suite 490 → 498) — the seeded Feudal village fields 53 fighters at
+  a .623 militia share by simulated minute 15, one barracks and one range ever, a2–a5 untouched.
+  The arena table is in the commit body.
+
 ## [Unreleased] — 2026-11-13
 
 ### Added — `docs/ROADMAP.md` P1-5 (tower chain half): Watch Tower → Guard Tower → Keep

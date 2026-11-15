@@ -257,7 +257,7 @@ reports `tools/ai-arena.js` before/after.
     left within 12 tiles of the TC (farm count = food villagers − tile-gatherers).
   - **Check:** idle-player run, minute 12: red owns a lumber camp and ≥ 2 farms. **Size:** M.
 
-- [ ] **A6 — Military production**
+- [x] **A6 — Military production**
   - **Change:** a Barracks once red has 12 villagers; Archery Range after Feudal; train a
     mix from `CFG.AI_ARMY = {militia: .6, archer: .4}`; new units gather at a rally tile
     between the TC and the map centre.

@@ -20,8 +20,13 @@
    `mining_camp` on the ground where `CFG.AI_DROP_MIN_WORKERS` of its villagers walk further
    than `CFG.AI_DROP_RADIUS` to a drop-off, and a `mill` plus `farm`s once no berry is left
    inside `CFG.AI_BERRY_RADIUS` of the keep — the three thresholds authored in data/units.json
-   like A3's two, every cost and footprint still BLD's. The split into src/ai-eco.js this
-   comment used to announce ("when this file passes ~250 lines") is its own later card. */
+   like A3's two, every cost and footprint still BLD's.
+   A6 adds the seventh, eighth and ninth decisions, `aiBarracks` / `aiRange`, `aiTrainArmy` /
+   `aiArmyRanked` and `aiRally`: a `barracks` once 12 villagers are alive and an `archery_range`
+   once it is finished and red is Feudal (one of each, ever), the `CFG.AI_ARMY` mix in place of
+   the single kind A2 hardcoded in `aiTrain`, and the `Game.ai[1].rally` tile a leaderless
+   fighter is marched to. The split into src/ai-eco.js this comment used to announce ("when this
+   file passes ~250 lines") is its own later card. */
 
 function aiStep(Game, dt) {
   if (!Game.started) return;                   // the village sleeps until the game begins
@@ -34,8 +39,12 @@ function aiStep(Game, dt) {
   if (tick && aiHouse(Game, tc)) markDirty(Game);   // A4: then the room — a house before the village runs out of it
   if (tick && aiCamps(Game, tc)) markDirty(Game);   // A5 1+2: then the ground — a camp where the walk is too long
   if (tick && aiFarms(Game, tc)) markDirty(Game);   // A5 3: then the food — a mill and fields once the berries are gone
+  if (tick && aiBarracks(Game, tc)) markDirty(Game);   // A6 1: then the arms — a barracks once the village is 12 strong
+  if (tick && aiRange(Game, tc)) markDirty(Game);   // A6 2: and an archery range once that one is finished and red is Feudal
+  if (tick && aiRally(Game, tc)) markDirty(Game);   // A6 4: the army walks to its rally tile before the wave takes it
   if (aiWantsVillager(Game)) aiTrain(Game, tc);   // A3: then grow to CFG.AI_VILLAGERS, through `train`
   else aiAttackWave(Game);                     // with nothing to make, the village fights instead
+  if (tick && aiTrainArmy(Game)) markDirty(Game);   // A6 3: then the military queues, from CFG.AI_ARMY
 }
 
 /** The attack-wave clock (docs/GAME_RULES.md): Game.wave counts every second of a started
@@ -325,6 +334,117 @@ function aiFarms(Game, tc) {
   return built;
 }
 
+/** A6 rule 1, the barracks: one, ever, finished or not (the A5 camp guard), and the gate is the
+ *  number the card names — 12 living villagers, the only figure A6 authors besides
+ *  `CFG.AI_ARMY`, every cost, footprint and train time still `BLD.barracks`'s. Below that the
+ *  village is still a village and spends its wood on rooms and fields; at it, the card has the
+ *  village start an army. The ground and crew are `aiArmySite`'s. */
+function aiBarracks(Game, tc) {
+  if (Game.buildings.some((b) => b.team === 1 && b.kind === 'barracks')) return false;
+  if (Game.units.filter((u) => !u.dead && u.team === 1 && u.kind === 'villager').length < 12) return false;
+  return aiArmySite(Game, tc, 'barracks');
+}
+
+/** A6 rule 2, the archery range: one, ever, and it waits for the barracks to be *finished* — an
+ *  unfinished site trains nobody, so raising a second row on a foundation would spend red wood
+ *  on a building that cannot answer the queue — and for the Feudal Age the row itself asks for
+ *  (A7 is the card that ages red up; A6 honours the gate, exactly the way A5 honours
+ *  `BLD.mill`'s). */
+function aiRange(Game, tc) {
+  if (Game.buildings.some((b) => b.team === 1 && b.kind === 'archery_range')) return false;
+  if (!Game.buildings.some((b) => b.team === 1 && b.kind === 'barracks' && b.built >= 1)) return false;
+  return aiArmySite(Game, tc, 'archery_range');
+}
+
+/** The half A6's two rows share, and the reason they cannot each invent one: the row's age gate
+ *  read off the row (`BLD[kind].age` against `Game.age[1]`, the same reading `canPlaceAt` applies
+ *  and the reason `aiMill` exists — asking `build` instead would answer `Barracks requires
+ *  Feudal Age` into Game.aiLog once a second until A7 ages the village up), the cost, the nearest
+ *  ground `canPlaceAt` accepts around the keep (`aiPad`, A5's), then the crew from `aiCrewFor`'s
+ *  pool asked with no resource to prefer — a barracks belongs to the nearest hand free for work,
+ *  which is that helper's own last-resort answer — and then `build`, whose every answer is a
+ *  team-1 toast (A1's rule). */
+function aiArmySite(Game, tc, kind) {
+  if ((BLD[kind].age ?? 0) > Game.age[1]) return false;              // the row's own age gate, asked quietly
+  if (!canAfford(Game, 1, BLD[kind].cost)) return false;             // `build`'s own answer, asked first
+  const pad = aiPad(Game, kind, tc);
+  if (!pad) return false;                                             // nowhere to stand the row's footprint
+  const crew = aiCrewFor(Game, pad, null);
+  return !!build(Game, kind, pad.tx * CFG.TILE, pad.ty * CFG.TILE, 1, crew ? [crew.id] : []);
+}
+
+/** The mix A6 rule 3 trains, ranked: `CFG.AI_ARMY`'s kinds ordered by how far below their share
+ *  of red's *living and queued* fighters each is, biggest deficit first and ties in the table's
+ *  own order — the shape `aiRanked` gives the village's resources. Queued counts because a
+ *  paid-for slot is already spent (docs/TODO.md P1-10's lesson): reading only the living would
+ *  let a barracks with a militia on the forge order a second one and bury the village's gold in
+ *  a queue nobody can field. */
+function aiArmyRanked(Game) {
+  const have = {};
+  let total = 0;
+  for (const u of Game.units) if (!u.dead && u.team === 1 && CFG.AI_ARMY[u.kind] !== undefined) {
+    have[u.kind] = (have[u.kind] || 0) + 1; total++;
+  }
+  for (const b of Game.buildings) if (b.team === 1) for (const j of b.queue) {
+    if (CFG.AI_ARMY[j.kind] === undefined) continue;
+    have[j.kind] = (have[j.kind] || 0) + 1; total++;
+  }
+  return Object.keys(CFG.AI_ARMY)
+    .map((kind, i) => ({ kind, i, short: CFG.AI_ARMY[kind] * total - (have[kind] || 0) }))
+    .sort((a, b) => (b.short - a.short) || a.i - b.i)
+    .map((x) => x.kind);
+}
+
+/** A6 rule 3, once per tick: every finished red building trains the ranked kind its own `trains`
+ *  row allows — a barracks the militia, an archery range the archer, a house or a mill nothing —
+ *  and only while red still has a population slot to spend, because `train` would otherwise
+ *  answer `Need more houses` into Game.aiLog every second, the noise A4 and A5 spent their
+ *  pre-checks to avoid. A building with a unit in its queue trains nothing more: A2's rule, kept
+ *  through `aiTrain` so the builder keeps its queue short instead of hoarding five. */
+function aiTrainArmy(Game) {
+  if (popCommitted(Game, 1) >= popCap(Game, 1)) return false;         // `train`'s own wall, asked first
+  const ranked = aiArmyRanked(Game);
+  let queued = false;
+  for (const b of Game.buildings) {
+    if (b.team !== 1 || b.built < 1) continue;
+    const kind = ranked.find((k) => (BLD[b.kind].trains || []).indexOf(k) >= 0);
+    if (kind !== undefined && aiTrain(Game, b, kind)) queued = true;
+  }
+  return queued;
+}
+
+/** The army's gathering ground (A6 rule 4), computed once and kept in `Game.ai[1]`: the tile
+ *  halfway between the red Town Center and the map centre. Stored rather than recomputed because
+ *  the brain slot is what `encodeState` / `decodeState` already save (A2), and a rally that moved
+ *  every tick would have the army walk in circles; `aiTickDue` owns that slot's clock and this
+ *  field now lives beside it. */
+function aiRallyTile(Game, tc) {
+  const brain = Game.ai[1];
+  if (!brain.rally) {
+    brain.rally = { tx: Math.floor((tc.tx + Math.floor(Game.world.w / 2)) / 2),
+      ty: Math.floor((tc.ty + Math.floor(Game.world.h / 2)) / 2) };
+  }
+  return brain.rally;
+}
+
+/** A6 rule 4, asked every tick: a red fighter with no order is given the `move` order
+ *  `issueOrder` (`src/commands.js`) gives a fighter it selects — `{ kind, x, y }`, here the
+ *  rally tile's centre, the same anchor `canPlaceAt`, `aiPad` and `aiFarWorkers` work from — so
+ *  the army gathers instead of standing on its own barracks. `aiAttackWave` still replaces it on
+ *  a wave (A2's rule, A8's to change), which is why the rally runs before the wave in `aiStep`,
+ *  and a garrisoned unit owns no order to fill. */
+function aiRally(Game, tc) {
+  const at = aiRallyTile(Game, tc);
+  const x = at.tx * CFG.TILE + CFG.TILE / 2, y = at.ty * CFG.TILE + CFG.TILE / 2;
+  let sent = 0;
+  for (const u of Game.units) {
+    if (u.dead || u.team !== 1 || u.garrisonedIn || u.kind === 'villager' || u.order.kind !== 'idle') continue;
+    u.order = { kind: 'move', x, y };
+    sent++;
+  }
+  return sent;
+}
+
 /** How big the village should be: `CFG.AI_VILLAGERS` (22), held down by the population the
  *  buildings actually allow — `min(CFG.AI_VILLAGERS, popCap(Game, 1))` — so the Town Center
  *  keeps one villager queued without ever asking for a sixth while red still lives in one
@@ -361,15 +481,18 @@ function aiAttackWave(Game) {
 /** The training decision, asked through `train` — the door A2 deletes `queueTrain` for
  *  (docs/TODO.md P1-21: that helper spent red gold and food and pushed onto the queue
  *  itself, so red fielded militia no row ever promised the player). Asking the command
- *  means asking what the building's row allows: a Town Center makes villagers, and until
- *  card A6 puts a Barracks up there is no fighter here to ask for. The queue is never
- *  double-filled, and an ask the stockpile cannot pay is refused by `train` — into
- *  Game.aiLog, where an enemy complaint belongs — instead of being half-paid here. */
-function aiTrain(Game, tc) {
-  if (tc.queue.length) return;
-  if ((BLD[tc.kind].trains || []).indexOf('villager') < 0) return;
-  if (!canAfford(Game, 1, KINDS.villager.cost)) return;
-  train(Game, tc, 'villager');
+ *  means asking what the building's row allows: a Town Center makes villagers — the kind A2
+ *  hardcoded and still the only one `aiWantsVillager` asks for, so A6 makes it the default
+ *  rather than the only answer — while `aiTrainArmy` asks the same door for the military rows
+ *  through `CFG.AI_ARMY`. The queue is never double-filled, and an ask the stockpile cannot pay
+ *  is refused by `train` — into Game.aiLog, where an enemy complaint belongs — instead of being
+ *  half-paid here. */
+function aiTrain(Game, b, kind = 'villager') {
+  if (b.queue.length) return false;
+  if ((BLD[b.kind].trains || []).indexOf(kind) < 0) return false;
+  if (!canAfford(Game, 1, KINDS[kind].cost)) return false;
+  train(Game, b, kind);
+  return true;
 }
 
 function nearestEnemy(Game, team) {

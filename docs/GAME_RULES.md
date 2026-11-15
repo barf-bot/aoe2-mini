@@ -371,20 +371,44 @@ document: a wave is not a decision and a decision is not a wave (roadmap A2).
   whose berries are gone ploughs and says nothing about the mill until card A7 ages it up; asking
   `build` there would answer `Mill requires Feudal Age` into `Game.aiLog` once a second, the noise
   A4 spends its `canAfford` pre-check to avoid. Costs and footprints are `BLD.mill` / `BLD.farm`'s.
-- **Train** (`aiTrain`, `src/ai.js`) — one unit per tick while the village is smaller than
-  `min(CFG.AI_VILLAGERS, popCap(Game, team))` (`aiWantsVillager`, `src/ai.js`: A3 sets the
-  target at 22, and from A4 on the cap is what the village owns — the Town Center's 5 plus
-  every finished house — so the village stops only while a house is still going up), asked
-  through `train` (`src/commands.js`) like any other player's: the building's own `trains` row
-  is the law, so a Town Center queues `villager` and nothing else until a Barracks exists
-  (card A6). The removed `queueTrain` used to spend and push militia onto the Town Center queue
-  behind that row's back (docs/TODO.md P1-21). A building with a unit in its queue trains
+- **Armoury** (`aiBarracks` / `aiRange` / `aiArmySite`, `src/ai.js`, roadmap A6) — a village of
+  **12** living villagers — the number the card names and the only figure A6 authors besides
+  `CFG.AI_ARMY`, every cost, footprint and train time still the rows' — puts up a `barracks` on
+  the nearest ground `canPlaceAt` accepts beside the keep, one ever (finished or not, the same
+  guard A5's camps use), and once that barracks is *finished* and red is Feudal an
+  `archery_range`, also one ever. Both rows are Feudal, so their age is read from the row before
+  `build` is called (A5's `aiMill` rule) and a Dark Age village raises neither and writes no
+  `requires Feudal Age` line while it waits for card A7 to age it up. The crew is
+  `aiCrewFor`'s pool asked with no resource to prefer — a barracks belongs to the nearest hand
+  free for work, that helper's own last-resort answer — so a builder stays off the resource
+  columns the way A4 rules.
+- **Train** (`aiTrain` / `aiTrainArmy` / `aiArmyRanked`, `src/ai.js`) — one unit per tick per
+  building while the village is smaller than `min(CFG.AI_VILLAGERS, popCap(Game, team))`
+  (`aiWantsVillager`, `src/ai.js`: A3 sets the target at 22, and from A4 on the cap is what the
+  village owns — the Town Center's 5 plus every finished house — so the village stops only while
+  a house is still going up), asked through `train` (`src/commands.js`) like any other player's:
+  the building's own `trains` row is the law (docs/TODO.md P1-21 — the removed `queueTrain` used
+  to spend and push militia onto the Town Center queue behind that row's back), so a Town Center
+  queues `villager` and a barracks `militia`. A6 replaces the single kind A2 hardcoded there with
+  the authored `CFG.AI_ARMY`: `aiArmyRanked` orders the army's kinds by how far below their share
+  of red's **living and queued** fighters each is (**.6** militia, **.4** archer) and
+  `aiTrainArmy` asks every finished red building for the ranked kind its own row allows — militia
+  from a barracks, archers from an archery range, nothing from a house or a mill — and stops
+  while red has no population slot left, the wall `train` itself enforces, asked quietly first
+  for the same reason A4 and A5 pre-check their costs. A building with a unit in its queue trains
   nothing more, and a half-built enemy Town Center caps nobody, trains nobody and sends no wave
   (docs/TODO.md P1-9).
+- **Rally** (`aiRally` / `aiRallyTile`, `src/ai.js`, roadmap A6) — `Game.ai[1].rally` is the tile
+  halfway between the red Town Center and the map centre, computed on the first tick that needs
+  it and never again: the brain slot is what `encodeState` / `decodeState` save (A2), and a
+  rally tile that moved every second would have the army walk in circles. Every red fighter with
+  no order is given the `move` order `issueOrder` (`src/commands.js`) gives a selected fighter,
+  to that tile's centre, so trained units gather instead of standing on their own barracks.
 - **Fight** (`aiAttackWave`, `src/ai.js`) — at population cap, every militia holding no live
   order is sent at the closest blue unit (`nearestEnemy`, `src/ai.js`) and the village
   announces `Red attack wave!` through `toast` with team 1, so it lands in `Game.aiLog` and
-  never over the player's toast line (the A1 rule, which A2 completes for this call).
+  never over the player's toast line (the A1 rule, which A2 completes for this call). A wave is
+  what replaces an A6 rally order; the army's own targeting is card A8's.
 
 ## Win / lose
 
@@ -402,7 +426,7 @@ clearing `result` back to `null`. No auto-restart, no countdown.
 
 ## Save / load
 
-The game remembers itself through one `localStorage` slot: `SAVE_PATH` (`src/config.js:291`) is the
+The game remembers itself through one `localStorage` slot: `SAVE_PATH` (`src/config.js:295`) is the
 key, `storageGet` / `storageSet` (`src/save.js:9` / `src/save.js:18`) the only door, and both
 answer quietly (`null` / `false`) when the platform has none or refuses the write — which is how
 node (`tools/headless-check.js`, `tools/render-preview.js`) and private mode keep running.

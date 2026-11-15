@@ -799,4 +799,234 @@ check(!a5millTwice.err && a5millTwice.once === a5millTwice.twice && a5millTwice.
   'buildings ' + a5millTwice.once + ' -> ' + a5millTwice.twice + ' mills=' + a5millTwice.mills +
   ' log=' + a5millTwice.log + (a5millTwice.err ? ' err=' + a5millTwice.err : ''));
 
+/* ---- 21. roadmap A6: military production -------------------------------- */
+/* A6 (docs/plans/2026-11-14-strix-local-roadmap.md §5, needs A5) — the village arms. Rule 1: a
+   `barracks` once 12 of its villagers are alive, one ever (finished or not), on the ground
+   `canPlaceAt` accepts beside the keep with `aiCrewFor`'s pool for a crew. Rule 2: an
+   `archery_range` once that barracks is FINISHED and red is Feudal — A7 is the card that ages
+   red up, and A6 honours the gate the way A5 honours `BLD.mill`'s: asked from the row before
+   `build` is called, so a Dark Age village never spends an `Archery Range requires Feudal Age`
+   line once a second. Rule 3: `CFG.AI_ARMY` (.6 militia / .4 archer, authored in
+   data/units.json beside `CFG.AI_SPLIT` like A5's three numbers) replaces the single kind A2
+   hardcoded in `aiTrain` — a finished building trains the trainable kind furthest below its
+   share of red's living+queued fighters, militia from a barracks and archers from an archery
+   range, still one unit per queue and still every answer on team 1. Rule 4: `Game.ai[1].rally`,
+   the tile halfway between the red Town Center and the map centre, computed once and saved with
+   the brain — a fighter with no order gets the `move` order `issueOrder` would give it to that
+   tile, and `aiAttackWave` still overrides it on a wave (A8's to change). No age logic (A7), no
+   wave or targeting change (A8), no defending (A9).
+   Both new rows are Feudal, so the field fixture — A5's authored field at the seeded map, the
+   roster topped to the 12 villagers rule 1 asks for and the four houses A4 would have raised by
+   then — is aged to Feudal exactly as A5's mill fixtures were; the Dark Age village is proved
+   silent instead of proved wrong. */
+const A6_VILLAGE = 12;                                  // rule 1's number: the village that arms
+const A6_PLAIN = { villagers: A6_VILLAGE, houses: 4 };  // and the population it would have raised
+const a6bld = (g, kind) => g.buildings.filter((b) => b.team === 1 && b.kind === kind);
+/** A6's fixture: `seed`'s village on A5's authored field (`a5wipe` + `a5put`, so the village has
+ *  wood, berries and gold to run on), `opts.villagers` living red villagers (the roster's four
+ *  plus `makeUnit` on the grass beside the keep, the `onMap` way), `opts.houses` finished red
+ *  houses, `opts.build` finished buildings of any kind, `opts.age` (1 — the barracks and the
+ *  range are Feudal rows) and the `rich` stockpile every A2-A5 fixture uses, so a cost is never
+ *  the answer a check reads. */
+function a6seed(seed, opts = {}) {
+  const g = AoE2.createState();
+  AoE2.resetGame(g, seed);
+  g.started = true;
+  g.age[1] = opts.age === undefined ? 1 : opts.age;
+  a5wipe(g);
+  for (const p of A5_FIELD) a5put(g, p[0], p[1], p[2], p[3]);
+  const tc = redTc(g), have = a3vill(g).length;
+  for (let i = have; i < opts.villagers; i++) {
+    const p = tileCentre(g, tc.tx + 1 + (i % 3), tc.ty + 4 + Math.floor(i / 3));
+    AoE2.makeUnit(g, 'villager', 1, p.x, p.y);
+  }
+  for (const k of [].concat(opts.houses ? Array.from({ length: opts.houses }, () => 'house') : [], opts.build || [])) {
+    const pad = freeSpotAround(g.world, g, tc.tx, tc.ty, AoE2.BLD[k].w, AoE2.BLD[k].h, 8);
+    const b = AoE2.makeBuilding(g, k, 1, pad.tx, pad.ty);
+    b.built = 1; b.hp = b.maxHp;
+  }
+  return rich(g);
+}
+/** One second of the army, read the way every A6 invariant is judged: which rows exist and are
+ *  finished (with the crew each unfinished one holds), who is alive and who is queued, the order
+ *  kinds the living fighters hold, the brain's rally tile and the population the rows allow. */
+function a6sample(g) {
+  const live = g.units.filter((u) => !u.dead && u.team === 1);
+  const fighters = live.filter((u) => u.kind !== 'villager');
+  const n = (arr, kind) => arr.filter((k) => k === kind).length;
+  const living = fighters.map((u) => u.kind);
+  const queued = [];
+  const queues = {};
+  let qmax = 0;
+  const qbad = [];
+  for (const b of g.buildings) {
+    if (b.team !== 1) continue;
+    const kinds = b.queue.map((x) => x.kind);
+    if (kinds.length > qmax) qmax = kinds.length;            // A2's one-per-building rule
+    for (const k of kinds) if ((AoE2.BLD[b.kind].trains || []).indexOf(k) < 0) qbad.push(b.kind + ':' + k);
+    if (kinds.length && !queues[b.kind]) queues[b.kind] = [...new Set(kinds)].sort().join('+');
+    if (b.built >= 1) queued.push(...kinds.filter((k) => k !== 'villager'));
+  }
+  const site = (kind) => a6bld(g, kind).map((b) => ({ done: b.built >= 1,
+    crew: g.units.filter((u) => !u.dead && u.order.kind === 'build' && u.order.b === b.id).length }));
+  const bar = site('barracks'), rng = site('archery_range');
+  const trains = {};
+  for (const b of g.buildings) if (b.team === 1 && b.built >= 1) for (const k of AoE2.BLD[b.kind].trains || []) trains[k] = 1;
+  const army = living.concat(queued);                     // rule 3's population: living + queued
+  return { t: Math.round(g.time), vills: live.length - fighters.length,
+    army: army.length, militia: n(living, 'militia'), archer: n(living, 'archer'),
+    armyMilitia: n(army, 'militia'), armyArcher: n(army, 'archer'),
+    stray: fighters.filter((u) => !trains[u.kind]).join(','),
+    idle: fighters.filter((u) => u.order.kind === 'idle').length,
+    move: fighters.filter((u) => u.order.kind === 'move').length,
+    attack: fighters.filter((u) => u.order.kind === 'attack').length,
+    barracks: bar.length, barracksDone: bar.filter((x) => x.done).length, barracksCrew: bar.map((x) => x.crew).join('+'),
+    ranges: rng.length, rangesDone: rng.filter((x) => x.done).length, rangesCrew: rng.map((x) => x.crew).join('+'),
+    queues: JSON.stringify(queues), qmax, qbad: qbad.join(','),
+    rally: JSON.stringify((g.ai || [])[1] && (g.ai || [])[1].rally),
+    tc: [redTc(g).tx, redTc(g).ty], cap: AoE2.popCap(g, 1), used: AoE2.popUsed(g, 1) };
+}
+/** `seconds` of the brain on that fixture, one CFG.AI_TICK per 30 steps, sampled every second. */
+function a6run(seed, opts, seconds) {
+  const g = a6seed(seed, opts);
+  const wood = g.res[1].wood;
+  const seen = [];
+  for (let i = 0; i < seconds; i++) { steps(g, 30); seen.push(a6sample(g)); }
+  return { seed: g.world.seed, spent: wood - g.res[1].wood, log: peek(g), seen, last: seen[seen.length - 1] };
+}
+/** the card's proof: `minutes` simulated minutes of the field fixture, sampled once a minute —
+ *  the a5watch shape and the same cost (15 minutes is 27000 fixed steps). */
+function a6watch(seed, opts, minutes) {
+  const g = a6seed(seed, opts);
+  const out = { seed: g.world.seed, samples: [] };
+  for (let i = 1; i <= minutes * 1800; i++) {
+    AoE2.stepSim(g, SIM_DT);
+    if (g.result) break;                                  // an ended game stops the clock
+    if (i % 1800 === 0) out.samples.push(a6sample(g));
+  }
+  return out;
+}
+/** the first fighter the AI's own barracks produces, the order it woke up with, and every rally
+ *  tile the brain ever held — one value is the rule (computed once, never recomputed). The window
+ *  is the two rows' own times: BLD.barracks.time of work before the site trains anything, then
+ *  KINDS.militia.time before the first fighter walks out. */
+function a6firstFighter(seed, opts) {
+  const g = a6seed(seed, opts);
+  const tc = redTc(g);
+  const seeded = g.units.filter((u) => !u.dead && u.team === 1 && u.kind !== 'villager').map((u) => u.id);
+  const rallies = new Set();
+  let unit = null;
+  for (let i = 0; i < 30 * (AoE2.BLD.barracks.time + AoE2.KINDS.militia.time + 3) && !unit; i++) {
+    AoE2.stepSim(g, SIM_DT);
+    if (g.result) break;
+    if (g.ai[1].rally) rallies.add(JSON.stringify(g.ai[1].rally));
+    const fresh = g.units.find((u) => !u.dead && u.team === 1 && u.kind === 'militia' && seeded.indexOf(u.id) < 0);
+    if (fresh && fresh.order.kind !== 'idle') unit = { kind: fresh.kind, order: fresh.order.kind, x: fresh.order.x, y: fresh.order.y };
+  }
+  const mid = { tx: Math.floor((tc.tx + Math.floor(g.world.w / 2)) / 2), ty: Math.floor((tc.ty + Math.floor(g.world.h / 2)) / 2) };
+  return { unit, rallies: rallies.size, rally: JSON.stringify(g.ai[1].rally), mid: JSON.stringify(mid),
+    at: [mid.tx * AoE2.CFG.TILE + AoE2.CFG.TILE / 2, mid.ty * AoE2.CFG.TILE + AoE2.CFG.TILE / 2] };
+}
+const a6field = attempt(() => a6watch(AoE2.CFG.SEED, A6_PLAIN, 15));
+const a6m15 = !a6field.err ? a6field.samples[14] : null;
+const a6twice = attempt(() => a6run(AoE2.CFG.SEED, A6_PLAIN, 2));                  // the barracks tick, then the tick after
+const a6dark = attempt(() => a6run(AoE2.CFG.SEED, { villagers: A6_VILLAGE, houses: 4, age: 0 }, 1));
+const a6range = attempt(() => a6run(AoE2.CFG.SEED,                  // a finished barracks and the camp its wood workers need
+  { villagers: A6_VILLAGE, houses: 4, build: ['barracks', 'lumber_camp'] }, 2));
+const a6fresh = attempt(() => a6firstFighter(AoE2.CFG.SEED, A6_PLAIN));
+
+// 34. the mix the card authors, the way AI_SPLIT / AI_VILLAGERS / AI_DROP_RADIUS are authored
+check(JSON.stringify(AoE2.CFG.AI_ARMY) === JSON.stringify({ militia: 0.6, archer: 0.4 }),
+  'a6: CFG.AI_ARMY is authored as .6 militia / .4 archer',
+  'AI_ARMY=' + JSON.stringify(AoE2.CFG.AI_ARMY));
+
+// 35. the card's number, read at simulated minute 15: at least five fighters, and every one of
+//     them a kind a FINISHED red building actually trains — a barracks' militia or a range's
+//     archer, never a unit the brain forged past the row the way queueTrain used to (P1-21).
+check(!a6field.err && a6field.samples.length === 15 && !!a6m15 && a6m15.army >= 5 &&
+      a6m15.barracksDone === 1 && a6m15.stray === '',
+  'a6: at simulated minute 15 the village fields 5+ fighters, all of them from a finished barracks\' trains row',
+  !a6field.err && !a6m15 ? 'no minute-15 sample' :
+    'army=' + (a6m15 ? a6m15.army : '-') + ' barracks_done=' + (a6m15 ? a6m15.barracksDone : '-') +
+    ' stray=' + (a6m15 ? JSON.stringify(a6m15.stray) : '-') + ' err=' + a6field.err);
+
+// 36. rule 1's second half — one barracks, ever, finished or not — and rule 2's other half: an
+//     unfinished barracks raises no archery range. The tick after the barracks goes up starts
+//     neither, and the site keeps exactly the one villager it was crewed with (A4's tally).
+check(!a6twice.err && a6twice.seen[0].barracks === 1 && a6twice.seen[1].barracks === 1 &&
+      a6twice.seen[1].barracksCrew === '1' && a6twice.seen[1].ranges === 0,
+  'a6: one barracks ever - the tick after it goes up starts no second one, and an unfinished barracks starts no range',
+  't1=' + (a6twice.seen ? JSON.stringify(a6twice.seen[0].barracks) : '-') +
+  ' t2=' + (a6twice.err ? '-' : JSON.stringify({ barracks: a6twice.seen[1].barracks,
+    crew: a6twice.seen[1].barracksCrew, ranges: a6twice.seen[1].ranges })) +
+  ' spent=' + (a6twice.err ? '-' : a6twice.spent) + '/' +
+  (a6twice.err ? '-' : AoE2.BLD.barracks.cost.wood + AoE2.BLD.lumber_camp.cost.wood) +
+  ' log=' + (a6twice.err ? a6twice.err : a6twice.log));
+
+// 37. the age gate, asked quietly (A5's mill rule, now on the military rows too): a Dark Age
+//     village of 12 villagers builds neither row and writes no `requires Feudal Age` line.
+const a6darkS = !a6dark.err ? a6dark.last : null;
+check(!a6dark.err && a6darkS.barracks === 0 && a6darkS.ranges === 0 &&
+      !a6dark.log.includes('Barracks requires') && !a6dark.log.includes('Archery Range requires'),
+  'a6: a Dark Age village raises no barracks and no archery range - and never asks, so the log stays clean',
+  'barracks=' + (a6darkS ? a6darkS.barracks : '-') + ' ranges=' + (a6darkS ? a6darkS.ranges : '-') +
+  ' spent=' + (a6dark.err ? '-' : a6dark.spent) + ' log=' + (a6dark.err ? a6dark.err : a6dark.log));
+
+// 38. rule 2, on the village that earned it: a finished barracks plus the camp its wood workers
+//     need (so the only 175 the tick spends on a 2x2 row is the range's own) raises exactly one
+//     archery range for BLD.archery_range's cost, crewed by one villager, and the tick after it
+//     starts no second one (the same one-ever guard the barracks rule uses).
+check(!a6range.err && a6range.seen[0].ranges === 1 && a6range.seen[0].rangesDone === 0 &&
+      a6range.seen[0].rangesCrew === '1' && a6range.seen[1].ranges === 1 &&
+      a6range.seen[0].barracks === 1,
+  'a6: a finished Feudal barracks raises one archery range, crewed by one villager, and never a second',
+  't1=' + (a6range.seen ? JSON.stringify([a6range.seen[0].ranges, a6range.seen[0].rangesDone,
+    a6range.seen[0].rangesCrew, a6range.seen[0].barracks]) : '-') +
+  ' t2=' + (a6range.seen ? JSON.stringify([a6range.seen[1].ranges, a6range.seen[1].rangesDone]) : '-') +
+  ' spent=' + (a6range.err ? '-' : a6range.spent) + '/' +
+  (a6range.err ? '-' : AoE2.BLD.archery_range.cost.wood) +
+  ' log=' + (a6range.err ? a6range.err : a6range.log));
+
+// 39. rule 3, the mix: .6 militia / .4 archer over the same 15-minute run, ±.1. The tolerance is
+//     the card's, not a fudge: the shares are what the two rows can be measured against once both
+//     exist, and the cadences (BLD.barracks trains a 21 s militia, BLD.archery_range a 35 s
+//     archer) put the running share at 35 / 56 = .625 — .025 from the authored .6.
+const a6share = (!a6field.err && a6m15 && a6m15.army)
+  ? Math.round((a6m15.armyMilitia / a6m15.army) * 1000) / 1000 : 0;
+check(!a6field.err && !!a6m15 && a6m15.army > 0 && a6m15.rangesDone === 1 &&
+      Math.abs(a6share - AoE2.CFG.AI_ARMY.militia) <= 0.1 &&
+      Math.abs((a6m15.armyArcher / a6m15.army) - AoE2.CFG.AI_ARMY.archer) <= 0.1,
+  'a6: the fighter mix trends to CFG.AI_ARMY (.6/.4, tolerance .1) once both rows are standing',
+  'militia=' + (a6m15 ? a6m15.armyMilitia : '-') + ' archer=' + (a6m15 ? a6m15.armyArcher : '-') +
+  ' share=' + a6share + ' army=' + (a6m15 ? a6m15.army : '-') +
+  ' ranges_done=' + (a6m15 ? a6m15.rangesDone : '-') + ' err=' + a6field.err);
+
+// 40. and what every one of those 15 minutes holds in its queues: a barracks queues militia, an
+//     archery range archers and a Town Center villagers — never another row's kind (docs/TODO.md
+//     P1-21's rule, which A6's mix must not break either) and never two units in one building
+//     (A2's short queue, kept by `aiTrain`), while at least one minute shows both military rows
+//     queuing at once — the moment rule 3 has two buildings to split between.
+const a6qBad = !a6field.err ? a6field.samples.filter((s) => s.qbad !== '').length : -1;
+const a6qLong = !a6field.err ? a6field.samples.filter((s) => s.qmax > 1).length : -1;
+const a6qBoth = !a6field.err ? a6field.samples.filter((s) => s.queues.includes('"barracks"') &&
+  s.queues.includes('"archery_range"')).length : 0;
+check(!a6field.err && a6qBad === 0 && a6qLong === 0 && a6qBoth >= 1,
+  'a6: every queue in the run holds its own row\'s kind, one at a time (barracks:militia, archery_range:archer)',
+  'wrong_kind=' + a6qBad + ' over_long=' + a6qLong + ' minutes_with_both=' + a6qBoth +
+  ' t15=' + (a6m15 ? a6m15.queues : '-') + ' err=' + a6field.err);
+
+// 41. rule 4: the fighter that walks out of the barracks wakes up with a `move` order to the
+//     rally tile — the exact shape `issueOrder` (src/commands.js) gives a selected fighter, not a
+//     new order kind — that tile is the stored midpoint between the red Town Center and the map
+//     centre, and the brain holds one value, not one per tick.
+const a6rallyValues = !a6field.err ? new Set(a6field.samples.map((s) => s.rally)).size : 0;
+check(!a6fresh.err && !!a6fresh.unit && a6fresh.unit.order === 'move' &&
+      a6fresh.unit.x === a6fresh.at[0] && a6fresh.unit.y === a6fresh.at[1] &&
+      a6fresh.rally === a6fresh.mid && a6fresh.rallies === 1 &&
+      !a6field.err && a6rallyValues === 1,
+  'a6: a trained fighter\'s order is a move to Game.ai[1].rally, the stored TC-map-centre midpoint',
+  'unit=' + (a6fresh.unit ? JSON.stringify(a6fresh.unit) : 'none') + ' rally=' + a6fresh.rally +
+  ' expected=' + a6fresh.mid + ' values=' + a6fresh.rallies +
+  ' field_values=' + a6rallyValues + ' err=' + a6fresh.err + '/' + a6field.err);
+
 report();
